@@ -513,6 +513,64 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- T11: list_receivable_items() — narrow picker RPC (id + name + unit
+-- symbol only; no cost columns), tenant-isolated, role-checked
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_count int;
+  v_names text[];
+  v_symbols text[];
+  v_msg text;
+  v_argnames text[];
+begin
+  -- Staff of A: sees active own-restaurant items only (Rice, Sugar —
+  -- name-ordered; OldOil is inactive, Flour belongs to restaurant B).
+  perform set_config('request.jwt.claims',
+    '{"sub":"e4e4e4e4-e4e4-4e4e-8e4e-e4e4e4e4e4e4","restaurant_id":"e0e0e0e0-e0e0-4e0e-8e0e-e0e0e0e0e0e0","role":"staff"}',
+    true);
+
+  select array_agg(t.item_name order by t.item_name), array_agg(t.unit_symbol order by t.item_name)
+    into v_names, v_symbols
+    from public.list_receivable_items() t;
+  perform pg_temp.assert_true('T11: staff sees Rice + Sugar via RPC',
+    v_names = array['Rice','Sugar']);
+  perform pg_temp.assert_true('T11: unit symbols come through',
+    v_symbols = array['kg','kg']);
+
+  select count(*) into v_count from public.list_receivable_items();
+  perform pg_temp.assert_true('T11: exactly 2 rows (inactive + cross-restaurant excluded)',
+    v_count = 2);
+
+  -- The RPC returns exactly three columns — avg_unit_cost cannot leak.
+  select proargnames into v_argnames from pg_proc
+   where proname = 'list_receivable_items' and pg_function_is_visible(oid);
+  perform pg_temp.assert_true('T11: output columns are exactly id/name/symbol',
+    v_argnames = array['item_id','item_name','unit_symbol']);
+
+  -- Manager of A: same visibility.
+  perform set_config('request.jwt.claims',
+    '{"sub":"e3e3e3e3-e3e3-4e3e-8e3e-e3e3e3e3e3e3","restaurant_id":"e0e0e0e0-e0e0-4e0e-8e0e-e0e0e0e0e0e0","role":"manager"}',
+    true);
+  select count(*) into v_count from public.list_receivable_items();
+  perform pg_temp.assert_true('T11: manager sees the same 2 rows', v_count = 2);
+
+  -- Role-less session is rejected with a friendly error.
+  perform set_config('request.jwt.claims',
+    '{"sub":"e6e6e6e6-e6e6-4e6e-8e6e-e6e6e6e6e6e6","restaurant_id":"e0e0e0e0-e0e0-4e0e-8e0e-e0e0e0e0e0e0","role":""}',
+    true);
+  begin
+    perform public.list_receivable_items();
+    perform pg_temp.assert_true('T11: role-less session raises', false);
+  exception when raise_exception then
+    get stacked diagnostics v_msg = message_text;
+    perform pg_temp.assert_true('T11: role error is friendly',
+      v_msg like '%Only signed-in restaurant users%');
+  end;
+end $$;
+
+-- ---------------------------------------------------------------------------
 -- Cleanup: nothing to clean (single transaction rolls back)
 -- ---------------------------------------------------------------------------
 

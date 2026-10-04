@@ -204,3 +204,19 @@
 - Manual checklist: no dead links/placeholders; loading/empty/error/success states exist and are test-covered; role matrix enforced by guard + RPC + RLS (staff page access + staff RPC call tested); responsive via fieldset cards + wrapping totals, touch targets ≥44px (static verification — no browser in VM); refresh/deep-link safe (route registered).
 - Blockers: none new. B-001 (branding/credentials), B-002 (Docker), B-003 (no browser) still open.
 - Next task: P2-03 (RPC log_wastage / log_usage with reason codes + UI)
+
+## Run 14b — 2026-10-04 — P2-02 security follow-up (staff cost visibility)
+
+- What changed:
+  - `supabase/migrations/20261004174710_receivable_items_rpc.sql` — drops the `items_select_staff` RLS policy; new `list_receivable_items()` SECURITY DEFINER function returning exactly (item_id, item_name, unit_symbol) for active own-restaurant items, with tenant + owner/manager/staff role checks from JWT claims and a friendly error for role-less sessions; `grant execute … to authenticated`.
+  - `src/types/database.ts` regenerated via `gen:types:interim`.
+  - `src/api/stock.ts` — `listReceivableItems()` (Zod-parsed RPC rows → `{id, name, unitSymbol}`); the module header documents the no-cost-columns contract.
+  - `src/features/stock/hooks.ts` — `useReceivableItems` now delegates to `listReceivableItems` (query key moved to `stockQueryKey`).
+  - `src/features/stock/ReceivingPage.tsx` — picker options show name + unit only (no avg hint for anyone); success report's "Unit cost" and "Avg cost (old → new)" columns render for owner/manager only (staff see item/qty/movement). Line/receipt totals stay (computed from the user's own inputs).
+  - Tests: `src/api/stock.test.ts` (+4: RPC mapping, empty, friendly role error, malformed-row rejection); `src/features/stock/hooks.test.tsx` (picker delegates to the RPC, profile gating); `src/features/stock/ReceivingPage.test.tsx` (+1: staff success report hides cost columns; picker option has no avg); `supabase/tests/p1_01_items_rls_test.sql` (T3 rewritten: staff direct SELECT on `items` returns 0 rows again, writes still denied); `supabase/tests/p2_02_receive_goods_test.sql` (+T11, 7 assertions: staff/manager see Rice+Sugar only, inactive + cross-restaurant excluded, output columns exactly id/name/symbol, role-less rejected).
+  - ARCHITECTURE.md §7 row + §11 (new decision entry); FEATURE_MATRIX.md picker row corrected to `listReceivableItems`.
+- Gates: typecheck ✅ · lint ✅ (0 errors, 0 warnings) · test ✅ (287 passed, 33 files) · test:db ✅ (all suites incl. T11) · build ✅ · audit:wiring ✅ (44 rows, 6 api modules) · audit:routes static ✅ (live crawl deferred per B-003, banner shown, CI-gated)
+- Decisions made: RLS policies can't hide columns per role (single `authenticated` PG role), so staff item visibility moved from a policy to a narrow SECURITY DEFINER RPC — direct staff SELECT on `items` is denied again; "no costs for staff" now holds at the SQL level, not just in the UI. Narrow-picker RPC is the reuse pattern for P2-03 (usage/wastage) and P5 (counts). (Caught during coordinator verification of the P2-02 handoff: the page showed `avg_unit_cost` to staff and the picker fetched `SELECT *`.)
+- Manual checklist: no dead links/placeholders; staff report verified in unit test; role matrix enforced by guard + RPC + RLS (db-tested); responsive unchanged (report table already scrolls horizontally on small screens).
+- Blockers: none new. B-001 (branding/credentials), B-002 (Docker), B-003 (no browser) still open. Environment note: a VM restart mid-P2-02 wiped the pnpm global install and the PostgreSQL install (both live outside `~`); reinstalled pnpm 9.12.0 + postgresql-16, rebuilt `restaurant_inventory` from `scripts/interim-db-setup.sql` + all migrations, re-ran test:db green — recorded in `~/TOOLS.md`.
+- Next task: P2-03 (RPC log_wastage / log_usage with reason codes + UI)

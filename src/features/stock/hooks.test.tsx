@@ -3,8 +3,7 @@ import { renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/toast/ToastProvider";
-import { listItems } from "@/api/items";
-import { receiveGoods } from "@/api/stock";
+import { listReceivableItems, receiveGoods } from "@/api/stock";
 import { itemsQueryKey } from "@/features/items/hooks";
 import { stockQueryKey } from "@/features/items/stockHooks";
 import { useReceivableItems, useReceiveGoods } from "./hooks";
@@ -12,10 +11,8 @@ import { useReceivableItems, useReceiveGoods } from "./hooks";
 // The API modules are mocked: these tests verify hook wiring (delegation,
 // gating, invalidation, toasts) with zero network.
 vi.mock("@/api/stock", () => ({
+  listReceivableItems: vi.fn(),
   receiveGoods: vi.fn(),
-}));
-vi.mock("@/api/items", () => ({
-  listItems: vi.fn(),
 }));
 
 const { authState } = vi.hoisted(() => ({
@@ -33,7 +30,7 @@ vi.mock("@/features/auth/useAuth", () => ({
 }));
 
 const mockedReceiveGoods = vi.mocked(receiveGoods);
-const mockedListItems = vi.mocked(listItems);
+const mockedListReceivableItems = vi.mocked(listReceivableItems);
 
 let queryClient: QueryClient;
 
@@ -60,28 +57,26 @@ beforeEach(() => {
     restaurantId: "restaurant-1",
     role: "owner",
   };
-  mockedListItems.mockResolvedValue({ items: [], total: 0 });
+  mockedListReceivableItems.mockResolvedValue([]);
 });
 
 describe("useReceivableItems", () => {
-  it("lists active items name-sorted for the picker", async () => {
+  it("delegates to listReceivableItems (narrow id/name/unit picker rows)", async () => {
+    mockedListReceivableItems.mockResolvedValue([
+      { id: ITEM_ID, name: "Rice", unitSymbol: "kg" },
+    ]);
     const { result } = renderHook(() => useReceivableItems(), { wrapper });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(mockedListItems).toHaveBeenCalledWith(
-      expect.objectContaining({
-        page: 1,
-        pageSize: 100,
-        active: true,
-        sortColumn: "name",
-        sortDirection: "asc",
-      }),
-    );
+    expect(mockedListReceivableItems).toHaveBeenCalledWith();
+    expect(result.current.items).toEqual([
+      { id: ITEM_ID, name: "Rice", unitSymbol: "kg" },
+    ]);
   });
 
   it("does not query without a restaurant profile", () => {
     authState.profile = null;
     renderHook(() => useReceivableItems(), { wrapper });
-    expect(mockedListItems).not.toHaveBeenCalled();
+    expect(mockedListReceivableItems).not.toHaveBeenCalled();
   });
 });
 

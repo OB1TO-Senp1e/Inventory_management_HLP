@@ -66,6 +66,45 @@ export async function getCurrentStock(
   return toCurrentStock(currentStockRowSchema.parse(data));
 }
 
+export interface ReceivableItem {
+  id: string;
+  name: string;
+  unitSymbol: string;
+}
+
+const receivableItemRowSchema = z.object({
+  item_id: z.string().uuid(),
+  item_name: z.string(),
+  unit_symbol: z.string(),
+});
+
+function toReceivableItem(
+  row: z.infer<typeof receivableItemRowSchema>,
+): ReceivableItem {
+  return {
+    id: row.item_id,
+    name: row.item_name,
+    unitSymbol: row.unit_symbol,
+  };
+}
+
+/**
+ * List active items for stock-transaction pickers (receiving, usage/wastage,
+ * counts) via the `list_receivable_items` RPC. Returns ONLY id + name + unit
+ * symbol — deliberately no cost columns: staff use this picker, and the
+ * role matrix (§7) says staff see no costs. SECURITY DEFINER with
+ * tenant + role checks inside; direct `items` access stays RLS-governed.
+ */
+export async function listReceivableItems(): Promise<ReceivableItem[]> {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc("list_receivable_items");
+  if (error) {
+    throw new Error(error.message);
+  }
+  const rows = z.array(receivableItemRowSchema).parse(data);
+  return rows.map(toReceivableItem);
+}
+
 export interface OpeningBalanceResult {
   movementId: string;
 }

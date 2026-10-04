@@ -11,29 +11,29 @@ vi.mock("./hooks", () => ({
   useReceiveGoods: vi.fn(),
 }));
 
+const { authState } = vi.hoisted(() => ({
+  authState: {
+    profile: { role: "owner" } as { role: "owner" | "manager" | "staff" },
+  },
+}));
+
+vi.mock("@/features/auth/useAuth", () => ({
+  useAuth: () => ({ profile: authState.profile }),
+}));
+
 const mockedUseReceivableItems = vi.mocked(useReceivableItems);
 const mockedUseReceiveGoods = vi.mocked(useReceiveGoods);
 
 const ITEM_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const MOVEMENT_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc";
 
+// Narrow picker rows from list_receivable_items: id + name + unit symbol,
+// deliberately no cost columns (staff use this picker).
 const items = [
   {
     id: ITEM_ID,
     name: "Rice",
-    categoryId: null,
-    categoryName: null,
-    unitId: "unit-1",
-    unitName: "kilogram",
     unitSymbol: "kg",
-    storageLocationId: null,
-    storageLocationName: null,
-    parLevel: 10,
-    reorderPoint: 4,
-    active: true,
-    avgUnitCost: 40,
-    createdAt: "",
-    updatedAt: "",
   },
 ];
 
@@ -52,6 +52,7 @@ const mutate = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
+  authState.profile = { role: "owner" };
   mockedUseReceivableItems.mockReturnValue({
     items,
     isLoading: false,
@@ -185,5 +186,49 @@ describe("ReceivingPage", () => {
     expect(screen.getByText(/couldn't load items/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /retry/i }));
     expect(refetch).toHaveBeenCalled();
+  });
+
+  it("hides cost columns from staff in the success report (role matrix: no costs)", async () => {
+    authState.profile = { role: "staff" };
+    mutate.mockImplementation((_input, options) => {
+      options?.onSuccess?.(
+        {
+          lines: [
+            {
+              movementId: MOVEMENT_ID,
+              itemId: ITEM_ID,
+              quantity: 10,
+              unitCost: 50,
+              oldAvgCost: 40,
+              newAvgCost: 45,
+            },
+          ],
+        },
+        _input,
+        undefined,
+      );
+    });
+    render(<ReceivingPage />, { wrapper });
+
+    fireEvent.change(screen.getByLabelText("Item"), {
+      target: { value: ITEM_ID },
+    });
+    fireEvent.change(screen.getByLabelText(/quantity \(kg\)/i), {
+      target: { value: "10" },
+    });
+    fireEvent.change(screen.getByLabelText(/unit cost/i), {
+      target: { value: "50" },
+    });
+    // The picker shows name + unit only — no average cost hint for anyone.
+    expect(screen.getByRole("option", { name: "Rice (kg)" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /post receipt/i }));
+
+    await screen.findByText(/receipt posted to the stock ledger/i);
+    // Staff see item / qty / movement — never the RPC-returned costs.
+    expect(screen.queryByText("Unit cost")).not.toBeInTheDocument();
+    expect(screen.queryByText("Avg cost (old → new)")).not.toBeInTheDocument();
+    expect(screen.queryByText(/₹50\.00/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/₹40\.00/)).not.toBeInTheDocument();
+    expect(screen.getByText("Rice (kg)")).toBeInTheDocument();
   });
 });

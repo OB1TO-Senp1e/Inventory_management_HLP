@@ -1,8 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/toast/useToast";
 import { useAuth } from "@/features/auth/useAuth";
-import { listItems, type Item } from "@/api/items";
-import { receiveGoods, type ReceiveGoodsResult } from "@/api/stock";
+import {
+  listReceivableItems,
+  receiveGoods,
+  type ReceivableItem,
+  type ReceiveGoodsResult,
+} from "@/api/stock";
 import { itemsQueryKey } from "@/features/items/hooks";
 import { stockQueryKey } from "@/features/items/stockHooks";
 import type { ReceiveGoodsInput } from "@/schemas/stock";
@@ -10,11 +14,10 @@ import type { ReceiveGoodsInput } from "@/schemas/stock";
 /**
  * Receiving hooks (P2-02). Components never call the API module directly.
  *
- * `useReceivableItems` feeds the receipt line item picker: all active
- * items, name-sorted, one page of up to 100 (plenty for a single
- * restaurant's catalogue in v1). Staff see rows here thanks to the
- * `items_select_staff` policy (P2-02); the picker is their only item
- * surface — item management stays owner/manager-only.
+ * `useReceivableItems` feeds the receipt line item picker: active items as
+ * id + name + unit symbol via the `list_receivable_items` RPC — no cost
+ * columns, so staff (who use this picker per the role matrix) never see
+ * costs. Item management stays owner/manager-only.
  */
 
 function useRestaurantId(): string | null {
@@ -23,7 +26,7 @@ function useRestaurantId(): string | null {
 }
 
 export interface ReceivableItems {
-  items: Item[];
+  items: ReceivableItem[];
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;
@@ -32,19 +35,12 @@ export interface ReceivableItems {
 export function useReceivableItems(): ReceivableItems {
   const restaurantId = useRestaurantId();
   const query = useQuery({
-    queryKey: [...itemsQueryKey, "receivable"],
-    queryFn: () =>
-      listItems({
-        page: 1,
-        pageSize: 100,
-        active: true,
-        sortColumn: "name",
-        sortDirection: "asc",
-      }),
+    queryKey: [...stockQueryKey, "receivableItems"],
+    queryFn: () => listReceivableItems(),
     enabled: restaurantId !== null,
   });
   return {
-    items: query.data?.items ?? [],
+    items: query.data ?? [],
     isLoading: query.isLoading,
     isError: query.isError,
     refetch: () => {

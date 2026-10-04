@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseClient } from "@/lib/supabase";
-import { createOpeningBalance, getCurrentStock, receiveGoods } from "./stock";
+import { createOpeningBalance, getCurrentStock, listReceivableItems, receiveGoods } from "./stock";
 
 // No network in these tests: the client factory is mocked outright.
 vi.mock("@/lib/supabase", () => ({ getSupabaseClient: vi.fn() }));
@@ -270,5 +270,40 @@ describe("receiveGoods", () => {
     await expect(receiveGoods({ lines: [lineInput, lineInput] })).rejects.toThrow(
       "receive_goods: line 2",
     );
+  });
+});
+
+describe("listReceivableItems", () => {
+  const rpcRow = {
+    item_id: ITEM_ID,
+    item_name: "Rice",
+    unit_symbol: "kg",
+  };
+
+  it("calls the list_receivable_items RPC and maps rows", async () => {
+    mockRpc.mockResolvedValue({ data: [rpcRow], error: null });
+    const result = await listReceivableItems();
+    expect(mockRpc).toHaveBeenCalledWith("list_receivable_items");
+    expect(result).toEqual([{ id: ITEM_ID, name: "Rice", unitSymbol: "kg" }]);
+  });
+
+  it("returns an empty list when no active items exist", async () => {
+    mockRpc.mockResolvedValue({ data: [], error: null });
+    await expect(listReceivableItems()).resolves.toEqual([]);
+  });
+
+  it("surfaces RPC errors (e.g. role-less session rejected)", async () => {
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: "Only signed-in restaurant users can list receivable items." },
+    });
+    await expect(listReceivableItems()).rejects.toThrow(
+      "Only signed-in restaurant users",
+    );
+  });
+
+  it("rejects malformed rows before they reach components", async () => {
+    mockRpc.mockResolvedValue({ data: [{ item_id: "not-a-uuid" }], error: null });
+    await expect(listReceivableItems()).rejects.toThrow();
   });
 });

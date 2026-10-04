@@ -11,6 +11,7 @@ import {
 } from "@/schemas/stock";
 import type { ReceiveGoodsResult } from "@/api/stock";
 import { useReceivableItems, useReceiveGoods } from "./hooks";
+import { useAuth } from "@/features/auth/useAuth";
 
 const inputClass =
   "h-11 w-full rounded-md border border-input bg-background px-3 text-sm " +
@@ -56,6 +57,12 @@ export function ReceivingPage() {
   const receivable = useReceivableItems();
   const receiveGoods = useReceiveGoods();
   const [result, setResult] = useState<ReceiveGoodsResult | null>(null);
+  const { profile } = useAuth();
+  // Role matrix §7: staff see no costs. The receipt form's unit-cost input
+  // is typed by the user (not revealed by the app), but the RPC-returned
+  // costs in the success report are hidden from staff.
+  const canViewCosts =
+    profile?.role === "owner" || profile?.role === "manager";
 
   const {
     register,
@@ -126,8 +133,12 @@ export function ReceivingPage() {
               <tr className="border-b bg-muted/50 text-left">
                 <th className="px-4 py-3 font-medium">Item</th>
                 <th className="px-4 py-3 font-medium">Qty</th>
-                <th className="px-4 py-3 font-medium">Unit cost</th>
-                <th className="px-4 py-3 font-medium">Avg cost (old → new)</th>
+                {canViewCosts && (
+                  <>
+                    <th className="px-4 py-3 font-medium">Unit cost</th>
+                    <th className="px-4 py-3 font-medium">Avg cost (old → new)</th>
+                  </>
+                )}
                 <th className="px-4 py-3 font-medium">Movement</th>
               </tr>
             </thead>
@@ -140,11 +151,15 @@ export function ReceivingPage() {
                       {item ? `${item.name} (${item.unitSymbol})` : line.itemId}
                     </td>
                     <td className="px-4 py-3">{formatNumber(line.quantity)}</td>
-                    <td className="px-4 py-3">{formatINR(line.unitCost)}</td>
-                    <td className="px-4 py-3">
-                      {formatINR(line.oldAvgCost)} →{" "}
-                      {formatINR(line.newAvgCost)}
-                    </td>
+                    {canViewCosts && (
+                      <>
+                        <td className="px-4 py-3">{formatINR(line.unitCost)}</td>
+                        <td className="px-4 py-3">
+                          {formatINR(line.oldAvgCost)} →{" "}
+                          {formatINR(line.newAvgCost)}
+                        </td>
+                      </>
+                    )}
                     <td
                       className="px-4 py-3 font-mono text-xs text-muted-foreground"
                       title={line.movementId}
@@ -263,8 +278,7 @@ export function ReceivingPage() {
                           <option value="">Select an item…</option>
                           {receivable.items.map((item) => (
                             <option key={item.id} value={item.id}>
-                              {item.name} ({item.unitSymbol}) — avg{" "}
-                              {formatINR(item.avgUnitCost)}
+                              {item.name} ({item.unitSymbol})
                             </option>
                           ))}
                         </select>
@@ -305,11 +319,6 @@ export function ReceivingPage() {
                           min="0"
                           step="any"
                           className={inputClass}
-                          placeholder={
-                            selectedItem
-                              ? `Avg ${formatINR(selectedItem.avgUnitCost)}`
-                              : undefined
-                          }
                           disabled={isSubmitting}
                           {...register(`lines.${index}.unitCost`)}
                         />

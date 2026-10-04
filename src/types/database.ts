@@ -511,6 +511,14 @@ export type Database = {
       gen_random_uuid: { Args: Record<PropertyKey, never>; Returns: string };
       gen_salt: { Args: { "": string }; Returns: string };
       has_role: { Args: { p_required: string }; Returns: boolean };
+      list_receivable_items: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          item_id: string;
+          item_name: string;
+          unit_symbol: string;
+        }[];
+      };
       pgp_armor_headers: { Args: { "": string }; Returns: Record<string, unknown>[] };
       receive_goods: { Args: { p_lines: Json }; Returns: Json };
       set_preferred_supplier: {
