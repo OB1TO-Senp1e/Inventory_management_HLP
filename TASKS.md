@@ -1,0 +1,63 @@
+# TASKS.md — Ordered task list
+
+> One line per task: `- [STATUS] ID | Title | depends: <ids> | acceptance: <short testable criteria>`
+> Statuses: TODO, IN_PROGRESS, DONE, BLOCKED. One task per run: first TODO whose dependencies are DONE.
+
+## Phase 0 — Foundation
+
+- [TODO] P0-01 | Repo init: Vite + React + TS strict, Tailwind, shadcn/ui, ESLint, Prettier, pnpm scripts, .env.example | depends: — | acceptance: pnpm install && pnpm typecheck && pnpm lint && pnpm build all pass on fresh clone
+- [TODO] P0-02 | Supabase project setup: CLI config, migrations folder, type generation script, local dev README | depends: P0-01 | acceptance: supabase start works locally; pnpm gen:types produces src/types/database.ts; README documents local dev
+- [TODO] P0-03 | Core schema migration: restaurants, profiles (role), categories, storage locations, units + RLS helpers | depends: P0-02 | acceptance: migration applies cleanly; current_restaurant_id() and has_role() work; RLS denies cross-restaurant reads (db test)
+- [TODO] P0-04 | Auth: sign in, sign out, password reset, session persistence, protected routes, role guard | depends: P0-03 | acceptance: sign in/out/reset flows pass on 390px+1280px; unauthenticated route redirects; role guard blocks staff from /reports
+- [TODO] P0-05 | AppShell: responsive layout, navigation per role, breadcrumbs, toast system, error boundary, 404 page, theme tokens | depends: P0-04 | acceptance: nav renders per role; 404 page shows on unknown route; no overflow at 360/768/1280
+- [TODO] P0-06 | Audit tooling: audit-routes.ts, audit-wiring.ts, Playwright config with 3 role fixtures, CI workflow | depends: P0-05 | acceptance: pnpm audit:routes and pnpm audit:wiring run and fail correctly on a deliberate gap; CI runs all gates
+- [TODO] P0-07 | Seed data and test users (one per role) | depends: P0-03 | acceptance: seed.sql loads 1 restaurant, 3 users (owner/manager/staff), sample categories/locations/units; dev login documented
+
+## Phase 1 — Items and suppliers
+
+- [TODO] P1-01 | Items: schema, CRUD UI, categories, units, par and reorder levels, archive | depends: P0-07 | acceptance: create/edit/archive item with validation; list has search/filter/sort/pagination/empty states; RLS per role tested
+- [TODO] P1-02 | Storage locations and categories management screens | depends: P1-01 | acceptance: CRUD for locations/categories; item form dropdowns reflect changes; delete blocked when in use (or archived)
+- [TODO] P1-03 | Suppliers: schema, CRUD UI, contact details | depends: P0-07 | acceptance: supplier CRUD with validation; list search/filter; archived suppliers hidden from PO prefill
+- [TODO] P1-04 | Supplier price list per item (with price history table) | depends: P1-01, P1-03 | acceptance: set price per item/supplier; history shows every change with date; preferred supplier flagged
+- [TODO] P1-05 | CSV import/export for items and suppliers with validation preview and error report | depends: P1-01, P1-03 | acceptance: import CSV previews row errors before commit; export downloads valid CSV; malformed file shows useful errors
+
+## Phase 2 — Stock ledger
+
+- [TODO] P2-01 | stock_movements schema, append-only enforcement, current_stock view, opening balance entry | depends: P1-01 | acceptance: UPDATE/DELETE on movements rejected (trigger+policy test); current_stock sums correctly; opening balance posts via RPC
+- [TODO] P2-02 | RPC receive_goods (batch, expiry, cost, weighted average) + receiving UI (ad hoc) | depends: P2-01 | acceptance: ad hoc receipt posts ledger rows, updates avg cost, shows batch/expiry; e2e receipt flow passes both viewports
+- [TODO] P2-03 | RPC log_wastage / log_usage with reason codes + UI | depends: P2-01 | acceptance: wastage/usage with reason code posts movement; staff can log; invalid qty rejected; reason required
+- [TODO] P2-04 | Item detail page: stock level, ledger history, batches, expiry | depends: P2-02, P2-03 | acceptance: detail shows live stock, paginated ledger, batch/expiry list; realtime update on new movement
+- [TODO] P2-05 | Stock overview screen: filter by category/location/low/expiring, realtime updates | depends: P2-04 | acceptance: filters combine correctly; low/expiring badges; realtime insert updates list without refresh
+
+## Phase 3 — Purchasing
+
+- [TODO] P3-01 | Purchase orders: schema, create/edit draft, line items, supplier prefill from price list | depends: P1-04, P2-01 | acceptance: draft PO with lines created; supplier prefill pulls latest price; totals in ₹ en-IN
+- [TODO] P3-02 | PO lifecycle: send, partial receive, full receive via receive_goods, cancel | depends: P3-01, P2-02 | acceptance: status transitions draft→sent→partially_received→received→cancelled enforced; partial receive updates remaining qty
+- [TODO] P3-03 | Reorder suggestions: items at/below reorder point grouped by preferred supplier, one-click draft PO | depends: P3-01, P2-05 | acceptance: suggestions list matches low-stock items; one click creates draft PO per supplier with correct lines
+- [TODO] P3-04 | PO print/PDF view | depends: P3-02 | acceptance: print view renders PO with totals/GST; browser print produces clean single-doc output
+
+## Phase 4 — Recipes, costing, sales
+
+- [TODO] P4-01 | Menu items and recipes: schema, builder UI, yield, unit conversion | depends: P1-01 | acceptance: recipe builder adds ingredients with qty/unit; yield set; unit conversion validated and tested
+- [TODO] P4-02 | Recipe costing: live cost per dish, food-cost %, selling price field | depends: P4-01, P2-02 | acceptance: cost per dish updates as ingredient costs change; food-cost % = cost/price; en-IN ₹ formatting
+- [TODO] P4-03 | RPC record_sales deducting stock via recipes + sales entry UI (per dish, per day) | depends: P4-01, P2-01 | acceptance: sales entry posts sale_deduction movements per ingredient; daily entry aggregates; e2e passes
+- [TODO] P4-04 | Insufficient stock handling on sale deduction (warn, allow with negative flag, audit) | depends: P4-03 | acceptance: selling beyond stock shows warning, allows with explicit confirm, flags movement and audit log entry
+
+## Phase 5 — Counts and reporting
+
+- [TODO] P5-01 | Stock counts: create, count sheet UI (mobile-optimised), save progress | depends: P2-05 | acceptance: count created and assigned; mobile sheet saves progress offline-tolerant; progress visible to manager
+- [TODO] P5-02 | Variance review and approval → RPC apply_stock_count posts adjustments | depends: P5-01, P2-01 | acceptance: variance = counted − expected shown; approve posts count_adjustment movements; staff cannot approve
+- [TODO] P5-03 | Dashboard: low stock, expiring soon, today's usage and wastage, stock value (owner/manager) | depends: P2-05, P2-03 | acceptance: dashboard cards match underlying queries; staff sees no costs; loads < 2s on seeded data
+- [TODO] P5-04 | Reports: usage, wastage by reason, food cost trend, supplier price changes; date filters; CSV export | depends: P4-02, P2-03 | acceptance: each report filters by date; CSV export downloads; charts render with empty state
+- [TODO] P5-05 | Audit log screen (owner only) | depends: P0-04 | acceptance: sensitive actions listed with actor/time; staff/manager blocked by RLS; filter by action/date
+- [TODO] P5-06 | User management (owner): invite, change role, deactivate | depends: P0-04 | acceptance: owner invites/changes role/deactivates; deactivated user cannot sign in; audit entry written
+
+## Phase 6 — Production hardening
+
+- [TODO] P6-01 | PWA: manifest, icons, service worker, install prompt, offline shell | depends: P0-05 | acceptance: Lighthouse PWA checks pass; install prompt works; offline shell loads cached app shell
+- [TODO] P6-02 | Offline queue for wastage/usage/receiving with conflict-safe sync and visible sync status | depends: P6-01, P2-02, P2-03 | acceptance: actions queued offline sync on reconnect; conflicts resolved safely; sync status visible
+- [TODO] P6-03 | Performance pass: indexes review, query review, bundle splitting, Lighthouse ≥ 90 on mobile | depends: P5-04 | acceptance: Lighthouse mobile ≥ 90; slow queries have indexes; bundle split verified in build output
+- [TODO] P6-04 | Security pass: RLS review for every table and RPC, input validation, rate limiting on edge functions, dependency audit | depends: P5-06 | acceptance: RLS matrix re-tested for all roles; pnpm audit clean or documented; validation fuzz passes
+- [TODO] P6-05 | Full regression: every route, every role, every flow, on mobile and desktop | depends: P6-04 | acceptance: all route + wiring audits green; e2e suite passes on 390px and 1280px for all roles
+- [TODO] P6-06 | Deployment: Vercel project, Supabase production project, env config, migration runbook, backup policy, README | depends: P6-05 | acceptance: production URL live; migrations runbook executed once cleanly; README covers setup+deploy+rollback
+- [TODO] P6-07 | Handover: user guide per role (short, with screenshots), admin guide, known limitations | depends: P6-06 | acceptance: guides exist in docs/ per role; screenshots current; limitations listed honestly
