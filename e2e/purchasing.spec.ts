@@ -162,3 +162,55 @@ test.describe("PO lifecycle (P3-02)", () => {
     });
   });
 });
+
+test.describe("PO print view (P3-04)", () => {
+  test.describe("as owner", () => {
+    test.use({ role: "owner" });
+
+    test("detail page links to the print view", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/purchase-orders/d0000000-0000-0000-0000-000000000001");
+      const printLink = page.getByRole("link", { name: /print/i });
+      await expect(printLink).toBeVisible();
+      await expect(printLink).toHaveAttribute(
+        "href",
+        "/purchase-orders/d0000000-0000-0000-0000-000000000001/print",
+      );
+    });
+
+    test("print view renders the document with totals and GST", async ({ page }) => {
+      await stubBackend(page);
+      // Stubbed draft PO: 10×32.5 + 5×58 = ₹615 subtotal, 18% GST.
+      await page.goto("/purchase-orders/d0000000-0000-0000-0000-000000000001/print");
+      await expect(
+        page.getByRole("article", { name: /purchase order/i }),
+      ).toBeVisible();
+      // Restaurant (buyer) and supplier blocks.
+      await expect(page.getByRole("heading", { name: "Testaurant" })).toBeVisible();
+      await expect(page.getByText("Fresh Farms Produce", { exact: true }).first()).toBeVisible();
+      await expect(page.getByText(/GSTIN: 27ABCDE1234F1Z5/)).toBeVisible();
+      // Lines with snapshotted prices.
+      await expect(page.getByText("₹615.00")).toBeVisible();
+      // GST section: 615 × 18% = 110.70, grand total 725.70.
+      await expect(page.getByText("GST (18%)")).toBeVisible();
+      await expect(page.getByText("₹110.70")).toBeVisible();
+      await expect(page.getByText("₹725.70")).toBeVisible();
+    });
+
+    test("print view without a backend shows the error state", async ({ page }) => {
+      await page.goto("/purchase-orders/d0000000-0000-0000-0000-000000000001/print");
+      await expect(page.getByRole("alert")).toHaveText(/could not load/i, {
+        timeout: 20000,
+      });
+    });
+  });
+
+  test.describe("as staff", () => {
+    test.use({ role: "staff" });
+
+    test("staff is bounced off the print view (costs)", async ({ page }) => {
+      await page.goto("/purchase-orders/d0000000-0000-0000-0000-000000000001/print");
+      await expect(page).toHaveURL(/\/$/);
+    });
+  });
+});

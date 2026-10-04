@@ -15,6 +15,7 @@
 | `/suppliers/:id/prices` | `features/suppliers/SupplierPricesPage`       | owner, manager        | suppliers list | DONE | `e2e/prices.spec.ts`     |
 | `/purchase-orders`     | `features/purchasing/PurchaseOrdersPage`      | owner, manager        | AppShell nav | DONE   | `e2e/purchasing.spec.ts` |
 | `/purchase-orders/:id` | `features/purchasing/PurchaseOrderDetailPage` | owner, manager        | PO list      | DONE   | `e2e/purchasing.spec.ts` |
+| `/purchase-orders/:id/print` | `features/purchasing/PurchaseOrderPrintPage` | owner, manager        | PO detail    | DONE   | `e2e/purchasing.spec.ts` |
 | `/receiving`           | `features/stock/ReceivingPage`                | owner, manager, staff | AppShell nav | DONE   | `e2e/stock.spec.ts`      |
 | `/stock`               | `features/stock/StockOverviewPage`            | owner, manager        | AppShell nav | DONE   | `e2e/stock.spec.ts`      |
 | `/wastage`             | `features/stock/WastagePage`                  | owner, manager, staff | AppShell nav | DONE   | `e2e/stock.spec.ts`      |

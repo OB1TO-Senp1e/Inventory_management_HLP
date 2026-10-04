@@ -41,3 +41,54 @@
       sans-serif;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Print stylesheet (P3-04) — purchase order document.
+ *
+ * The print page (`PurchaseOrderPrintPage`) renders inside the normal
+ * AppShell; these rules strip the chrome (nav, sidebar, buttons, toasts)
+ * so window.print() yields a clean single document. Sections marked
+ * `.po-avoid-break` never split across pages; table rows may break between
+ * rows but never inside one.
+ * ------------------------------------------------------------------------- */
+@media print {
+  /* Hide everything the document does not need. */
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* AppShell chrome: nav/sidebar live outside the <article>, but belt and
+     braces — anything explicitly marked no-print stays out. */
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 12pt;
+  }
+
+  .po-document {
+    box-shadow: none !important;
+  }
+
+  .po-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .po-lines tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .po-lines thead {
+    break-inside: avoid;
+  }
+
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+}

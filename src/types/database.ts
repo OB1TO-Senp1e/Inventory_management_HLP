@@ -219,6 +219,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           expected_date: string | null;
+          gst_rate: number;
           id: string;
           notes: string | null;
           order_date: string;
@@ -231,6 +232,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           expected_date?: string | null;
+          gst_rate?: number;
           id?: string;
           notes?: string | null;
           order_date?: string;
@@ -243,6 +245,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           expected_date?: string | null;
+          gst_rate?: number;
           id?: string;
           notes?: string | null;
           order_date?: string;
@@ -620,6 +623,7 @@ export type Database = {
       };
     };
     Functions: {
+      cancel_purchase_order: { Args: { p_po_id: string }; Returns: undefined };
       create_opening_balance: {
         Args: { p_item_id: string; p_quantity: number; p_unit_cost: number };
         Returns: string;
@@ -627,6 +631,7 @@ export type Database = {
       create_purchase_order: {
         Args: {
           p_expected_date: string;
+          p_gst_rate?: number;
           p_lines: Json;
           p_notes: string;
           p_order_date: string;
@@ -656,7 +661,12 @@ export type Database = {
         Returns: string;
       };
       pgp_armor_headers: { Args: { "": string }; Returns: Record<string, unknown>[] };
-      receive_goods: { Args: { p_lines: Json }; Returns: Json };
+      receive_goods: {
+        Args: { p_lines: Json; p_reference_id?: string; p_reference_type?: string };
+        Returns: Json;
+      };
+      receive_purchase_order: { Args: { p_lines: Json; p_po_id: string }; Returns: Json };
+      send_purchase_order: { Args: { p_po_id: string }; Returns: undefined };
       set_preferred_supplier: {
         Args: { p_item_id: string; p_supplier_id: string };
         Returns: {

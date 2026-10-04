@@ -65,6 +65,7 @@ export function PurchaseOrderDialog({ onClose }: { onClose: () => void }) {
       orderDate: new Date().toISOString().slice(0, 10),
       expectedDate: undefined,
       notes: undefined,
+      gstRate: 0,
     },
   });
 
@@ -255,6 +256,22 @@ export function PurchaseOrderDialog({ onClose }: { onClose: () => void }) {
                   {...register("notes")}
                 />
                 <FieldError id="po-notes-error" message={errors.notes?.message} />
+              </div>
+              <div>
+                <label htmlFor="po-gst-rate" className={labelClass}>
+                  GST rate <span className="font-normal text-muted-foreground\">(%, optional)</span>
+                </label>
+                <input
+                  id="po-gst-rate"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  className={inputClass}
+                  placeholder="0"
+                  {...register("gstRate")}
+                />
+                <FieldError id="po-gst-rate-error" message={errors.gstRate?.message} />
               </div>
             </div>
 

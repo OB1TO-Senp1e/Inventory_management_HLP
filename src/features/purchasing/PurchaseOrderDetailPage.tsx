@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, PackageCheck, Pencil, Plus, Send, Trash2, XCircle } from "lucide-react";
+import { ArrowLeft, PackageCheck, Pencil, Plus, Printer, Send, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -44,6 +44,7 @@ export function PurchaseOrderDetailPage() {
   const [editingHeader, setEditingHeader] = useState(false);
   const [expectedDate, setExpectedDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [gstRate, setGstRate] = useState("");
   const [lineToRemove, setLineToRemove] = useState<{ id: string; name: string } | null>(null);
   const [itemToAdd, setItemToAdd] = useState("");
   const [qtyToAdd, setQtyToAdd] = useState("1");
@@ -107,15 +108,22 @@ export function PurchaseOrderDetailPage() {
   const startHeaderEdit = () => {
     setExpectedDate(po.expectedDate ?? "");
     setNotes(po.notes ?? "");
+    setGstRate(String(po.gstRate ?? 0));
     setEditingHeader(true);
   };
 
   const saveHeader = () => {
+    const rate = gstRate.trim() === "" ? 0 : Number(gstRate);
+    if (!(rate >= 0) || !(rate <= 100)) {
+      notify("error", "GST rate must be between 0 and 100.");
+      return;
+    }
     updateMutation.mutate(
       {
         id: po.id,
         expectedDate: expectedDate === "" ? null : expectedDate,
         notes: notes.trim() === "" ? null : notes.trim(),
+        gstRate: rate,
       },
       { onSuccess: () => setEditingHeader(false) },
     );
@@ -222,11 +230,17 @@ export function PurchaseOrderDetailPage() {
         title={`Purchase order`}
         description={`${po.supplierName} · ordered ${formatDate(po.orderDate)}`}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" asChild className="min-h-[44px]">
               <Link to="/purchase-orders">
                 <ArrowLeft className="mr-1 size-4" aria-hidden="true" />
                 All orders
+              </Link>
+            </Button>
+            <Button variant="outline" asChild className="min-h-[44px]">
+              <Link to={`/purchase-orders/${po.id}/print`}>
+                <Printer className="mr-1 size-4" aria-hidden="true" />
+                Print
               </Link>
             </Button>
             {isDraft && !editingHeader && (
@@ -299,6 +313,21 @@ export function PurchaseOrderDetailPage() {
                 className={inputClass}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="po-edit-gst-rate" className={labelClass}>
+                GST rate (%)
+              </label>
+              <input
+                id="po-edit-gst-rate"
+                type="number"
+                min={0}
+                max={100}
+                step="0.01"
+                className={inputClass}
+                value={gstRate}
+                onChange={(e) => setGstRate(e.target.value)}
               />
             </div>
           </div>

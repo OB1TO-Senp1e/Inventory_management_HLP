@@ -51,6 +51,13 @@ export const purchaseOrderLineInputSchema = z.object({
 
 export type PurchaseOrderLineInput = z.infer<typeof purchaseOrderLineInputSchema>;
 
+/** GST percent applied to the PO subtotal on the print view (P3-04). Snapshotted at creation. */
+const gstRateSchema = z.coerce
+  .number()
+  .min(0, "GST rate cannot be negative.")
+  .max(100, "GST rate cannot exceed 100%.")
+  .default(0);
+
 /** Create a draft PO: supplier + dates + notes + at least one line. */
 export const createPurchaseOrderSchema = z.object({
   supplierId: uuidSchema,
@@ -64,6 +71,7 @@ export const createPurchaseOrderSchema = z.object({
     .trim()
     .max(1000, "Notes must be 1000 characters or fewer.")
     .optional(),
+  gstRate: gstRateSchema,
   lines: z
     .array(purchaseOrderLineInputSchema)
     .min(1, "A purchase order needs at least one line.")
@@ -87,6 +95,12 @@ export const updatePurchaseOrderSchema = z.object({
     .string()
     .trim()
     .max(1000, "Notes must be 1000 characters or fewer.")
+    .nullable()
+    .optional(),
+  gstRate: z.coerce
+    .number()
+    .min(0, "GST rate cannot be negative.")
+    .max(100, "GST rate cannot exceed 100%.")
     .nullable()
     .optional(),
 });

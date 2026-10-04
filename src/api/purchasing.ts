@@ -12,7 +12,7 @@ import {
 } from "@/schemas/purchaseOrder";
 
 /**
- * Purchasing API (P3-01, P3-02) — the ONLY module allowed to touch the
+ * Purchasing API (P3-01, P3-02, P3-04) — the ONLY module allowed to touch the
  * `purchase_orders` and `purchase_order_lines` tables. All inputs are
  * Zod-validated before any client call; all outputs are Zod-validated
  * before they reach components.
@@ -50,10 +50,15 @@ export interface PurchaseOrder {
   id: string;
   supplierId: string;
   supplierName: string;
+  supplierAddress: string | null;
+  supplierPhone: string | null;
+  supplierEmail: string | null;
+  supplierGstin: string | null;
   status: PurchaseOrderStatus;
   orderDate: string;
   expectedDate: string | null;
   notes: string | null;
+  gstRate: number;
   lineCount: number;
   total: number;
   createdAt: string;
@@ -62,10 +67,14 @@ export interface PurchaseOrder {
 
 export interface PurchaseOrderDetail extends PurchaseOrder {
   lines: PurchaseOrderLine[];
+  /** GST amount = total * gstRate / 100 (₹). */
+  gstAmount: number;
+  /** total + gstAmount (₹). */
+  grandTotal: number;
 }
 
 const PO_SELECT =
-  "id, supplier_id, status, order_date, expected_date, notes, created_at, updated_at, suppliers(name)";
+  "id, supplier_id, status, order_date, expected_date, notes, gst_rate, created_at, updated_at, suppliers(name, address, phone, email, gstin)";
 
 const poRowSchema = z.object({
   id: z.string(),
@@ -74,9 +83,16 @@ const poRowSchema = z.object({
   order_date: z.string(),
   expected_date: z.string().nullable(),
   notes: z.string().nullable(),
+  gst_rate: z.coerce.number(),
   created_at: z.string(),
   updated_at: z.string(),
-  suppliers: z.object({ name: z.string() }),
+  suppliers: z.object({
+    name: z.string(),
+    address: z.string().nullable(),
+    phone: z.string().nullable(),
+    email: z.string().nullable(),
+    gstin: z.string().nullable(),
+  }),
 });
 
 type PurchaseOrderRow = z.infer<typeof poRowSchema>;
@@ -86,10 +102,15 @@ function toPurchaseOrder(row: PurchaseOrderRow, lineCount: number, total: number
     id: row.id,
     supplierId: row.supplier_id,
     supplierName: row.suppliers.name,
+    supplierAddress: row.suppliers.address,
+    supplierPhone: row.suppliers.phone,
+    supplierEmail: row.suppliers.email,
+    supplierGstin: row.suppliers.gstin,
     status: row.status,
     orderDate: row.order_date,
     expectedDate: row.expected_date,
     notes: row.notes,
+    gstRate: row.gst_rate,
     lineCount,
     total,
     createdAt: row.created_at,
@@ -245,7 +266,12 @@ export async function getPurchaseOrder(rawId: unknown): Promise<PurchaseOrderDet
   const lines = z.array(lineRowSchema).parse(lineData).map(toPurchaseOrderLine);
 
   const total = lines.reduce((sum, l) => sum + l.lineTotal, 0);
-  return { ...toPurchaseOrder(po, lines.length, total), lines };
+  const poDetail = toPurchaseOrder(po, lines.length, total);
+  // Money math: round to paise (2dp) — GST and grand total derive from the
+  // snapshotted subtotal and rate so every consumer agrees.
+  const gstAmount = Math.round(total * (poDetail.gstRate / 100) * 100) / 100;
+  const grandTotal = Math.round((total + gstAmount) * 100) / 100;
+  return { ...poDetail, lines, gstAmount, grandTotal };
 }
 
 /**
@@ -262,6 +288,7 @@ export async function createPurchaseOrder(rawInput: unknown): Promise<string> {
     p_order_date: input.orderDate,
     p_expected_date: input.expectedDate ?? null,
     p_notes: input.notes ?? null,
+    p_gst_rate: input.gstRate ?? 0,
     p_lines: input.lines.map((l) => ({
       item_id: l.itemId,
       quantity: l.quantity,
@@ -281,10 +308,13 @@ export async function createPurchaseOrder(rawInput: unknown): Promise<string> {
 export async function updatePurchaseOrder(rawInput: unknown): Promise<void> {
   const input: UpdatePurchaseOrderInput = updatePurchaseOrderSchema.parse(rawInput);
   const client = getSupabaseClient();
-  const patch: { expected_date: string | null; notes: string | null } = {
+  const patch: { expected_date: string | null; notes: string | null; gst_rate?: number } = {
     expected_date: input.expectedDate ?? null,
     notes: input.notes?.trim() ? input.notes.trim() : null,
   };
+  if (input.gstRate !== undefined && input.gstRate !== null) {
+    patch.gst_rate = input.gstRate;
+  }
   const { error } = await client
     .from("purchase_orders")
     .update(patch)
@@ -559,4 +589,21 @@ export async function listReorderSuggestions(): Promise<
     group.lines.sort((a, b) => a.itemName.localeCompare(b.itemName));
   }
   return sorted;
+}
+
+/**
+ * The current restaurant's name, for the PO print header (P3-04).
+ * RLS (`restaurants_select_own`) restricts this to the caller's restaurant.
+ */
+export async function getRestaurantName(): Promise<string> {
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .from("restaurants")
+    .select("name")
+    .limit(1)
+    .single();
+  if (error) {
+    throw friendlyError(error);
+  }
+  return z.object({ name: z.string() }).parse(data).name;
 }

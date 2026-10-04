@@ -160,9 +160,16 @@ const PURCHASE_ORDERS = [
     order_date: "2026-10-05",
     expected_date: "2026-10-12",
     notes: "Weekly order",
+    gst_rate: 18,
     created_at: NOW,
     updated_at: NOW,
-    suppliers: { name: SUPPLIERS[0].name },
+    suppliers: {
+      name: SUPPLIERS[0].name,
+      address: SUPPLIERS[0].address,
+      phone: SUPPLIERS[0].phone,
+      email: SUPPLIERS[0].email,
+      gstin: SUPPLIERS[0].gstin,
+    },
   },
   {
     id: "d0000000-0000-0000-0000-000000000002",
@@ -171,9 +178,16 @@ const PURCHASE_ORDERS = [
     order_date: "2026-10-04",
     expected_date: "2026-10-11",
     notes: null,
+    gst_rate: 0,
     created_at: NOW,
     updated_at: NOW,
-    suppliers: { name: SUPPLIERS[0].name },
+    suppliers: {
+      name: SUPPLIERS[0].name,
+      address: SUPPLIERS[0].address,
+      phone: SUPPLIERS[0].phone,
+      email: SUPPLIERS[0].email,
+      gstin: SUPPLIERS[0].gstin,
+    },
   },
 ];
 
@@ -248,6 +262,7 @@ const TABLES: Record<string, Record<string, unknown>[]> = {
   "rpc:list_receivable_items": RECEIVABLE_ITEMS,
   purchase_orders: PURCHASE_ORDERS,
   purchase_order_lines: PURCHASE_ORDER_LINES,
+  restaurants: [{ id: R, name: "Testaurant", created_at: NOW, updated_at: NOW }],
 };
 
 /** Tiny PostgREST subset: eq/neq/ilike filters, limit/offset, content-range. */

@@ -103,7 +103,7 @@ export function AppShell() {
   return (
     <div className="min-h-dvh bg-background text-foreground">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r bg-card lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r bg-card print:hidden lg:flex">
         <div className="flex h-16 shrink-0 items-center border-b px-4">
           <Brand />
         </div>
@@ -152,9 +152,9 @@ export function AppShell() {
         </div>
       )}
 
-      <div className="flex min-h-dvh flex-col lg:pl-64">
+      <div className="flex min-h-dvh flex-col lg:pl-64 print:lg:pl-0">
         {/* Mobile top bar */}
-        <div className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-1 border-b bg-background px-4 lg:hidden">
+        <div className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-1 border-b bg-background px-4 print:hidden lg:hidden">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
@@ -168,7 +168,7 @@ export function AppShell() {
         </div>
 
         {/* Desktop header */}
-        <header className="sticky top-0 z-30 hidden h-16 shrink-0 items-center justify-between gap-4 border-b bg-background px-6 lg:flex">
+        <header className="sticky top-0 z-30 hidden h-16 shrink-0 items-center justify-between gap-4 border-b bg-background px-6 print:hidden lg:flex">
           <Breadcrumbs />
           <div className="flex shrink-0 items-center gap-3">
             <RoleBadge role={profile.role} />
@@ -176,9 +176,9 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="w-full flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mx-auto w-full max-w-6xl">
-            <div className="mb-4 lg:hidden">
+        <main className="w-full flex-1 px-4 py-6 print:p-0 sm:px-6 lg:px-8">
+          <div className="mx-auto w-full max-w-6xl print:max-w-none">
+            <div className="mb-4 print:hidden lg:hidden">
               <Breadcrumbs />
             </div>
             <Outlet />

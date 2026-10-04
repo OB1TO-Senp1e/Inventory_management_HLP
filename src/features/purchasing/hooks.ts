@@ -8,6 +8,7 @@ import {
   cancelPurchaseOrder,
   createPurchaseOrder,
   getPurchaseOrder,
+  getRestaurantName,
   listPurchaseOrders,
   listReorderSuggestions,
   receivePurchaseOrder,
@@ -54,6 +55,16 @@ export function usePurchaseOrder(id: string | null) {
     queryKey: [...purchaseOrdersQueryKey, "detail", id],
     queryFn: () => getPurchaseOrder(id as string),
     enabled: restaurantId !== null && id !== null,
+  });
+}
+
+/** Current restaurant's name, for the PO print header (P3-04). */
+export function useRestaurantName() {
+  const restaurantId = useRestaurantId();
+  return useQuery({
+    queryKey: [...purchaseOrdersQueryKey, "restaurant-name"],
+    queryFn: getRestaurantName,
+    enabled: restaurantId !== null,
   });
 }
 

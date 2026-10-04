@@ -30,6 +30,21 @@ describe("createPurchaseOrderSchema", () => {
   it("accepts a minimal valid draft", () => {
     const parsed = createPurchaseOrderSchema.parse(valid);
     expect(parsed.lines).toHaveLength(1);
+    expect(parsed.gstRate).toBe(0);
+  });
+
+  it("accepts an explicit GST rate", () => {
+    const parsed = createPurchaseOrderSchema.parse({ ...valid, gstRate: 18 });
+    expect(parsed.gstRate).toBe(18);
+  });
+
+  it("rejects out-of-range GST rates", () => {
+    expect(() =>
+      createPurchaseOrderSchema.parse({ ...valid, gstRate: -1 }),
+    ).toThrow(/cannot be negative/);
+    expect(() =>
+      createPurchaseOrderSchema.parse({ ...valid, gstRate: 101 }),
+    ).toThrow(/cannot exceed 100/);
   });
 
   it("rejects empty lines", () => {

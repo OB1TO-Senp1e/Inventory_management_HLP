@@ -17,6 +17,7 @@ export const routeAccess: Record<string, RouteAccess> = {
   "/suppliers/:id/prices": { roles: ["owner", "manager"] },
   "/purchase-orders": { roles: ["owner", "manager"] },
   "/purchase-orders/:id": { roles: ["owner", "manager"] },
+  "/purchase-orders/:id/print": { roles: ["owner", "manager"] },
   "/receiving": { roles: ["owner", "manager", "staff"] },
   "/stock": { roles: ["owner", "manager"] },
   "/wastage": { roles: ["owner", "manager", "staff"] },

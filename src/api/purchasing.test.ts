@@ -69,9 +69,16 @@ const poRow = {
   order_date: "2026-10-05",
   expected_date: null,
   notes: null,
+  gst_rate: 18,
   created_at: "2026-10-05T00:00:00Z",
   updated_at: "2026-10-05T00:00:00Z",
-  suppliers: { name: "Fresh Farms" },
+  suppliers: {
+    name: "Fresh Farms",
+    address: "APMC Market",
+    phone: "+91 98200 12345",
+    email: null,
+    gstin: "27ABCDE1234F1Z5",
+  },
 };
 
 const lineRow = {
@@ -134,6 +141,40 @@ describe("getPurchaseOrder", () => {
     expect(po.total).toBeCloseTo(325);
   });
 
+  it("computes GST amount and grand total from the snapshotted rate", async () => {
+    mockFrom
+      .mockReturnValueOnce(chainable({ data: poRow, error: null }))
+      .mockReturnValueOnce(chainable({ data: [lineRow], error: null }));
+
+    const po = await getPurchaseOrder(PO_ID);
+    expect(po.gstRate).toBe(18);
+    // 325 * 18% = 58.5, rounded to paise.
+    expect(po.gstAmount).toBeCloseTo(58.5);
+    expect(po.grandTotal).toBeCloseTo(383.5);
+  });
+
+  it("rounds GST to paise on awkward totals", async () => {
+    const awkwardLine = { ...lineRow, quantity: 3, unit_price: 33.33 };
+    mockFrom
+      .mockReturnValueOnce(chainable({ data: poRow, error: null }))
+      .mockReturnValueOnce(chainable({ data: [awkwardLine], error: null }));
+
+    const po = await getPurchaseOrder(PO_ID);
+    // 99.99 * 18% = 17.9982 → 18.00
+    expect(po.gstAmount).toBeCloseTo(18, 2);
+    expect(po.grandTotal).toBeCloseTo(117.99, 2);
+  });
+
+  it("exposes supplier details for the print view", async () => {
+    mockFrom
+      .mockReturnValueOnce(chainable({ data: poRow, error: null }))
+      .mockReturnValueOnce(chainable({ data: [lineRow], error: null }));
+
+    const po = await getPurchaseOrder(PO_ID);
+    expect(po.supplierAddress).toBe("APMC Market");
+    expect(po.supplierGstin).toBe("27ABCDE1234F1Z5");
+  });
+
   it("rejects invalid ids before any network call", async () => {
     await expect(getPurchaseOrder("not-a-uuid")).rejects.toThrow();
     expect(mockFrom).not.toHaveBeenCalled();
@@ -146,6 +187,7 @@ describe("createPurchaseOrder", () => {
     const id = await createPurchaseOrder({
       supplierId: SUPPLIER_ID,
       orderDate: "2026-10-05",
+      gstRate: 18,
       lines: [{ itemId: ITEM_ID, quantity: 10, unitPrice: 32.5 }],
     });
     expect(id).toBe(PO_ID);
@@ -154,10 +196,24 @@ describe("createPurchaseOrder", () => {
       p_order_date: "2026-10-05",
       p_expected_date: null,
       p_notes: null,
+      p_gst_rate: 18,
       p_lines: [
         { item_id: ITEM_ID, quantity: 10, unit_price: 32.5, notes: null },
       ],
     });
+  });
+
+  it("defaults gstRate to 0", async () => {
+    mockRpc.mockResolvedValue({ data: PO_ID, error: null });
+    await createPurchaseOrder({
+      supplierId: SUPPLIER_ID,
+      orderDate: "2026-10-05",
+      lines: [{ itemId: ITEM_ID, quantity: 10, unitPrice: 32.5 }],
+    });
+    expect(mockRpc).toHaveBeenCalledWith(
+      "create_purchase_order",
+      expect.objectContaining({ p_gst_rate: 0 }),
+    );
   });
 
   it("rejects empty lines before any network call", async () => {

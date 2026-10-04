@@ -90,7 +90,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         role="status"
         aria-live="polite"
         aria-label="Notifications"
-        className="pointer-events-none fixed inset-x-4 bottom-4 z-[100] flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:w-96"
+        className="pointer-events-none fixed inset-x-4 bottom-4 z-[100] flex flex-col gap-2 print:hidden sm:inset-x-auto sm:right-4 sm:w-96"
       >
         {toasts.map((toast) => (
           <ToastView key={toast.id} toast={toast} onDismiss={dismiss} />
