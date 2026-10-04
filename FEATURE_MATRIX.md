@@ -23,11 +23,22 @@
 | Edit item | `features/items/ItemDialog` | `getItem`, `updateItem` | `items` | owner, manager | `src/api/items.test.ts` |
 | Archive item (soft delete) | `features/items/ItemsPage` + `components/ConfirmDialog` | `archiveItem` | `items` | owner, manager | `src/api/items.test.ts` |
 | Item form lookups (categories, units, locations) | `features/items/ItemDialog` | `listItemCategories`, `listStorageLocations`, `listUnits` | `item_categories`, `storage_locations`, `units` | owner, manager | `src/api/items.test.ts` |
+| Settings: categories list (tabs, states) | `features/settings/SettingsPage`, `features/settings/TaxonomySection` | `listCategories` | `item_categories` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx`, `src/features/settings/SettingsPage.test.tsx` |
+| Create category | `features/settings/TaxonomyDialog` | `createCategory` | `item_categories` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx` |
+| Rename category | `features/settings/TaxonomyDialog` | `updateCategory` | `item_categories` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx` |
+| Archive category (soft delete) | `features/settings/TaxonomySection` + `components/ConfirmDialog` | `archiveCategory` | `item_categories` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx` |
+| Delete category (blocked when in use) | `features/settings/DeleteTaxonomyDialog` | `deleteCategory`, `countCategoryItems` | `item_categories`, `items` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx`, `supabase/tests/p1_02_taxonomy_test.sql` |
+| Settings: storage locations list (tabs, states) | `features/settings/SettingsPage`, `features/settings/TaxonomySection` | `listLocations` | `storage_locations` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx`, `src/features/settings/SettingsPage.test.tsx` |
+| Create storage location | `features/settings/TaxonomyDialog` | `createLocation` | `storage_locations` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx` |
+| Rename storage location | `features/settings/TaxonomyDialog` | `updateLocation` | `storage_locations` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx` |
+| Archive storage location (soft delete) | `features/settings/TaxonomySection` + `components/ConfirmDialog` | `archiveLocation` | `storage_locations` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx` |
+| Delete storage location (blocked when in use) | `features/settings/DeleteTaxonomyDialog` | `deleteLocation`, `countLocationItems` | `storage_locations`, `items` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx`, `supabase/tests/p1_02_taxonomy_test.sql` |
 
 ## Planned coverage (checklist, not yet rows)
 
 - [x] Auth: sign in/out/reset → `profiles` → unit tests done in P0-04a; live GoTrue e2e (`e2e/auth.spec.ts`) deferred to P0-04b
 - [x] Items CRUD → `items` → `supabase/tests/p1_01_items_rls_test.sql` (P1-01); e2e `e2e/items.spec.ts` (deterministic specs run everywhere, live CRUD in CI)
+- [x] Categories + storage locations management → `item_categories`, `storage_locations` → `supabase/tests/p1_02_taxonomy_test.sql` (P1-02: active flag, RESTRICT deletes, RLS); e2e `e2e/settings.spec.ts` (deterministic specs run everywhere, live CRUD in CI)
 - [ ] Suppliers + price list → `suppliers`, `supplier_prices` → e2e + db tests
 - [ ] Receiving (`receive_goods`) → `stock_movements` → RPC tests
 - [ ] Wastage/usage (`log_wastage`, `log_usage`) → `stock_movements` → RPC tests

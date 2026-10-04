@@ -26,6 +26,15 @@ import type {
 
 export const itemsQueryKey = ["items"] as const;
 
+/**
+ * Query keys for the item-form dropdown lookups. Exported so other features
+ * (e.g. settings/taxonomy management) can invalidate them when the
+ * underlying data changes — the item form must reflect creates, renames and
+ * archives immediately.
+ */
+export const itemCategoriesQueryKey = ["item-categories"] as const;
+export const storageLocationsQueryKey = ["storage-locations"] as const;
+
 function useRestaurantId(): string | null {
   const { profile } = useAuth();
   return profile?.restaurantId ?? null;
@@ -65,12 +74,12 @@ export function useItemLookups(): ItemLookups {
   const restaurantId = useRestaurantId();
   const enabled = restaurantId !== null;
   const categories = useQuery({
-    queryKey: ["item-categories"],
+    queryKey: itemCategoriesQueryKey,
     queryFn: listItemCategories,
     enabled,
   });
   const locations = useQuery({
-    queryKey: ["storage-locations"],
+    queryKey: storageLocationsQueryKey,
     queryFn: listStorageLocations,
     enabled,
   });

@@ -10,6 +10,7 @@ import { NotFoundPage } from "@/components/NotFoundPage";
 import { AppShell } from "@/components/layout/AppShell";
 import { HomePage } from "@/features/home/HomePage";
 import { ItemsPage } from "@/features/items/ItemsPage";
+import { SettingsPage } from "@/features/settings/SettingsPage";
 import { routeAccess } from "./access";
 import type { UserRole } from "@/schemas/role";
 
@@ -27,6 +28,7 @@ function isRoleEntry(entry: [string, { public: true } | { roles: UserRole[] }]):
  */
 const builtSections: Record<string, ReactNode> = {
   "/items": <ItemsPage />,
+  "/settings": <SettingsPage />,
 };
 
 /**

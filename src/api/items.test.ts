@@ -255,14 +255,19 @@ describe("lookups", () => {
     });
     const categories = await listItemCategories();
     expect(mockFrom).toHaveBeenCalledWith("item_categories");
+    expect(builder["eq"]).toHaveBeenCalledWith("active", true);
     expect(builder["order"]).toHaveBeenCalledWith("name");
     expect(categories).toEqual([{ id: "c1", name: "Vegetables" }]);
   });
 
   it("lists storage locations", async () => {
-    mockQuery({ data: [{ id: "l1", name: "Dry Store" }], error: null });
+    const builder = mockQuery({
+      data: [{ id: "l1", name: "Dry Store" }],
+      error: null,
+    });
     const locations = await listStorageLocations();
     expect(mockFrom).toHaveBeenCalledWith("storage_locations");
+    expect(builder["eq"]).toHaveBeenCalledWith("active", true);
     expect(locations).toEqual([{ id: "l1", name: "Dry Store" }]);
   });
 

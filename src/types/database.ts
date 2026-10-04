@@ -5,6 +5,7 @@ export type Database = {
     Tables: {
       item_categories: {
         Row: {
+          active: boolean;
           created_at: string;
           created_by: string | null;
           id: string;
@@ -13,6 +14,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          active?: boolean;
           created_at?: string;
           created_by?: string | null;
           id?: string;
@@ -21,6 +23,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          active?: boolean;
           created_at?: string;
           created_by?: string | null;
           id?: string;
@@ -173,6 +176,7 @@ export type Database = {
       };
       storage_locations: {
         Row: {
+          active: boolean;
           created_at: string;
           created_by: string | null;
           id: string;
@@ -181,6 +185,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          active?: boolean;
           created_at?: string;
           created_by?: string | null;
           id?: string;
@@ -189,6 +194,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          active?: boolean;
           created_at?: string;
           created_by?: string | null;
           id?: string;

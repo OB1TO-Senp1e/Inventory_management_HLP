@@ -226,12 +226,13 @@ const unitRowSchema = z.object({
   symbol: z.string(),
 });
 
-/** Categories for the item form dropdown (RLS scopes to the restaurant). */
+/** Categories for the item form dropdown (active only; RLS scopes to the restaurant). */
 export async function listItemCategories(): Promise<LookupOption[]> {
   const client = getSupabaseClient();
   const { data, error } = await client
     .from("item_categories")
     .select("id, name")
+    .eq("active", true)
     .order("name");
   if (error) {
     throw friendlyError(error);
@@ -239,12 +240,13 @@ export async function listItemCategories(): Promise<LookupOption[]> {
   return z.array(categoryRowSchema).parse(data);
 }
 
-/** Storage locations for the item form dropdown. */
+/** Storage locations for the item form dropdown (active only). */
 export async function listStorageLocations(): Promise<LookupOption[]> {
   const client = getSupabaseClient();
   const { data, error } = await client
     .from("storage_locations")
     .select("id, name")
+    .eq("active", true)
     .order("name");
   if (error) {
     throw friendlyError(error);
