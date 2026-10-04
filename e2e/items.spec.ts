@@ -31,9 +31,10 @@ test.describe("items access", () => {
       page,
     }) => {
       await page.goto("/items");
-      await expect(page.getByRole("alert")).toHaveText(
-        /could not load items/i,
-      );
+      // React Query retries (~7s backoff) before the error state renders.
+      await expect(page.getByRole("alert")).toHaveText(/could not load items/i, {
+        timeout: 20000,
+      });
       await expect(
         page.getByRole("button", { name: "Retry" }),
       ).toBeVisible();

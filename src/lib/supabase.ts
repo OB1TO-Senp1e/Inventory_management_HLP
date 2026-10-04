@@ -19,6 +19,12 @@ export function getSupabaseClient(): SupabaseClient {
       "Missing Supabase configuration. Copy .env.example to .env and set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.",
     );
   }
-  cachedClient = createClient(url, anonKey);
+  cachedClient = createClient(url, anonKey, {
+    // postgrest-js retries idempotent requests internally (3x with backoff).
+    // React Query is the designated retry layer (see main.tsx), so disable
+    // the hidden one — otherwise failures take ~35s (3x3 retries) to surface
+    // instead of ~7s, in the app and in e2e.
+    db: { retry: false },
+  });
   return cachedClient;
 }

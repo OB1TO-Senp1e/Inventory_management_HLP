@@ -7,6 +7,13 @@ import { defineConfig, devices } from "@playwright/test";
  * Role fixtures live in e2e/fixtures.ts and inject mocked sessions via the
  * test-only `ri.mockRole` localStorage hook (see src/api/auth.ts) — no live
  * GoTrue needed.
+ *
+ * Backend contract: `pnpm test:e2e` builds the app with a dummy Supabase URL
+ * (http://127.0.0.1:54321, nothing listens there), so data queries attempt
+ * real HTTP requests that fail deterministically with connection-refused.
+ * Specs that assert the no-backend UX wait out React Query's retries and
+ * check the error state; specs that need the real UI call
+ * `stubBackend(page)` (see e2e/stub-backend.ts) to serve canned rows.
  */
 export default defineConfig({
   testDir: "./e2e",

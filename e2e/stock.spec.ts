@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { stubBackend } from "./stub-backend";
 
 /**
  * Stock ledger spec (P2-01).
@@ -46,14 +47,16 @@ test.describe("opening balance access", () => {
   test.describe("as staff", () => {
     test.use({ role: "staff" });
 
-    test("opening-balance action is hidden from staff", async ({ page }) => {
+    test("staff cannot reach the items page (opening balance is owner/manager-only)", async ({
+      page,
+    }) => {
       await page.goto("/items");
-      await expect(page.getByRole("heading", { name: "Items" })).toBeVisible();
-      // The action must not render at all for staff (RLS is the enforcer;
-      // the UI additionally hides it).
+      // The route guard bounces staff to home — the action is unreachable,
+      // not merely hidden (RLS is the enforcer; the guard is the UI layer).
+      await expect(page).toHaveURL(/\/$/);
       await expect(
-        page.getByRole("button", { name: /set opening balance/i }),
-      ).toHaveCount(0);
+        page.getByRole("heading", { name: "Items" }),
+      ).not.toBeVisible();
     });
   });
 });
@@ -63,6 +66,7 @@ test.describe("receiving access", () => {
     test.use({ role: "owner" });
 
     test("receiving page renders the receipt form chrome", async ({ page }) => {
+      await stubBackend(page);
       await page.goto("/receiving");
       await expect(
         page.getByRole("heading", { name: "Receiving" }),
@@ -78,19 +82,12 @@ test.describe("receiving access", () => {
     test("receipt form validates before any network call", async ({
       page,
     }) => {
+      await stubBackend(page);
       await page.goto("/receiving");
-      // Without a backend the picker errors, so the form is absent; with a
-      // backend the empty submit shows inline errors. Either way no receipt
-      // is posted.
-      const postButton = page.getByRole("button", { name: /post receipt/i });
-      if (await postButton.isVisible()) {
-        await postButton.click();
-        await expect(page.getByRole("alert").first()).toBeVisible();
-      } else {
-        await expect(
-          page.getByRole("button", { name: /retry/i }),
-        ).toBeVisible();
-      }
+      // Empty submit: Zod rejects client-side, inline errors appear, and
+      // the stubbed backend sees no request.
+      await page.getByRole("button", { name: /post receipt/i }).click();
+      await expect(page.getByRole("alert").first()).toBeVisible();
     });
   });
 
@@ -156,6 +153,7 @@ test.describe("wastage access", () => {
     test.use({ role: "staff" });
 
     test("wastage page renders the quick-log form", async ({ page }) => {
+      await stubBackend(page);
       await page.goto("/wastage");
       await expect(
         page.getByRole("heading", { name: "Usage & wastage" }),
@@ -172,13 +170,10 @@ test.describe("wastage access", () => {
     });
 
     test("toggle switches the reason codes", async ({ page }) => {
+      await stubBackend(page);
       await page.goto("/wastage");
       const reason = page.getByLabel("Reason");
-      if (!(await reason.isVisible())) {
-        // Without a backend the picker errors; nothing to toggle.
-        await expect(page.getByRole("button", { name: /retry/i })).toBeVisible();
-        return;
-      }
+      await expect(reason).toBeVisible();
       await expect(
         reason.getByRole("option", { name: "Kitchen use" }),
       ).toBeAttached();
@@ -192,16 +187,11 @@ test.describe("wastage access", () => {
     });
 
     test("form validates before any network call", async ({ page }) => {
+      await stubBackend(page);
       await page.goto("/wastage");
-      const logButton = page.getByRole("button", { name: /log usage/i });
-      if (await logButton.isVisible()) {
-        await logButton.click();
-        await expect(page.getByRole("alert").first()).toBeVisible();
-      } else {
-        await expect(
-          page.getByRole("button", { name: /retry/i }),
-        ).toBeVisible();
-      }
+      // Empty submit: Zod rejects client-side and inline errors appear.
+      await page.getByRole("button", { name: /log usage/i }).click();
+      await expect(page.getByRole("alert").first()).toBeVisible();
     });
   });
 

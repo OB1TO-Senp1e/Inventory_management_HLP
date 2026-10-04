@@ -44,7 +44,10 @@ test.describe("settings access", () => {
       page,
     }) => {
       await page.goto("/settings");
-      await expect(page.getByRole("alert")).toHaveText(/could not load/i);
+      // React Query retries (~7s backoff) before the error state renders.
+      await expect(page.getByRole("alert")).toHaveText(/could not load/i, {
+        timeout: 20000,
+      });
       await expect(
         page.getByRole("button", { name: "Retry" }),
       ).toBeVisible();

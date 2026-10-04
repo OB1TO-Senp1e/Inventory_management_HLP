@@ -59,7 +59,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:db": "bash scripts/test-db.sh",
-    "test:e2e": "playwright test",
+    "test:e2e": "VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=e2e-dummy-key vite build && playwright test",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.e2e.json"
   },
   "type": "module",

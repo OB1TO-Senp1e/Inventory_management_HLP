@@ -29,9 +29,10 @@ test.describe("supplier price list access", () => {
       page,
     }) => {
       await page.goto("/suppliers/00000000-0000-0000-0000-000000000000/prices");
-      await expect(page.getByRole("alert")).toHaveText(
-        /could not load the price list/i,
-      );
+      // React Query retries (~7s backoff) before the error state renders.
+      await expect(page.getByRole("alert")).toHaveText(/could not load the price list/i, {
+        timeout: 20000,
+      });
       await expect(
         page.getByRole("button", { name: "Retry" }),
       ).toBeVisible();
