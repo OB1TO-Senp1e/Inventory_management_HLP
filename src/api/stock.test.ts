@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseClient } from "@/lib/supabase";
-import { createOpeningBalance, getCurrentStock, listReceivableItems, receiveGoods } from "./stock";
+import { createOpeningBalance, getCurrentStock, listReceivableItems, logUsage, logWastage, receiveGoods } from "./stock";
 
 // No network in these tests: the client factory is mocked outright.
 vi.mock("@/lib/supabase", () => ({ getSupabaseClient: vi.fn() }));
@@ -305,5 +305,109 @@ describe("listReceivableItems", () => {
   it("rejects malformed rows before they reach components", async () => {
     mockRpc.mockResolvedValue({ data: [{ item_id: "not-a-uuid" }], error: null });
     await expect(listReceivableItems()).rejects.toThrow();
+  });
+});
+
+describe("logWastage", () => {
+  const input = {
+    itemId: ITEM_ID,
+    quantity: 5,
+    reason: "spoiled",
+    notes: "smells off",
+  };
+
+  it("calls the log_wastage RPC with snake_case params", async () => {
+    mockRpc.mockResolvedValue({ data: MOVEMENT_ID, error: null });
+    const result = await logWastage(input);
+    expect(mockRpc).toHaveBeenCalledWith("log_wastage", {
+      p_item_id: ITEM_ID,
+      p_quantity: 5,
+      p_reason: "spoiled",
+      p_notes: "smells off",
+    });
+    expect(result).toEqual({ movementId: MOVEMENT_ID });
+  });
+
+  it("sends null for blank notes", async () => {
+    mockRpc.mockResolvedValue({ data: MOVEMENT_ID, error: null });
+    await logWastage({ ...input, notes: "" });
+    expect(mockRpc).toHaveBeenCalledWith(
+      "log_wastage",
+      expect.objectContaining({ p_notes: null }),
+    );
+  });
+
+  it("rejects zero quantity before any RPC call", async () => {
+    await expect(logWastage({ ...input, quantity: 0 })).rejects.toThrow(
+      "greater than zero",
+    );
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing reason before any RPC call", async () => {
+    await expect(
+      logWastage({ itemId: ITEM_ID, quantity: 1 }),
+    ).rejects.toThrow();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown reason code before any RPC call", async () => {
+    await expect(logWastage({ ...input, reason: "moldy" })).rejects.toThrow();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a usage reason code for wastage", async () => {
+    await expect(
+      logWastage({ ...input, reason: "kitchen_use" }),
+    ).rejects.toThrow();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces RPC errors verbatim", async () => {
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: "log_wastage: item 123 not found in your restaurant." },
+    });
+    await expect(logWastage(input)).rejects.toThrow("not found in your restaurant");
+  });
+});
+
+describe("logUsage", () => {
+  const input = {
+    itemId: ITEM_ID,
+    quantity: 2,
+    reason: "kitchen_use",
+  };
+
+  it("calls the log_usage RPC with snake_case params", async () => {
+    mockRpc.mockResolvedValue({ data: MOVEMENT_ID, error: null });
+    const result = await logUsage(input);
+    expect(mockRpc).toHaveBeenCalledWith("log_usage", {
+      p_item_id: ITEM_ID,
+      p_quantity: 2,
+      p_reason: "kitchen_use",
+      p_notes: null,
+    });
+    expect(result).toEqual({ movementId: MOVEMENT_ID });
+  });
+
+  it("rejects negative quantity before any RPC call", async () => {
+    await expect(logUsage({ ...input, quantity: -1 })).rejects.toThrow(
+      "greater than zero",
+    );
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a wastage reason code for usage", async () => {
+    await expect(logUsage({ ...input, reason: "expired" })).rejects.toThrow();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces RPC errors verbatim", async () => {
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: "log_usage: your role cannot log usage." },
+    });
+    await expect(logUsage(input)).rejects.toThrow("cannot log usage");
   });
 });

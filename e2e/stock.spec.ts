@@ -150,3 +150,87 @@ test.describe("receiving live flow", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("wastage access", () => {
+  test.describe("as staff", () => {
+    test.use({ role: "staff" });
+
+    test("wastage page renders the quick-log form", async ({ page }) => {
+      await page.goto("/wastage");
+      await expect(
+        page.getByRole("heading", { name: "Usage & wastage" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Usage", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Wastage", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: /log usage/i }),
+      ).toBeVisible();
+    });
+
+    test("toggle switches the reason codes", async ({ page }) => {
+      await page.goto("/wastage");
+      const reason = page.getByLabel("Reason");
+      if (!(await reason.isVisible())) {
+        // Without a backend the picker errors; nothing to toggle.
+        await expect(page.getByRole("button", { name: /retry/i })).toBeVisible();
+        return;
+      }
+      await expect(
+        reason.getByRole("option", { name: "Kitchen use" }),
+      ).toBeAttached();
+      await page.getByRole("button", { name: "Wastage", exact: true }).click();
+      await expect(
+        reason.getByRole("option", { name: "Expired" }),
+      ).toBeAttached();
+      await expect(
+        reason.getByRole("option", { name: "Kitchen use" }),
+      ).not.toBeAttached();
+    });
+
+    test("form validates before any network call", async ({ page }) => {
+      await page.goto("/wastage");
+      const logButton = page.getByRole("button", { name: /log usage/i });
+      if (await logButton.isVisible()) {
+        await logButton.click();
+        await expect(page.getByRole("alert").first()).toBeVisible();
+      } else {
+        await expect(
+          page.getByRole("button", { name: /retry/i }),
+        ).toBeVisible();
+      }
+    });
+  });
+
+  test.describe("as owner", () => {
+    test.use({ role: "owner" });
+
+    test("owner can open the wastage page", async ({ page }) => {
+      await page.goto("/wastage");
+      await expect(
+        page.getByRole("heading", { name: "Usage & wastage" }),
+      ).toBeVisible();
+    });
+  });
+});
+
+test.describe("wastage live flow", () => {
+  test.skip(!LIVE, "needs a live Supabase backend (E2E_LIVE_SUPABASE=1)");
+  test.use({ role: "staff" });
+
+  test("staff logs wastage with a reason code", async ({ page }) => {
+    // The receiving live flow creates the item; reuse the first picker row.
+    await page.goto("/wastage");
+    const itemSelect = page.getByLabel("Item");
+    await expect(itemSelect).toBeVisible();
+    await itemSelect.selectOption({ index: 1 });
+    await page.getByLabel(/quantity \(.+\)/i).fill("1");
+    await page.getByRole("button", { name: "Wastage", exact: true }).click();
+    await page.getByLabel("Reason").selectOption({ label: "Expired" });
+    await page.getByRole("button", { name: /log wastage/i }).click();
+    await expect(page.getByText("Wastage logged.")).toBeVisible();
+  });
+});

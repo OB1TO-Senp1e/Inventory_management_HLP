@@ -21,7 +21,7 @@ describe("getNavItems", () => {
 
   it("staff sees only the operational sections", () => {
     const labels = getNavItems("staff").map((i) => i.label);
-    expect(labels).toEqual(["Home", "Receiving", "Wastage", "Stock Counts"]);
+    expect(labels).toEqual(["Home", "Receiving", "Usage & wastage", "Stock Counts"]);
   });
 
   it("always starts with Home", () => {

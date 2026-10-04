@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseClient } from "@/lib/supabase";
-import { getCurrentProfile, getSession, resetPassword, signIn, signOut } from "./auth";
+import { getCurrentProfile, getSession, onAuthStateChange, resetPassword, signIn, signOut } from "./auth";
 
 // No network in these tests: the client factory is mocked outright.
 vi.mock("@/lib/supabase", () => ({ getSupabaseClient: vi.fn() }));
@@ -188,5 +188,14 @@ describe("mock role (test-only session mock)", () => {
     window.localStorage.setItem(KEY, "superadmin");
     mockAuth.getSession.mockResolvedValue({ data: { session: null }, error: null });
     await expect(getSession()).resolves.toBeNull();
+  });
+
+  it("returns a no-op subscription when the mock is active (never touches the client)", () => {
+    window.localStorage.setItem(KEY, "manager");
+    const callback = vi.fn();
+    const unsubscribe = onAuthStateChange(callback);
+    expect(mockedGetSupabaseClient).not.toHaveBeenCalled();
+    expect(callback).not.toHaveBeenCalled();
+    expect(() => unsubscribe()).not.toThrow();
   });
 });

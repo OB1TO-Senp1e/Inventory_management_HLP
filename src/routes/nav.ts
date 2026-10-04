@@ -33,7 +33,7 @@ export const allNavItems: NavItem[] = [
   { path: "/purchase-orders", label: "Purchase Orders", icon: ClipboardList },
   { path: "/receiving", label: "Receiving", icon: PackageCheck },
   { path: "/stock", label: "Stock", icon: Boxes },
-  { path: "/wastage", label: "Wastage", icon: Trash2 },
+  { path: "/wastage", label: "Usage & wastage", icon: Trash2 },
   { path: "/recipes", label: "Recipes", icon: ChefHat },
   { path: "/sales", label: "Sales", icon: ReceiptText },
   { path: "/stock-counts", label: "Stock Counts", icon: ClipboardCheck },

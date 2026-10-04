@@ -6,7 +6,7 @@ import { AuthContext, type AuthContextValue } from "@/features/auth/AuthContext"
 import type { UserRole } from "@/schemas/role";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { RoleGuard } from "./RoleGuard";
-import { canAccessPath } from "./access";
+import { canAccessPath, isRegisteredPath } from "./access";
 
 function signedOutValue(): AuthContextValue {
   return {
@@ -151,5 +151,20 @@ describe("canAccessPath", () => {
     expect(canAccessPath("/nope", "owner")).toBe(false);
     expect(canAccessPath("/login", "owner")).toBe(false);
     expect(canAccessPath("/stock", null)).toBe(false);
+  });
+});
+
+describe("isRegisteredPath", () => {
+  it("matches exact and :param routes", () => {
+    expect(isRegisteredPath("/receiving")).toBe(true);
+    expect(isRegisteredPath("/suppliers/abc-123/prices")).toBe(true);
+    expect(isRegisteredPath("/items/abc-123")).toBe(true);
+  });
+
+  it("rejects unregistered paths", () => {
+    // There is no supplier detail page — /suppliers/:id is not registered.
+    expect(isRegisteredPath("/suppliers/abc-123")).toBe(false);
+    expect(isRegisteredPath("/nope")).toBe(false);
+    expect(isRegisteredPath("/suppliers/abc-123/prices/deeper")).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import { Fragment, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
+import { isRegisteredPath } from "@/routes/access";
 import { navLabelForPath } from "@/routes/nav";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +12,10 @@ interface Crumb {
 
 /**
  * Breadcrumb trail for the current location: Home plus one crumb per path
- * segment. All but the last crumb are links; the last is the current page.
+ * segment. All but the last crumb are links — but only when the accumulated
+ * path is a registered route; segments with no route (e.g. the supplier id
+ * in "/suppliers/:id/prices", which has no detail page) render as plain
+ * text so the trail never links to a 404.
  */
 export function Breadcrumbs() {
   const location = useLocation();
@@ -22,9 +26,10 @@ export function Breadcrumbs() {
     let acc = "";
     segments.forEach((segment, index) => {
       acc += `/${segment}`;
+      const isLast = index === segments.length - 1;
       items.push({
         label: navLabelForPath(acc),
-        to: index === segments.length - 1 ? null : acc,
+        to: isLast || !isRegisteredPath(acc) ? null : acc,
       });
     });
     return items;
@@ -46,7 +51,7 @@ export function Breadcrumbs() {
               <li className="min-w-0">
                 {isLast || !crumb.to ? (
                   <span
-                    aria-current="page"
+                    {...(isLast ? { "aria-current": "page" as const } : {})}
                     className={cn(
                       "truncate",
                       isLast ? "font-medium text-foreground" : "text-muted-foreground",

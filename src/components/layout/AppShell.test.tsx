@@ -55,11 +55,11 @@ describe("AppShell navigation per role", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("staff sees only receiving, wastage and stock counts", () => {
+  it("staff sees only receiving, usage & wastage and stock counts", () => {
     renderShell("staff");
     const nav = primaryNav();
     expect(within(nav).getByRole("link", { name: "Receiving" })).toBeInTheDocument();
-    expect(within(nav).getByRole("link", { name: "Wastage" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Usage & wastage" })).toBeInTheDocument();
     expect(
       within(nav).getByRole("link", { name: "Stock Counts" }),
     ).toBeInTheDocument();

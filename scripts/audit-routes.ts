@@ -350,7 +350,10 @@ async function livePhase(rows: RouteRow[], registered: string[]): Promise<CrawlR
   const viteBin = join(ROOT, "node_modules", ".bin", "vite");
   let server: ChildProcess | null = null;
   try {
-    server = spawn(viteBin, ["preview", "--port", String(PORT), "--strictPort"], {
+    // NOTE: --host 127.0.0.1 pins the bind to IPv4 localhost. Without it,
+    // vite binds [::1] (IPv6-only) on hosts where `localhost` resolves to
+    // ::1 first, and the 127.0.0.1 readiness probe below never succeeds.
+    server = spawn(viteBin, ["preview", "--port", String(PORT), "--strictPort", "--host", "127.0.0.1"], {
       cwd: ROOT,
       stdio: "pipe",
     });

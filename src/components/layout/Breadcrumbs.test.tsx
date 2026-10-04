@@ -43,4 +43,22 @@ describe("Breadcrumbs", () => {
       "page",
     );
   });
+
+  it("does not link trail segments with no registered route", () => {
+    // There is no supplier detail page: /suppliers/:id is not registered,
+    // so the middle crumb must be plain text (never a link to a 404).
+    renderAt("/suppliers/abc-123/prices");
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(nav).getByRole("link", { name: "Suppliers" })).toHaveAttribute(
+      "href",
+      "/suppliers",
+    );
+    const middle = within(nav).getByText("Abc 123");
+    expect(middle).not.toHaveAttribute("aria-current");
+    expect(within(nav).queryByRole("link", { name: "Abc 123" })).not.toBeInTheDocument();
+    expect(within(nav).getByText("Prices")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
 });

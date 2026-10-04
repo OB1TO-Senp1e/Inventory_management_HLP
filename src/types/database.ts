@@ -188,6 +188,7 @@ export type Database = {
           movement_type: string;
           notes: string | null;
           quantity: number;
+          reason_code: string | null;
           reference_id: string | null;
           reference_type: string | null;
           restaurant_id: string;
@@ -203,6 +204,7 @@ export type Database = {
           movement_type: string;
           notes?: string | null;
           quantity: number;
+          reason_code?: string | null;
           reference_id?: string | null;
           reference_type?: string | null;
           restaurant_id: string;
@@ -218,6 +220,7 @@ export type Database = {
           movement_type?: string;
           notes?: string | null;
           quantity?: number;
+          reason_code?: string | null;
           reference_id?: string | null;
           reference_type?: string | null;
           restaurant_id?: string;
@@ -518,6 +521,14 @@ export type Database = {
           item_name: string;
           unit_symbol: string;
         }[];
+      };
+      log_usage: {
+        Args: { p_item_id: string; p_notes?: string; p_quantity: number; p_reason: string };
+        Returns: string;
+      };
+      log_wastage: {
+        Args: { p_item_id: string; p_notes?: string; p_quantity: number; p_reason: string };
+        Returns: string;
       };
       pgp_armor_headers: { Args: { "": string }; Returns: Record<string, unknown>[] };
       receive_goods: { Args: { p_lines: Json }; Returns: Json };

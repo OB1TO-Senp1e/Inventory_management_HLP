@@ -3,15 +3,17 @@ import { renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/toast/ToastProvider";
-import { listReceivableItems, receiveGoods } from "@/api/stock";
+import { listReceivableItems, logUsage, logWastage, receiveGoods } from "@/api/stock";
 import { itemsQueryKey } from "@/features/items/hooks";
 import { stockQueryKey } from "@/features/items/stockHooks";
-import { useReceivableItems, useReceiveGoods } from "./hooks";
+import { useLogUsage, useLogWastage, useReceivableItems, useReceiveGoods } from "./hooks";
 
 // The API modules are mocked: these tests verify hook wiring (delegation,
 // gating, invalidation, toasts) with zero network.
 vi.mock("@/api/stock", () => ({
   listReceivableItems: vi.fn(),
+  logUsage: vi.fn(),
+  logWastage: vi.fn(),
   receiveGoods: vi.fn(),
 }));
 
@@ -31,6 +33,8 @@ vi.mock("@/features/auth/useAuth", () => ({
 
 const mockedReceiveGoods = vi.mocked(receiveGoods);
 const mockedListReceivableItems = vi.mocked(listReceivableItems);
+const mockedLogWastage = vi.mocked(logWastage);
+const mockedLogUsage = vi.mocked(logUsage);
 
 let queryClient: QueryClient;
 
@@ -122,5 +126,62 @@ describe("useReceiveGoods", () => {
     result.current.mutate(input);
     await waitFor(() => expect(result.current.isError).toBe(true));
     await screen.findByText(/quantity must be greater than zero/i);
+  });
+});
+
+describe("useLogWastage", () => {
+  const input = { itemId: ITEM_ID, quantity: 5, reason: "spoiled" as const };
+
+  it("delegates to the api and invalidates stock + items on success", async () => {
+    mockedLogWastage.mockResolvedValue({ movementId: "dddddddd-dddd-dddd-dddd-dddddddddddd" });
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    const { result } = renderHook(() => useLogWastage(), { wrapper });
+    result.current.mutate(input);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedLogWastage).toHaveBeenCalledWith(input);
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: stockQueryKey }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: itemsQueryKey }),
+    );
+    await screen.findByText(/wastage logged/i);
+    invalidateSpy.mockRestore();
+  });
+
+  it("toasts the RPC error message on failure", async () => {
+    mockedLogWastage.mockRejectedValue(new Error("log_wastage: a reason is required."));
+    const { result } = renderHook(() => useLogWastage(), { wrapper });
+    result.current.mutate(input);
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    await screen.findByText(/a reason is required/i);
+  });
+});
+
+describe("useLogUsage", () => {
+  const input = { itemId: ITEM_ID, quantity: 2, reason: "kitchen_use" as const };
+
+  it("delegates to the api and invalidates stock + items on success", async () => {
+    mockedLogUsage.mockResolvedValue({ movementId: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" });
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    const { result } = renderHook(() => useLogUsage(), { wrapper });
+    result.current.mutate(input);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedLogUsage).toHaveBeenCalledWith(input);
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: stockQueryKey }),
+    );
+    await screen.findByText(/usage logged/i);
+    invalidateSpy.mockRestore();
+  });
+
+  it("toasts the RPC error message on failure", async () => {
+    mockedLogUsage.mockRejectedValue(
+      new Error("log_usage: quantity must be greater than zero (got 0)."),
+    );
+    const { result } = renderHook(() => useLogUsage(), { wrapper });
+    result.current.mutate(input);
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    await screen.findByText(/greater than zero/i);
   });
 });

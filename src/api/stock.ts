@@ -3,9 +3,13 @@ import { getSupabaseClient } from "@/lib/supabase";
 import {
   createOpeningBalanceSchema,
   getCurrentStockSchema,
+  logUsageSchema,
+  logWastageSchema,
   receiveGoodsSchema,
   type CreateOpeningBalanceInput,
   type GetCurrentStockInput,
+  type LogUsageInput,
+  type LogWastageInput,
   type ReceiveGoodsInput,
 } from "@/schemas/stock";
 
@@ -127,6 +131,58 @@ export async function createOpeningBalance(
     p_item_id: input.itemId,
     p_quantity: input.quantity,
     p_unit_cost: input.unitCost,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  const movementId = z.string().uuid().parse(data);
+  return { movementId };
+}
+
+export interface LogMovementResult {
+  movementId: string;
+}
+
+/**
+ * Log wasted stock via the `log_wastage` RPC. Posts a negative-quantity
+ * `wastage` movement with a closed-set reason code (stored in the
+ * `reason_code` column). Owner/manager/staff — the RPC enforces this; staff
+ * use this constantly, so the form stays fast and cost-free.
+ *
+ * The RPC raises friendly exceptions for: non-positive quantity, missing /
+ * unknown reason code, unknown or archived item. Safe to show verbatim.
+ */
+export async function logWastage(
+  rawInput: unknown,
+): Promise<LogMovementResult> {
+  const input: LogWastageInput = logWastageSchema.parse(rawInput);
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc("log_wastage", {
+    p_item_id: input.itemId,
+    p_quantity: input.quantity,
+    p_reason: input.reason,
+    p_notes: input.notes ?? null,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  const movementId = z.string().uuid().parse(data);
+  return { movementId };
+}
+
+/**
+ * Log consumed stock via the `log_usage` RPC. Posts a negative-quantity
+ * `usage` movement with a closed-set reason code (stored in the
+ * `reason_code` column). Same roles and error contract as `logWastage`.
+ */
+export async function logUsage(rawInput: unknown): Promise<LogMovementResult> {
+  const input: LogUsageInput = logUsageSchema.parse(rawInput);
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc("log_usage", {
+    p_item_id: input.itemId,
+    p_quantity: input.quantity,
+    p_reason: input.reason,
+    p_notes: input.notes ?? null,
   });
   if (error) {
     throw new Error(error.message);

@@ -160,8 +160,18 @@ export async function getCurrentProfile(): Promise<UserProfile | null> {
 /**
  * Subscribe to auth state changes. Returns an unsubscribe function.
  * The callback receives the mapped session (or null on sign-out).
+ *
+ * Test-only behavior: when the `ri.mockRole` session mock is active, there
+ * are no real auth events to listen to — subscribing the real client would
+ * either throw (no Supabase env configured) or immediately clobber the
+ * mock with an INITIAL_SESSION=null event. So a mocked session gets a
+ * no-op subscription instead. The mock never touches the network.
  */
 export function onAuthStateChange(callback: (session: AuthSession | null) => void): () => void {
+  const mockRole = readMockRole();
+  if (mockRole) {
+    return () => {};
+  }
   const client = getSupabaseClient();
   const { data } = client.auth.onAuthStateChange((_event, session) => {
     const user = session?.user;

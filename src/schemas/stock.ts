@@ -73,3 +73,40 @@ export const receiveGoodsSchema = z.object({
     .min(1, "Add at least one line to the receipt."),
 });
 export type ReceiveGoodsInput = z.infer<typeof receiveGoodsSchema>;
+
+/**
+ * Wastage / usage logging (P2-03). Reason codes are a closed set per
+ * movement type (mirrors the DB CHECK on `stock_movements.reason_code`);
+ * the RPC signs the quantity negative itself, so the client sends a
+ * positive quantity. Staff must be able to log — keep this form fast and
+ * free of cost fields.
+ */
+export const wastageReasonSchema = z.enum(
+  ["expired", "spoiled", "damaged", "over_prepared", "other_wastage"],
+  { errorMap: () => ({ message: "Choose a reason." }) },
+);
+export type WastageReason = z.infer<typeof wastageReasonSchema>;
+
+export const usageReasonSchema = z.enum(
+  ["kitchen_use", "staff_meal", "tasting", "other_usage"],
+  { errorMap: () => ({ message: "Choose a reason." }) },
+);
+export type UsageReason = z.infer<typeof usageReasonSchema>;
+
+const logStockOutBaseSchema = z.object({
+  itemId: uuidSchema,
+  quantity: positiveQuantitySchema,
+  notes: blankToUndefined(
+    z.string().trim().max(500, "Notes must be 500 characters or fewer."),
+  ),
+});
+
+export const logWastageSchema = logStockOutBaseSchema.extend({
+  reason: wastageReasonSchema,
+});
+export type LogWastageInput = z.infer<typeof logWastageSchema>;
+
+export const logUsageSchema = logStockOutBaseSchema.extend({
+  reason: usageReasonSchema,
+});
+export type LogUsageInput = z.infer<typeof logUsageSchema>;

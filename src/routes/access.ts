@@ -41,3 +41,28 @@ export function canAccessPath(path: string, role: UserRole | null): boolean {
   }
   return access.roles.includes(role);
 }
+
+/**
+ * True when `path` matches a registered route pattern. `:param` segments
+ * match any single path segment ("/suppliers/:id" matches "/suppliers/abc").
+ * Used by Breadcrumbs so trail segments only link to real routes — a crumb
+ * for an unregistered path (e.g. "/suppliers/abc" — there is no supplier
+ * detail page) renders as plain text instead of a link to a 404.
+ */
+export function isRegisteredPath(path: string): boolean {
+  return Object.keys(routeAccess).some((pattern) => {
+    const regex = new RegExp(
+      "^" +
+        pattern
+          .split("/")
+          .map((seg) =>
+            seg.startsWith(":")
+              ? "[^/]+"
+              : seg.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+          )
+          .join("/") +
+        "$",
+    );
+    return regex.test(path);
+  });
+}
