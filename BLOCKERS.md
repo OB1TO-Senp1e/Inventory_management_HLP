@@ -11,3 +11,10 @@
 - **Workaround:** Proceed with neutral default theme, local Supabase, and sample seed data until provided.
 
 _(Add new blockers below, newest last. Mark resolved with date when cleared.)_
+
+## B-002 — `supabase start` cannot run in this VM (open; P0-02 blocked)
+
+- **Needed from:** human/infra — a dev environment where Docker bridge networking works (kernel with netfilter NAT modules), e.g. Docker Desktop or a standard cloud VM.
+- **What:** `supabase start` needs the Docker daemon. Three honest attempts made 2026-10-04: (1) installed Docker 29.1.3 via apt (was missing) — OK; (2) started `dockerd` — fails: `failed to add jump rules to ipv4 NAT table … Extension addrtype revision 0 not supported, missing kernel module?`; (3) `modprobe xt_addrtype iptable_nat xt_MASQUERADE` — modules not shipped for this kernel (`7.0.0-39-generic`), cannot be fixed from inside the VM. Without kernel NAT, no port publishing is possible, so the local Supabase stack cannot serve host ports.
+- **Blocks:** P0-02 acceptance (`supabase start` works; `pnpm gen:types` against the local DB). P0-03+ need the local DB to apply/test migrations and RLS.
+- **Workaround:** All non-Docker P0-02 deliverables are committed (CLI project-local, `supabase/config.toml`, `gen:types` script, local-dev README). On any Docker-capable machine: `supabase start && pnpm gen:types` unblocks fully. CI (P0-06) can also run Supabase-dependent gates where Docker is available.
