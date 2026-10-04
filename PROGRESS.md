@@ -279,3 +279,15 @@
 - Gates: typecheck ✅ · lint ✅ · test ✅ (363 passed, 37 files) · test:db ✅ (all suites incl. 5 new assertions) · build ✅ · audit:wiring ✅ (51 rows) · audit:routes ✅ (static + live crawl) · test:e2e ✅ (104 passed, 20 skipped, 0 failed — full suite green).
 - State files: TASKS.md P2-05 DONE · ROUTES.md `/stock` DONE · FEATURE_MATRIX.md updated · ARCHITECTURE.md §11 decision logged.
 - Next task: P3-01 (purchase orders lifecycle).
+
+## 2026-10-05 — P3-01 Purchase orders (draft): DONE
+- Migration `20261004213000_purchase_orders.sql`: `purchase_orders` (status lifecycle column, order/expected dates, notes) + `purchase_order_lines` (qty, unit_price snapshot, received_quantity, unique(po_id,item_id)). RLS owner/manager only (staff denied — costs). Draft-only triggers on both tables; `create_purchase_order()` RPC (SECURITY INVOKER, atomic header+lines, supplier/item validation).
+- Types regenerated via `gen:types:interim`.
+- `src/schemas/purchaseOrder.ts`: status enum, line/create/update schemas (duplicate-item guard, date validation, blank-date handling).
+- `src/api/purchasing.ts`: `listPurchaseOrders` (paginated, computed totals), `getPurchaseOrder` (detail+lines), `createPurchaseOrder` (RPC), `updatePurchaseOrder`, `addPurchaseOrderLine`, `removePurchaseOrderLine`.
+- `src/features/purchasing/`: `PurchaseOrdersPage` (list, status filter, ₹ en-IN totals, desktop table + mobile cards), `PurchaseOrderDetailPage` (lines, edit header/lines while draft), `PurchaseOrderDialog` (supplier picker, price-list prefill incl. "add all", manual lines, live total), `hooks.ts`.
+- Routes `/purchase-orders` and `/purchase-orders/:id` wired (owner/manager); ROUTES.md → DONE.
+- Tests: `src/api/purchasing.test.ts` (12), `src/schemas/purchaseOrder.test.ts` (8), page/dialog component tests (12); `supabase/tests/p3_01_purchase_orders_test.sql` (RPC validation, RLS, draft guards, isolation); `e2e/purchasing.spec.ts` (8 deterministic + 1 live skipped; stub extended with PO tables).
+- Gates: typecheck ✅ · lint ✅ · test ✅ (395 passed, 41 files) · test:db ✅ · build ✅ · audit:wiring ✅ (51 rows, 7 modules) · audit:routes ✅ (static + live crawl) · test:e2e purchasing specs ✅ (16 passed).
+- Decisions: unit_price snapshotted at creation (prices change); P3-02 owns status transitions and receive flow; no migration for prefill (reuses supplier_prices).
+- Next task: P3-02 (PO lifecycle: send, partial/full receive via receive_goods, cancel).

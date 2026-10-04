@@ -15,6 +15,8 @@ import { SettingsPage } from "@/features/settings/SettingsPage";
 import { SuppliersPage } from "@/features/suppliers/SuppliersPage";
 import { SupplierPricesPage } from "@/features/suppliers/SupplierPricesPage";
 import { ReceivingPage } from "@/features/stock/ReceivingPage";
+import { PurchaseOrdersPage } from "@/features/purchasing/PurchaseOrdersPage";
+import { PurchaseOrderDetailPage } from "@/features/purchasing/PurchaseOrderDetailPage";
 import { StockOverviewPage } from "@/features/stock/StockOverviewPage";
 import { WastagePage } from "@/features/stock/WastagePage";
 import { routeAccess } from "./access";
@@ -39,6 +41,8 @@ const builtSections: Record<string, ReactNode> = {
   "/receiving": <ReceivingPage />,
   "/stock": <StockOverviewPage />,
   "/wastage": <WastagePage />,
+  "/purchase-orders": <PurchaseOrdersPage />,
+  "/purchase-orders/:id": <PurchaseOrderDetailPage />,
 };
 
 /**

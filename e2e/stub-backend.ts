@@ -145,6 +145,43 @@ const RECEIVABLE_ITEMS = ITEMS.map((item) => ({
   unit_symbol: item.units.symbol,
 }));
 
+const PURCHASE_ORDERS = [
+  {
+    id: "d0000000-0000-0000-0000-000000000001",
+    supplier_id: SUPPLIERS[0].id,
+    status: "draft",
+    order_date: "2026-10-05",
+    expected_date: "2026-10-12",
+    notes: "Weekly order",
+    created_at: NOW,
+    updated_at: NOW,
+    suppliers: { name: SUPPLIERS[0].name },
+  },
+];
+
+const PURCHASE_ORDER_LINES = [
+  {
+    id: "e0000000-0000-0000-0000-000000000001",
+    po_id: PURCHASE_ORDERS[0].id,
+    item_id: ITEMS[0].id,
+    quantity: 10,
+    unit_price: 32.5,
+    received_quantity: 0,
+    notes: null,
+    items: { name: ITEMS[0].name, units: { symbol: "kg" } },
+  },
+  {
+    id: "e0000000-0000-0000-0000-000000000002",
+    po_id: PURCHASE_ORDERS[0].id,
+    item_id: ITEMS[1].id,
+    quantity: 5,
+    unit_price: 58,
+    received_quantity: 0,
+    notes: null,
+    items: { name: ITEMS[1].name, units: { symbol: "L" } },
+  },
+];
+
 const TABLES: Record<string, Record<string, unknown>[]> = {
   item_categories: CATEGORIES,
   storage_locations: LOCATIONS,
@@ -156,6 +193,8 @@ const TABLES: Record<string, Record<string, unknown>[]> = {
   current_stock: CURRENT_STOCK,
   stock_movements: STOCK_MOVEMENTS,
   "rpc:list_receivable_items": RECEIVABLE_ITEMS,
+  purchase_orders: PURCHASE_ORDERS,
+  purchase_order_lines: PURCHASE_ORDER_LINES,
 };
 
 /** Tiny PostgREST subset: eq/neq/ilike filters, limit/offset, content-range. */

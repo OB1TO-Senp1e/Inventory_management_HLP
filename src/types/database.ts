@@ -153,6 +153,121 @@ export type Database = {
           },
         ];
       };
+      purchase_order_lines: {
+        Row: {
+          created_at: string;
+          id: string;
+          item_id: string;
+          notes: string | null;
+          po_id: string;
+          quantity: number;
+          received_quantity: number;
+          restaurant_id: string;
+          unit_price: number;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          item_id: string;
+          notes?: string | null;
+          po_id: string;
+          quantity: number;
+          received_quantity?: number;
+          restaurant_id: string;
+          unit_price: number;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          item_id?: string;
+          notes?: string | null;
+          po_id?: string;
+          quantity?: number;
+          received_quantity?: number;
+          restaurant_id?: string;
+          unit_price?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_lines_item_id_fkey";
+            columns: ["item_id"];
+            isOneToOne: false;
+            referencedRelation: "items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "purchase_order_lines_po_id_fkey";
+            columns: ["po_id"];
+            isOneToOne: false;
+            referencedRelation: "purchase_orders";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "purchase_order_lines_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      purchase_orders: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          expected_date: string | null;
+          id: string;
+          notes: string | null;
+          order_date: string;
+          restaurant_id: string;
+          status: string;
+          supplier_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          expected_date?: string | null;
+          id?: string;
+          notes?: string | null;
+          order_date?: string;
+          restaurant_id: string;
+          status?: string;
+          supplier_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          expected_date?: string | null;
+          id?: string;
+          notes?: string | null;
+          order_date?: string;
+          restaurant_id?: string;
+          status?: string;
+          supplier_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "purchase_orders_supplier_id_fkey";
+            columns: ["supplier_id"];
+            isOneToOne: false;
+            referencedRelation: "suppliers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       restaurants: {
         Row: {
           created_at: string;
@@ -507,6 +622,16 @@ export type Database = {
     Functions: {
       create_opening_balance: {
         Args: { p_item_id: string; p_quantity: number; p_unit_cost: number };
+        Returns: string;
+      };
+      create_purchase_order: {
+        Args: {
+          p_expected_date: string;
+          p_lines: Json;
+          p_notes: string;
+          p_order_date: string;
+          p_supplier_id: string;
+        };
         Returns: string;
       };
       current_restaurant_id: { Args: Record<PropertyKey, never>; Returns: string };
