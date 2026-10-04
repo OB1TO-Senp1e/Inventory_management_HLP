@@ -12,6 +12,7 @@ import { HomePage } from "@/features/home/HomePage";
 import { ItemsPage } from "@/features/items/ItemsPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { SuppliersPage } from "@/features/suppliers/SuppliersPage";
+import { SupplierPricesPage } from "@/features/suppliers/SupplierPricesPage";
 import { routeAccess } from "./access";
 import type { UserRole } from "@/schemas/role";
 
@@ -31,6 +32,7 @@ const builtSections: Record<string, ReactNode> = {
   "/items": <ItemsPage />,
   "/settings": <SettingsPage />,
   "/suppliers": <SuppliersPage />,
+  "/suppliers/:id/prices": <SupplierPricesPage />,
 };
 
 /**

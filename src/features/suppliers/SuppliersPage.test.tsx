@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Supplier } from "@/api/suppliers";
 import { SuppliersPage } from "./SuppliersPage";
@@ -62,7 +63,7 @@ describe("SuppliersPage", () => {
       isError: false,
       refetch: vi.fn(),
     } as never);
-    render(<SuppliersPage />);
+    render(<MemoryRouter><SuppliersPage /></MemoryRouter>);
     expect(screen.getByLabelText("Loading suppliers")).toBeTruthy();
   });
 
@@ -74,7 +75,7 @@ describe("SuppliersPage", () => {
       isError: true,
       refetch,
     } as never);
-    render(<SuppliersPage />);
+    render(<MemoryRouter><SuppliersPage /></MemoryRouter>);
     expect(screen.getByRole("alert")).toHaveTextContent(
       /could not load suppliers/i,
     );
@@ -89,7 +90,7 @@ describe("SuppliersPage", () => {
       isError: false,
       refetch: vi.fn(),
     } as never);
-    render(<SuppliersPage />);
+    render(<MemoryRouter><SuppliersPage /></MemoryRouter>);
     expect(
       screen.getByText(/no suppliers yet — add your first supplier/i),
     ).toBeTruthy();
@@ -106,7 +107,7 @@ describe("SuppliersPage", () => {
       isError: false,
       refetch: vi.fn(),
     } as never);
-    render(<SuppliersPage />);
+    render(<MemoryRouter><SuppliersPage /></MemoryRouter>);
     // Both the table row and the mobile card render the name.
     expect(screen.getAllByText("Fresh Farms").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Ravi Kumar").length).toBeGreaterThan(0);
@@ -127,7 +128,7 @@ describe("SuppliersPage", () => {
       isError: false,
       refetch: vi.fn(),
     } as never);
-    render(<SuppliersPage />);
+    render(<MemoryRouter><SuppliersPage /></MemoryRouter>);
     expect(
       screen.queryByRole("button", { name: "Add supplier" }),
     ).toBeNull();
@@ -143,7 +144,7 @@ describe("SuppliersPage", () => {
       isError: false,
       refetch: vi.fn(),
     } as never);
-    render(<SuppliersPage />);
+    render(<MemoryRouter><SuppliersPage /></MemoryRouter>);
     const filters = mockedUseSuppliers.mock.calls[0]?.[0];
     expect(filters).toMatchObject({ active: true });
   });

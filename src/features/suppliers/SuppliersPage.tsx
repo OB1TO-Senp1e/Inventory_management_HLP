@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ArrowDown,
   ArrowUp,
@@ -6,6 +7,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Tag,
   Trash2,
   Truck,
 } from "lucide-react";
@@ -179,6 +181,21 @@ export function SuppliersPage() {
     }
     return (
       <div className="flex items-center justify-end gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-11 w-11"
+          asChild
+        >
+          <Link
+            to={`/suppliers/${supplier.id}/prices`}
+            aria-label={`Price list for ${supplier.name}`}
+            title="Price list"
+          >
+            <Tag />
+          </Link>
+        </Button>
         <Button
           type="button"
           variant="ghost"
@@ -431,6 +448,18 @@ export function SuppliersPage() {
                 )}
                 {canManage && (
                   <div className="mt-3 flex gap-2 border-t pt-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      className="flex-1"
+                      asChild
+                    >
+                      <Link to={`/suppliers/${supplier.id}/prices`}>
+                        <Tag aria-hidden="true" />
+                        Prices
+                      </Link>
+                    </Button>
                     <Button
                       type="button"
                       variant="outline"

@@ -212,6 +212,108 @@ export type Database = {
           },
         ];
       };
+      supplier_price_history: {
+        Row: {
+          changed_at: string;
+          changed_by: string | null;
+          id: string;
+          item_id: string;
+          new_price: number | null;
+          old_price: number | null;
+          restaurant_id: string;
+          supplier_id: string;
+        };
+        Insert: {
+          changed_at?: string;
+          changed_by?: string | null;
+          id?: string;
+          item_id: string;
+          new_price?: number | null;
+          old_price?: number | null;
+          restaurant_id: string;
+          supplier_id: string;
+        };
+        Update: {
+          changed_at?: string;
+          changed_by?: string | null;
+          id?: string;
+          item_id?: string;
+          new_price?: number | null;
+          old_price?: number | null;
+          restaurant_id?: string;
+          supplier_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "supplier_price_history_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      supplier_prices: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          currency: string;
+          id: string;
+          is_preferred: boolean;
+          item_id: string;
+          restaurant_id: string;
+          supplier_id: string;
+          unit_price: number;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          id?: string;
+          is_preferred?: boolean;
+          item_id: string;
+          restaurant_id: string;
+          supplier_id: string;
+          unit_price: number;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          id?: string;
+          is_preferred?: boolean;
+          item_id?: string;
+          restaurant_id?: string;
+          supplier_id?: string;
+          unit_price?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "supplier_prices_item_id_fkey";
+            columns: ["item_id"];
+            isOneToOne: false;
+            referencedRelation: "items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "supplier_prices_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "supplier_prices_supplier_id_fkey";
+            columns: ["supplier_id"];
+            isOneToOne: false;
+            referencedRelation: "suppliers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       suppliers: {
         Row: {
           active: boolean;
@@ -317,6 +419,27 @@ export type Database = {
       gen_salt: { Args: { "": string }; Returns: string };
       has_role: { Args: { p_required: string }; Returns: boolean };
       pgp_armor_headers: { Args: { "": string }; Returns: Record<string, unknown>[] };
+      set_preferred_supplier: {
+        Args: { p_item_id: string; p_supplier_id: string };
+        Returns: {
+          created_at: string;
+          created_by: string | null;
+          currency: string;
+          id: string;
+          is_preferred: boolean;
+          item_id: string;
+          restaurant_id: string;
+          supplier_id: string;
+          unit_price: number;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "supplier_prices";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
     };
     Enums: {
       [_ in never]: never;

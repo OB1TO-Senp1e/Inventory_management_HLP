@@ -17,3 +17,19 @@ export function formatNumber(value: number): string {
     value,
   );
 }
+
+/**
+ * Formats an ISO timestamp as an en-IN date + time in Asia/Kolkata
+ * (e.g. "12 Oct 2026, 3:45 pm").
+ */
+export function formatDateTime(iso: string): string {
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Kolkata",
+  }).format(new Date(iso));
+}
