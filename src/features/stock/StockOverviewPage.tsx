@@ -7,6 +7,7 @@ import {
   useStockOverview,
   useStockOverviewRealtime,
 } from "@/features/items/stockHooks";
+import { ReorderSuggestions } from "@/features/purchasing/ReorderSuggestions";
 import type { StockOverviewRow } from "@/api/stock";
 import { expiryStatus } from "@/lib/expiry";
 import { formatDate, formatNumber } from "@/lib/format";
@@ -223,6 +224,8 @@ export function StockOverviewPage() {
         title="Stock"
         description="Live on-hand quantities for every active item. New receipts, usage and wastage update this screen automatically."
       />
+
+      <ReorderSuggestions />
 
       <fieldset className="mb-4 flex flex-wrap items-end gap-2">
         <legend className="sr-only">Filter stock</legend>

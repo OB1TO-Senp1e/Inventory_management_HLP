@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getSupabaseClient } from "@/lib/supabase";
+import { listStockOverview } from "./stock";
 import {
   createPurchaseOrderSchema,
   purchaseOrderLineInputSchema,
@@ -445,4 +446,117 @@ export async function receivePurchaseOrder(
       receivedQuantity: l.received_quantity,
     })),
   };
+}
+
+const preferredPriceRowSchema = z.object({
+  item_id: z.string(),
+  supplier_id: z.string(),
+  unit_price: z.coerce.number(),
+  currency: z.string(),
+  suppliers: z.object({ name: z.string() }).nullable(),
+});
+
+export interface ReorderSuggestionLine {
+  itemId: string;
+  itemName: string;
+  unitSymbol: string;
+  currentQty: number;
+  reorderPoint: number;
+  parLevel: number;
+  /** Order-up-to-par quantity; at least 1 base unit when par math gives ≤ 0. */
+  suggestedQty: number;
+  /** Null when the item has no preferred supplier (unassigned group). */
+  unitPrice: number | null;
+  currency: string;
+}
+
+export interface ReorderSuggestionGroup {
+  /** Null for the "no preferred supplier" group (no PO can be created). */
+  supplierId: string | null;
+  supplierName: string;
+  lines: ReorderSuggestionLine[];
+}
+
+/**
+ * Reorder suggestions (P3-03): items at or below their reorder point
+ * (same predicate as the P2-05 stock overview's low-stock badge), grouped
+ * by preferred supplier. Items with no preferred supplier land in an
+ * "unassigned" group that cannot create a PO (a PO needs a supplier and a
+ * snapshotted unit price).
+ *
+ * Two reads joined client-side: `listStockOverview()` (items + derived
+ * stock) and one `supplier_prices` query for the preferred prices of the
+ * low-stock items. At most one preferred supplier per item per restaurant
+ * (partial unique index — see the P1-04 migration), so the join is 1:1.
+ *
+ * Suggested quantity orders up to par_level. When par math yields ≤ 0
+ * (misconfigured par ≤ current stock, yet still at/below reorder point),
+ * suggest 1 base unit rather than 0 — the item was flagged low-stock, so
+ * ordering nothing would be the surprising choice.
+ */
+export async function listReorderSuggestions(): Promise<
+  ReorderSuggestionGroup[]
+> {
+  const overview = await listStockOverview();
+  const lowStock = overview.filter((row) => row.quantity <= row.reorderPoint);
+  if (lowStock.length === 0) {
+    return [];
+  }
+
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .from("supplier_prices")
+    .select("item_id, supplier_id, unit_price, currency, suppliers(name)")
+    .eq("is_preferred", true)
+    .in(
+      "item_id",
+      lowStock.map((row) => row.itemId),
+    );
+  if (error) {
+    throw new Error(error.message);
+  }
+  const priceRows = z.array(preferredPriceRowSchema).parse(data);
+  const priceByItem = new Map(priceRows.map((row) => [row.item_id, row]));
+
+  const groups = new Map<string, ReorderSuggestionGroup>();
+  const UNASSIGNED = "unassigned";
+  for (const row of lowStock) {
+    const price = priceByItem.get(row.itemId);
+    const supplierId = price?.supplier_id ?? null;
+    const key = supplierId ?? UNASSIGNED;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        supplierId,
+        supplierName:
+          price?.suppliers?.name ?? "No preferred supplier",
+        lines: [],
+      };
+      groups.set(key, group);
+    }
+    const rawQty = row.parLevel - row.quantity;
+    const suggestedQty =
+      rawQty > 0 ? Math.round(rawQty * 100) / 100 : 1;
+    group.lines.push({
+      itemId: row.itemId,
+      itemName: row.name,
+      unitSymbol: row.unitSymbol,
+      currentQty: row.quantity,
+      reorderPoint: row.reorderPoint,
+      parLevel: row.parLevel,
+      suggestedQty,
+      unitPrice: price ? price.unit_price : null,
+      currency: price ? price.currency : "INR",
+    });
+  }
+
+  const sorted = [...groups.values()].sort((a, b) => {
+    if (a.supplierId === null) return 1;
+    if (b.supplierId === null) return -1;
+    return a.supplierName.localeCompare(b.supplierName);
+  });
+  for (const group of sorted) {
+    group.lines.sort((a, b) => a.itemName.localeCompare(b.itemName));
+  }
+  return sorted;
 }

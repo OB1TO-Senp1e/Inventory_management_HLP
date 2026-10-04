@@ -15,6 +15,9 @@ import {
 
 // No network in these tests: the client factory is mocked outright.
 vi.mock("@/lib/supabase", () => ({ getSupabaseClient: vi.fn() }));
+// listReorderSuggestions delegates the stock read to ./stock — mock it so
+// these tests cover only the suggestion/grouping logic.
+vi.mock("./stock", () => ({ listStockOverview: vi.fn() }));
 
 const mockedGetSupabaseClient = vi.mocked(getSupabaseClient);
 
@@ -357,5 +360,130 @@ describe("receivePurchaseOrder", () => {
         lines: [{ poLineId: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", quantity: 99 }],
       }),
     ).rejects.toThrow(/exceed the ordered quantity/);
+  });
+});
+
+describe("listReorderSuggestions", () => {
+  const ITEM_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  const ITEM_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+  const ITEM_C = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+  const SUP_A = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+  const SUP_B = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+
+  function overviewRow(overrides: Record<string, unknown>) {
+    return {
+      itemId: ITEM_A,
+      name: "Tomato",
+      categoryId: null,
+      categoryName: null,
+      locationId: null,
+      locationName: null,
+      unitSymbol: "kg",
+      reorderPoint: 10,
+      parLevel: 50,
+      quantity: 5,
+      lastMovementAt: null,
+      earliestExpiry: null,
+      ...overrides,
+    };
+  }
+
+  function priceRow(overrides: Record<string, unknown>) {
+    return {
+      item_id: ITEM_A,
+      supplier_id: SUP_A,
+      unit_price: 30,
+      currency: "INR",
+      suppliers: { name: "Fresh Farms" },
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns [] without querying prices when nothing is low-stock", async () => {
+    const { listStockOverview } = await import("./stock");
+    vi.mocked(listStockOverview).mockResolvedValue([
+      overviewRow({ quantity: 42 }),
+    ]);
+    const { listReorderSuggestions } = await import("./purchasing");
+    expect(await listReorderSuggestions()).toEqual([]);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("groups low-stock items by preferred supplier with order-up-to-par quantities", async () => {
+    const { listStockOverview } = await import("./stock");
+    vi.mocked(listStockOverview).mockResolvedValue([
+      overviewRow({ itemId: ITEM_A, name: "Tomato", quantity: 5, parLevel: 50, reorderPoint: 10 }),
+      overviewRow({ itemId: ITEM_B, name: "Milk", unitSymbol: "L", quantity: 8, parLevel: 40, reorderPoint: 10 }),
+      // Above reorder point — excluded.
+      overviewRow({ itemId: ITEM_C, name: "Flour", quantity: 100, parLevel: 50, reorderPoint: 10 }),
+    ]);
+    mockFrom.mockReturnValueOnce(
+      chainable({
+        data: [
+          priceRow({ item_id: ITEM_A, supplier_id: SUP_A, unit_price: 30, suppliers: { name: "Fresh Farms" } }),
+          priceRow({ item_id: ITEM_B, supplier_id: SUP_B, unit_price: 58, suppliers: { name: "Dairy Co" } }),
+        ],
+        error: null,
+      }),
+    );
+    const { listReorderSuggestions } = await import("./purchasing");
+    const groups = await listReorderSuggestions();
+    expect(groups).toHaveLength(2);
+    // Sorted by supplier name.
+    expect(groups[0].supplierName).toBe("Dairy Co");
+    expect(groups[0].lines[0]).toMatchObject({
+      itemId: ITEM_B,
+      itemName: "Milk",
+      suggestedQty: 32, // 40 - 8
+      unitPrice: 58,
+    });
+    expect(groups[1].supplierName).toBe("Fresh Farms");
+    expect(groups[1].lines[0]).toMatchObject({
+      itemId: ITEM_A,
+      suggestedQty: 45, // 50 - 5
+      unitPrice: 30,
+    });
+  });
+
+  it("puts items without a preferred supplier in the unassigned group", async () => {
+    const { listStockOverview } = await import("./stock");
+    vi.mocked(listStockOverview).mockResolvedValue([
+      overviewRow({ itemId: ITEM_A, quantity: 5 }),
+    ]);
+    mockFrom.mockReturnValueOnce(chainable({ data: [], error: null }));
+    const { listReorderSuggestions } = await import("./purchasing");
+    const groups = await listReorderSuggestions();
+    expect(groups).toHaveLength(1);
+    expect(groups[0].supplierId).toBeNull();
+    expect(groups[0].supplierName).toBe("No preferred supplier");
+    expect(groups[0].lines[0].unitPrice).toBeNull();
+  });
+
+  it("suggests at least 1 base unit when par math yields <= 0", async () => {
+    const { listStockOverview } = await import("./stock");
+    vi.mocked(listStockOverview).mockResolvedValue([
+      // Misconfigured: par (5) < current (8), yet at/below reorder (10).
+      overviewRow({ itemId: ITEM_A, quantity: 8, parLevel: 5, reorderPoint: 10 }),
+    ]);
+    mockFrom.mockReturnValueOnce(
+      chainable({ data: [priceRow({})], error: null }),
+    );
+    const { listReorderSuggestions } = await import("./purchasing");
+    const groups = await listReorderSuggestions();
+    expect(groups[0].lines[0].suggestedQty).toBe(1);
+  });
+
+  it("throws when the preferred-price query fails", async () => {
+    const { listStockOverview } = await import("./stock");
+    vi.mocked(listStockOverview).mockResolvedValue([overviewRow({})]);
+    mockFrom.mockReturnValueOnce(
+      chainable({ data: null, error: { message: "boom" } }),
+    );
+    const { listReorderSuggestions } = await import("./purchasing");
+    await expect(listReorderSuggestions()).rejects.toThrow(/boom/);
   });
 });

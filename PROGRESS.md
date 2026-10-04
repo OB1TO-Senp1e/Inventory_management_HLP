@@ -301,3 +301,12 @@
 - Gates: typecheck ✅ · lint ✅ · test ✅ (414 passed, 43 files) · test:db ✅ · build ✅ · audit:wiring ✅ (51 rows, 7 modules) · audit:routes ✅ (static + live crawl) · test:e2e ✅ (128 passed, 22 skipped, 0 failed — full suite green).
 - Decisions: PO line's snapshotted `unit_price` is the price authority on receives (not the live price list); `receive_purchase_order` returns the new status + per-line received quantities so the client can toast distinctly; client-side over-receive guard is UX-only, the RPC trigger is the enforcement.
 - Next task: P3-03 (reorder suggestions).
+
+## 2026-10-05 — P3-03 reorder suggestions — DONE
+- `listReorderSuggestions()` (`src/api/purchasing.ts`): low-stock items (qty ≤ reorder_point, same predicate as P2-05) grouped by preferred supplier; one `supplier_prices` query for preferred prices; no migration, no new RPC. Suggested qty = par − current (min 1 base unit); unassigned group for items without a preferred supplier.
+- UI: "Reorder suggestions" section on `/stock` (owner/manager only): per-supplier groups with lines (current qty, suggested qty, unit price, line total, estimated total) and one-click "Create draft PO" → navigates to the new draft. Unassigned group shows a hint instead of a button.
+- `useReorderSuggestions()` hook; `src/features/purchasing/ReorderSuggestions.tsx` (new).
+- Tests: `src/api/purchasing.test.ts` (+5: grouping, unassigned, min qty, error, empty); `src/features/purchasing/ReorderSuggestions.test.tsx` (new, 5: loading/error/empty/populated, one-click creation + navigation); `src/features/purchasing/hooks.test.tsx` (+1); `src/features/stock/StockOverviewPage.test.tsx` (ToastProvider + mocked reorder hook — the new section needs both); `e2e/stock.spec.ts` (+5 deterministic: grouping, one-click PO creation, unassigned, manager access, staff bounce); `e2e/stub-backend.ts` (preferred Milk price, `in` filter support, `create_purchase_order` RPC stub). Fixed the pre-existing /stock error-state spec's locators (the new section's alert required text/parent scoping).
+- Gates: typecheck ✅ · lint ✅ · test ✅ (425 passed, 44 files) · test:db ✅ · build ✅ · audit:wiring ✅ (51 rows) · audit:routes ✅ (static + live crawl) · test:e2e ✅ (138 passed, 22 skipped, 0 failed).
+- Decisions: section lives on `/stock` (where low stock is seen) not `/purchase-orders`; no DB changes (reads only); ARCHITECTURE.md §11 updated.
+- Next task: P3-04 (PO print/PDF view).

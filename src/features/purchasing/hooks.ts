@@ -9,6 +9,7 @@ import {
   createPurchaseOrder,
   getPurchaseOrder,
   listPurchaseOrders,
+  listReorderSuggestions,
   receivePurchaseOrder,
   removePurchaseOrderLine,
   sendPurchaseOrder,
@@ -215,5 +216,21 @@ export function useReceivePurchaseOrder() {
     onError: (err: unknown) => {
       error(err instanceof Error ? err.message : "Could not post the receipt.");
     },
+  });
+}
+
+export const reorderSuggestionsQueryKey = ["reorder-suggestions"] as const;
+
+/**
+ * Reorder suggestions (P3-03): low-stock items grouped by preferred
+ * supplier. Disabled until the profile loads. Creating a PO from a group
+ * invalidates the PO list via useCreatePurchaseOrder.
+ */
+export function useReorderSuggestions() {
+  const restaurantId = useRestaurantId();
+  return useQuery({
+    queryKey: reorderSuggestionsQueryKey,
+    queryFn: listReorderSuggestions,
+    enabled: restaurantId !== null,
   });
 }

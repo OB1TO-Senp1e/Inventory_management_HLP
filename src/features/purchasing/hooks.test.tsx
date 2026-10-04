@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/toast/ToastProvider";
 import {
   cancelPurchaseOrder,
+  listReorderSuggestions,
   receivePurchaseOrder,
   sendPurchaseOrder,
 } from "@/api/purchasing";
@@ -14,6 +15,7 @@ import {
   purchaseOrdersQueryKey,
   useCancelPurchaseOrder,
   useReceivePurchaseOrder,
+  useReorderSuggestions,
   useSendPurchaseOrder,
 } from "./hooks";
 
@@ -25,6 +27,7 @@ vi.mock("@/api/purchasing", () => ({
   createPurchaseOrder: vi.fn(),
   getPurchaseOrder: vi.fn(),
   listPurchaseOrders: vi.fn(),
+  listReorderSuggestions: vi.fn(),
   receivePurchaseOrder: vi.fn(),
   removePurchaseOrderLine: vi.fn(),
   sendPurchaseOrder: vi.fn(),
@@ -130,5 +133,17 @@ describe("useReceivePurchaseOrder", () => {
     await waitFor(() => expect(mockedReceive).toHaveBeenCalled());
     // Toast assertion is via the provider; the distinct message path is
     // exercised (no throw). Success path verified by delegation above.
+  });
+});
+
+describe("useReorderSuggestions", () => {
+  it("delegates to listReorderSuggestions", async () => {
+    const groups = [
+      { supplierId: "sup-1", supplierName: "Fresh Farms", lines: [] },
+    ];
+    vi.mocked(listReorderSuggestions).mockResolvedValue(groups);
+    const { result } = renderHook(() => useReorderSuggestions(), { wrapper });
+    await waitFor(() => expect(result.current.data).toEqual(groups));
+    expect(listReorderSuggestions).toHaveBeenCalled();
   });
 });

@@ -92,6 +92,13 @@ const SUPPLIER_PRICES = [
     items: { name: "Tomato", units: { symbol: "kg" } },
     suppliers: { name: "Fresh Farms Produce" },
   },
+  {
+    id: "f0000000-0000-0000-0000-000000000002", supplier_id: SUPPLIERS[0].id, item_id: ITEMS[1].id,
+    unit_price: 55, currency: "INR", is_preferred: true, updated_at: NOW,
+    items: { name: "Milk", units: { symbol: "L" } },
+    suppliers: { name: "Fresh Farms Produce" },
+  },
+  // Flour (ITEMS[2]) deliberately has no preferred price → unassigned group.
 ];
 
 const CURRENT_STOCK = [
@@ -204,13 +211,14 @@ const PURCHASE_ORDER_LINES = [
 ];
 
 /**
- * Lifecycle RPC stubs. `send`/`cancel` return void (null body);
- * `receive` echoes a canned partially_received result. These let the
- * deterministic specs exercise the send/cancel/receive UI flows without
+ * Lifecycle RPC stubs. `create` returns a canned PO id; `send`/`cancel`
+ * return void (null body); `receive` echoes a canned partially_received
+ * result. These let the deterministic specs exercise the PO UI flows without
  * a backend; the real RPC semantics are covered by supabase/tests and
  * the live e2e flow.
  */
 const RPC_STUBS: Record<string, unknown> = {
+  "rpc:create_purchase_order": "c0000000-0000-0000-0000-000000000001",
   "rpc:send_purchase_order": null,
   "rpc:cancel_purchase_order": null,
   "rpc:receive_purchase_order": {
@@ -268,6 +276,12 @@ async function handle(route: Route): Promise<void> {
     }
     if (value === "is.null") {
       rows = rows.filter((row) => row[param] === null || row[param] === undefined);
+      continue;
+    }
+    const inMatch = /^in\.\((.*)\)$/.exec(value);
+    if (inMatch) {
+      const values = inMatch[1].split(",");
+      rows = rows.filter((row) => values.includes(String(row[param])));
       continue;
     }
     const m = /^(eq|neq|ilike)\.(.*)$/.exec(value);

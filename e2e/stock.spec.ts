@@ -348,11 +348,13 @@ test.describe("stock overview access", () => {
     }) => {
       await page.goto("/stock");
       // React Query retries (~7s backoff) before the error state renders.
-      await expect(page.getByRole("alert")).toHaveText(/could not load stock/i, {
-        timeout: 20000,
-      });
+      // Scoped to the stock table's error container: the reorder-suggestions
+      // section renders its own alert + retry on the same page.
+      const stockAlert = page.getByText("Could not load stock.", { exact: true });
+      await expect(stockAlert).toBeVisible({ timeout: 20000 });
+      const stockErrorBox = stockAlert.locator("xpath=..");
       await expect(
-        page.getByRole("button", { name: "Retry" }),
+        stockErrorBox.getByRole("button", { name: "Retry" }),
       ).toBeVisible();
     });
   });
@@ -396,6 +398,86 @@ test.describe("stock overview live flow", () => {
     // Seeded data has items; the exact rows depend on the live backend.
     await expect(page.getByText(/Showing \d+ of \d+ items/)).toBeVisible({
       timeout: 20000,
+    });
+  });
+});
+
+test.describe("reorder suggestions", () => {
+  test.describe("as owner", () => {
+    test.use({ role: "owner" });
+
+    test("low-stock items group by preferred supplier", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/stock");
+      const section = page.locator(
+        'section[aria-labelledby="reorder-suggestions-heading"]',
+      );
+      await expect(
+        section.getByRole("heading", { name: "Reorder suggestions" }),
+      ).toBeVisible();
+      // Milk (3 <= 10) has Fresh Farms as preferred supplier.
+      await expect(section.getByText("Fresh Farms Produce")).toBeVisible();
+      await expect(section.getByText("Milk")).toBeVisible();
+      await expect(section.getByText(/Order 37 L/i)).toBeVisible();
+      // Flour (0 <= 20) has no preferred supplier → unassigned group.
+      await expect(section.getByText("No preferred supplier")).toBeVisible();
+      await expect(section.getByText("Flour")).toBeVisible();
+      // Tomato (42.5 > 10) is not low-stock → not suggested.
+      await expect(section.getByText("Tomato")).not.toBeVisible();
+    });
+
+    test("one click creates a draft PO for the supplier group", async ({
+      page,
+    }) => {
+      await stubBackend(page);
+      await page.goto("/stock");
+      const section = page.locator(
+        'section[aria-labelledby="reorder-suggestions-heading"]',
+      );
+      await section
+        .getByRole("button", { name: /create draft po \(1 item\)/i })
+        .click();
+      // The stubbed create_purchase_order RPC returns a canned PO id;
+      // the app navigates to the new draft.
+      await expect(page).toHaveURL(
+        /\/purchase-orders\/c0000000-0000-0000-0000-000000000001/,
+        { timeout: 15000 },
+      );
+    });
+
+    test("unassigned group offers no PO button", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/stock");
+      const section = page.locator(
+        'section[aria-labelledby="reorder-suggestions-heading"]',
+      );
+      // Only the Fresh Farms group has a create button.
+      await expect(
+        section.getByRole("button", { name: /create draft po/i }),
+      ).toHaveCount(1);
+    });
+  });
+
+  test.describe("as manager", () => {
+    test.use({ role: "manager" });
+
+    test("manager sees reorder suggestions", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/stock");
+      await expect(
+        page.getByRole("heading", { name: "Reorder suggestions" }),
+      ).toBeVisible();
+    });
+  });
+
+  test.describe("as staff", () => {
+    test.use({ role: "staff" });
+
+    test("staff is bounced off the stock page (no reorder visibility)", async ({
+      page,
+    }) => {
+      await page.goto("/stock");
+      await expect(page).toHaveURL(/\/$/);
     });
   });
 });

@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastProvider } from "@/components/toast/ToastProvider";
 import { StockOverviewPage } from "./StockOverviewPage";
 import { useItemLookups } from "@/features/items/hooks";
 import {
@@ -15,6 +16,14 @@ vi.mock("@/features/items/hooks", () => ({ useItemLookups: vi.fn() }));
 vi.mock("@/features/items/stockHooks", () => ({
   useStockOverview: vi.fn(),
   useStockOverviewRealtime: vi.fn(),
+}));
+vi.mock("@/features/purchasing/hooks", () => ({
+  useReorderSuggestions: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  })),
 }));
 
 const mockedUseStockOverview = vi.mocked(useStockOverview);
@@ -83,7 +92,9 @@ function wrapper({ children }: { children: ReactNode }) {
   });
   return (
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{children}</MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter>{children}</MemoryRouter>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }
