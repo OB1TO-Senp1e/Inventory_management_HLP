@@ -12,12 +12,13 @@
 
 _(Add new blockers below, newest last. Mark resolved with date when cleared.)_
 
-## B-003 — No runnable headless browser in this VM (open; P0-06 live crawl deferred to CI)
+## B-003 — No runnable headless browser in this VM (RESOLVED 2026-10-05)
 
 - **What:** `pnpm audit:routes` phase 2 (Playwright live crawl) and `pnpm test:e2e` need a Chromium binary. Five honest attempts made 2026-10-04: (1) `npx playwright install chromium` hung on an interactive prompt — killed; (2) piped non-interactive retry — download started, then TLS socket timeout after ~5 min; (3) `apt-get install -y chromium` — installs a snap shim, and snapd is unavailable in this VM; (4) second download retry — same TLS timeout; (5) direct `curl` of the browser zip from cdn.playwright.dev — the CDN 307-redirects to `playwright.download.prss.microsoft.com`, which the egress proxy refuses (`GatewayExceptionResponse`).
 - **Blocks:** local live execution of the route crawl and e2e specs.
 - **Workaround:** the audit scripts are complete and correct; the static phases gate locally (`audit:wiring` fully, `audit:routes` phase 1). The live crawl prints an explicit DEFERRED banner (never a fake pass) and runs for real in CI, where `AUDIT_ROUTES_REQUIRE_LIVE=1` turns a missing browser into a hard failure. `npx playwright test --list` verified the specs load (16 tests across mobile 390px + desktop 1280px).
 - **Update 2026-10-04:** the CDN became reachable again and `pnpm exec playwright install chromium` succeeded — Chromium 1243 now lives in `~/.cache/ms-playwright` and renders the app correctly (verified with real screenshots of every built section). P2-03 ran the first green live `audit:routes` crawl in this VM. Blocker effectively resolved for local runs — close it once a full `pnpm test:e2e` passes locally. Related harness fix (P2-03, committed): `onAuthStateChange` is now mock-aware (no-op when `ri.mockRole` is active) — previously the real subscription's `INITIAL_SESSION(null)` clobbered mocked sessions.
+- **Resolved 2026-10-05:** full `pnpm test:e2e` passes locally — 94 passed, 18 skipped (live-backend specs, by design), 0 failed (`c8e3571`). Pre-existing spec bugs fixed (RQ-backoff timeouts, wrong staff access-model assertion), `e2e/stub-backend.ts` added for deterministic UI coverage, `test:e2e` builds with a dummy Supabase URL, and postgrest-js's hidden fetch retry disabled (React Query is the retry layer). Live `audit:routes` crawl also green.
 
 ## B-002 — `supabase start` cannot run in this VM (open; P0-02 blocked)
 

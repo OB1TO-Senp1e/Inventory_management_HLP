@@ -257,3 +257,15 @@
 - Manual checklist: no dead links/placeholders (live crawl verified every rendered href incl. the new detail links); loading/empty/error/success states test-covered; role matrix enforced by guard + RLS (staff bounced, db-tested); responsive unchanged (tables scroll horizontally on small screens).
 - Blockers: none new. B-001 (branding/credentials) still open; B-002 (Docker) still open.
 - Next task: P2-05 (Stock overview screen: filter by category/location/low/expiring, realtime updates)
+
+## 2026-10-05 — E2E stabilization (between P2-04 and P2-05) — `c8e3571`
+- Full `pnpm test:e2e` now green locally: **94 passed, 18 skipped (live-backend specs, by design), 0 failed** (2.2 min). B-003 RESOLVED.
+- Root causes fixed:
+  1. Pre-existing specs raced React Query's retry backoff (~7s) with 5s Playwright timeouts → bumped no-backend error-state assertions to 20s.
+  2. `e2e/stub-backend.ts` (new): intercepts `**/rest/v1/**` and serves canned rows so specs exercise the REAL receiving/wastage form UI deterministically with zero backend. Replaces the weak "backend-aware branch" pattern.
+  3. `pnpm test:e2e` now builds with a dummy Supabase URL (`http://127.0.0.1:54321`) — without a URL the client throws before any request and there is nothing to intercept. Documented in `playwright.config.ts`.
+  4. Disabled postgrest-js's hidden fetch retry (`db: { retry: false }` in `getSupabaseClient`): it stacked with React Query's 3 retries, taking ~35s to surface errors instead of ~7s. React Query is the single retry layer.
+  5. Fixed a wrong spec: staff opening-balance test visited `/items` (owner/manager-only) — staff bounce at the route guard, so the spec now asserts the bounce.
+- Also: `.gitignore` now excludes `test-results/` and `playwright-report/`.
+- Gates re-verified: unit 345/345, typecheck, lint, test:db all green.
+- VM restarted mid-session; recovered per TOOLS.md (pnpm 9.12.0 + PostgreSQL 16 reinstall, DB rebuilt from interim setup + 12 migrations).
