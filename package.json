@@ -44,9 +44,11 @@
     "build": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && vite build",
     "dev": "vite",
     "gen:types": "supabase gen types typescript --local > src/types/database.ts",
+    "gen:types:interim": "supabase gen types typescript --db-url \"host=/var/run/postgresql user=root dbname=restaurant_inventory\" --schema public > src/types/database.ts && prettier --write src/types/database.ts",
     "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:db": "bash scripts/test-db.sh",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },
   "type": "module",

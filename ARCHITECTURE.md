@@ -145,7 +145,9 @@ Views: `current_stock`, `low_stock_alerts` (≤ reorder point), `expiring_soon` 
 ## 11. Decisions log
 
 - 2026-10-04 (Run 0): Fixed stack adopted as specified. Single-restaurant v1; no POS/barcode/multi-outlet. Ledger + RPC architecture chosen for auditability. Locale India defaults.
+- 2026-10-04: Interim dev DB = native local PostgreSQL 16 (Docker unavailable in this VM; Supabase local stack can't run). RLS helpers (`current_restaurant_id()`, `has_role()`) read `current_setting('request.jwt.claims', true)` — the same mechanism Supabase uses to populate `auth.jwt()` — so migrations and RLS verify identically locally and on Supabase cloud. Interim-only scaffolding (stub `auth.users`) lives in `scripts/interim-db-setup.sql`, never in migrations. User authorized completing the project before Supabase credentials arrive (".env can be configured later"); re-verify all migrations against cloud on credential arrival.
 - 2026-10-04 (Run 1 / P0-01): React pinned to 18.3 (template defaulted to 19); TypeScript 5.7 (dropped `erasableSyntaxOnly`, a 5.8+ option); shadcn/ui wired manually without CLI; ESLint 9 flat config with `--max-warnings 0`; pnpm 9.12.0. All deps are fixed-stack items — no new dependency justifications needed.
+- 2026-10-04 (Run 3 / P0-03): `pnpm test:db` runs `supabase/tests/*.sql` against the interim DB (fails non-zero on error); `gen:types:interim` generates `src/types/database.ts` via the project-local CLI over unix-socket peer auth (`--db-url` keyword/value form — the CLI rejects the URL form for sockets). DB types are never hand-written.
 - _(append new decisions here, newest last)_
 
 ## 12. Dependency justifications
