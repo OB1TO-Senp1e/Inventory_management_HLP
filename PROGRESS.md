@@ -36,3 +36,11 @@
 - Gates: typecheck ✅ lint ✅ (0 errors, 0 warnings) test ✅ (3 passed) test:db ✅ (30 assertions) build ✅ — migration applies cleanly; RLS tests run as non-superuser `authenticated`
 - Decisions made: CLI type-gen needs keyword/value --db-url over unix socket (URL form rejected); test files staged to /tmp via `install -m 644` (postgres OS user can't traverse /home/hatch; repo files are 660). Noted in ~/TOOLS.md.
 - Next task: P0-04 (Auth)
+
+## Run 4 — 2026-10-04 — P0-04a Auth UI + guards (no live GoTrue)
+
+- What changed: `src/schemas/{role,auth}.ts` (Zod: role enum, sign-in/reset inputs); `src/api/auth.ts` — the only module touching supabase auth (`signIn`, `signOut`, `resetPassword`, `getSession`, `getCurrentProfile`, `onAuthStateChange`), Zod-validated inputs, typed outputs; `src/features/auth/` — `AuthProvider` (session restore via Supabase client persistence, profile/role load, error state for missing .env), `AuthContext`/`useAuth`, `LoginPage` (RHF+Zod, inline errors, disabled-while-submitting, error toast, `from`-destination redirect), `ResetPasswordPage` (success state + toast), `SignOutButton`, interim aria-live `Toast`; `src/routes/` — `ProtectedRoute` (→ /login preserving destination), `RoleGuard` (matrix enforcement, denied → /), `access.ts` route→roles map, `AuthLoading`; `AppRoutes` wires `/login` + `/reset-password` as public under `AuthProvider`. Tests: `src/api/auth.test.ts` (13), `src/routes/guards.test.tsx` (11), `src/features/auth/LoginPage.test.tsx` (4) — all with mocked client, zero network. ROUTES.md `/login`+`/reset-password` → DONE (e2e deferred to P0-04b); FEATURE_MATRIX.md auth rows added.
+- Gates: typecheck ✅ lint ✅ (0 errors, 0 warnings) test ✅ (31 passed) build ✅
+- Decisions made: jsdom + Testing Library added (justified in ARCHITECTURE.md §12); vitest `environment: jsdom` + setup file with per-test cleanup; jest-dom types via tsconfig `types`; interim Toast replaced by P0-05's toast system; `userRoleSchema` is the client role source of truth; live GoTrue e2e split to P0-04b (needs cloud credentials).
+- Blockers: none new. B-002 still open (no Docker in VM; interim native PG16 in use); P0-04b waits on Supabase cloud credentials (B-001).
+- Next task: P0-05 (AppShell)

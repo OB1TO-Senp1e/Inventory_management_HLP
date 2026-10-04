@@ -5,8 +5,8 @@
 
 | path                   | component                                     | roles                 | linked from  | status | e2e spec                 |
 | ---------------------- | --------------------------------------------- | --------------------- | ------------ | ------ | ------------------------ |
-| `/login`               | `features/auth/LoginPage`                     | public                | redirect     | TODO   | `e2e/auth.spec.ts`       |
-| `/reset-password`      | `features/auth/ResetPasswordPage`             | public                | login        | TODO   | `e2e/auth.spec.ts`       |
+| `/login`               | `features/auth/LoginPage`                     | public                | redirect     | DONE   | `e2e/auth.spec.ts` (deferred: P0-04b) |
+| `/reset-password`      | `features/auth/ResetPasswordPage`             | public                | login        | DONE   | `e2e/auth.spec.ts` (deferred: P0-04b) |
 | `/dashboard`           | `features/dashboard/DashboardPage`            | owner, manager        | AppShell nav | TODO   | `e2e/dashboard.spec.ts`  |
 | `/items`               | `features/items/ItemsPage`                    | owner, manager        | AppShell nav | TODO   | `e2e/items.spec.ts`      |
 | `/items/:id`           | `features/items/ItemDetailPage`               | owner, manager        | items list   | TODO   | `e2e/items.spec.ts`      |

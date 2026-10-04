@@ -8,8 +8,9 @@
 - [DONE] P0-01 | Repo init: Vite + React + TS strict, Tailwind, shadcn/ui, ESLint, Prettier, pnpm scripts, .env.example | depends: — | acceptance: pnpm install && pnpm typecheck && pnpm lint && pnpm build all pass on fresh clone
 - [BLOCKED] P0-02 | Supabase project setup: CLI config, migrations folder, type generation script, local dev README | depends: P0-01 | acceptance: supabase start works locally; pnpm gen:types produces src/types/database.ts; README documents local dev
 - [DONE] P0-03 | Core schema migration: restaurants, profiles (role), categories, storage locations, units + RLS helpers | depends: P0-02 | acceptance: migration applies cleanly; current_restaurant_id() and has_role() work; RLS denies cross-restaurant reads (db test)
-- [TODO] P0-04 | Auth: sign in, sign out, password reset, session persistence, protected routes, role guard | depends: P0-03 | acceptance: sign in/out/reset flows pass on 390px+1280px; unauthenticated route redirects; role guard blocks staff from /reports
-- [TODO] P0-05 | AppShell: responsive layout, navigation per role, breadcrumbs, toast system, error boundary, 404 page, theme tokens | depends: P0-04 | acceptance: nav renders per role; 404 page shows on unknown route; no overflow at 360/768/1280
+- [DONE] P0-04a | Auth UI + guards (no live GoTrue): sign in/out/reset screens, session persistence wiring, protected routes, role guard | depends: P0-03 | acceptance: guard unit tests pass; protected routes redirect with mocked session; role guard enforces matrix; typecheck/lint/test/build green
+- [TODO] P0-04b | Live auth e2e against Supabase cloud (deferred until credentials) | depends: P0-02 | acceptance: sign in/out/reset flows pass on 390px+1280px against real GoTrue; unauthenticated route redirects
+- [TODO] P0-05 | AppShell: responsive layout, navigation per role, breadcrumbs, toast system, error boundary, 404 page, theme tokens | depends: P0-04a | acceptance: nav renders per role; 404 page shows on unknown route; no overflow at 360/768/1280
 - [TODO] P0-06 | Audit tooling: audit-routes.ts, audit-wiring.ts, Playwright config with 3 role fixtures, CI workflow | depends: P0-05 | acceptance: pnpm audit:routes and pnpm audit:wiring run and fail correctly on a deliberate gap; CI runs all gates
 - [TODO] P0-07 | Seed data and test users (one per role) | depends: P0-03 | acceptance: seed.sql loads 1 restaurant, 3 users (owner/manager/staff), sample categories/locations/units; dev login documented
 
@@ -49,8 +50,8 @@
 - [TODO] P5-02 | Variance review and approval → RPC apply_stock_count posts adjustments | depends: P5-01, P2-01 | acceptance: variance = counted − expected shown; approve posts count_adjustment movements; staff cannot approve
 - [TODO] P5-03 | Dashboard: low stock, expiring soon, today's usage and wastage, stock value (owner/manager) | depends: P2-05, P2-03 | acceptance: dashboard cards match underlying queries; staff sees no costs; loads < 2s on seeded data
 - [TODO] P5-04 | Reports: usage, wastage by reason, food cost trend, supplier price changes; date filters; CSV export | depends: P4-02, P2-03 | acceptance: each report filters by date; CSV export downloads; charts render with empty state
-- [TODO] P5-05 | Audit log screen (owner only) | depends: P0-04 | acceptance: sensitive actions listed with actor/time; staff/manager blocked by RLS; filter by action/date
-- [TODO] P5-06 | User management (owner): invite, change role, deactivate | depends: P0-04 | acceptance: owner invites/changes role/deactivates; deactivated user cannot sign in; audit entry written
+- [TODO] P5-05 | Audit log screen (owner only) | depends: P0-04a | acceptance: sensitive actions listed with actor/time; staff/manager blocked by RLS; filter by action/date
+- [TODO] P5-06 | User management (owner): invite, change role, deactivate | depends: P0-04b | acceptance: owner invites/changes role/deactivates; deactivated user cannot sign in; audit entry written
 
 ## Phase 6 — Production hardening
 

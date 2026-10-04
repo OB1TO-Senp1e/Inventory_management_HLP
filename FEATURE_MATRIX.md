@@ -6,11 +6,16 @@
 
 | screen/action                    | component | api function | DB object | RLS roles | test file |
 | -------------------------------- | --------- | ------------ | --------- | --------- | --------- |
-| _(rows added from P0-01 onward)_ | —         | —            | —         | —         | —         |
+| Sign in                          | `features/auth/LoginPage` | `signIn` | GoTrue `auth.users` | public | `src/api/auth.test.ts`, `src/features/auth/LoginPage.test.tsx` |
+| Reset password                     | `features/auth/ResetPasswordPage` | `resetPassword` | GoTrue `auth.users` | public | `src/api/auth.test.ts` |
+| Sign out                           | `features/auth/SignOutButton` | `signOut` | GoTrue `auth.users` | owner, manager, staff | `src/api/auth.test.ts` |
+| Session restore + role load        | `features/auth/AuthProvider` | `getSession`, `getCurrentProfile`, `onAuthStateChange` | `profiles` | owner, manager, staff | `src/api/auth.test.ts` |
+| Protected route redirect           | `routes/ProtectedRoute` | `getSession` (via AuthProvider) | `profiles` | owner, manager, staff | `src/routes/guards.test.tsx` |
+| Role-based route guard             | `routes/RoleGuard` (+ `routes/access.ts` map) | `getCurrentProfile` (via AuthProvider) | `profiles` | owner, manager, staff | `src/routes/guards.test.tsx` |
 
 ## Planned coverage (checklist, not yet rows)
 
-- [ ] Auth: sign in/out/reset → `profiles` → `e2e/auth.spec.ts`
+- [x] Auth: sign in/out/reset → `profiles` → unit tests done in P0-04a; live GoTrue e2e (`e2e/auth.spec.ts`) deferred to P0-04b
 - [ ] Items CRUD → `items` → `supabase/tests/items_rls_test.sql`
 - [ ] Suppliers + price list → `suppliers`, `supplier_prices` → e2e + db tests
 - [ ] Receiving (`receive_goods`) → `stock_movements` → RPC tests
