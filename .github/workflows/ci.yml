@@ -1,0 +1,89 @@
+# CI — runs every quality gate from the loop prompt (§5).
+#
+# P0-06 audit tooling owns this file. The route audit's live crawl runs here
+# for real: browsers are installed and AUDIT_ROUTES_REQUIRE_LIVE=1 turns a
+# missing browser into a hard failure (no deferral allowed in CI).
+# test:db runs against the postgres service container; scripts/test-db.sh
+# switches to TCP when PGHOST is set.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: restaurant_inventory
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Set up test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d restaurant_inventory -f scripts/interim-db-setup.sql
+          for f in supabase/migrations/*.sql; do
+            psql -h localhost -U postgres -d restaurant_inventory -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: DB tests (RPCs + RLS)
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: restaurant_inventory
+        run: pnpm test:db
+
+      - name: Build
+        run: pnpm build
+
+      - name: Wiring audit
+        run: pnpm audit:wiring
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Route audit (live crawl)
+        env:
+          AUDIT_ROUTES_REQUIRE_LIVE: 1
+        run: pnpm audit:routes
+
+      - name: E2E smoke spec (mobile + desktop)
+        run: pnpm test:e2e

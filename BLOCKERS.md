@@ -12,6 +12,12 @@
 
 _(Add new blockers below, newest last. Mark resolved with date when cleared.)_
 
+## B-003 — No runnable headless browser in this VM (open; P0-06 live crawl deferred to CI)
+
+- **What:** `pnpm audit:routes` phase 2 (Playwright live crawl) and `pnpm test:e2e` need a Chromium binary. Five honest attempts made 2026-10-04: (1) `npx playwright install chromium` hung on an interactive prompt — killed; (2) piped non-interactive retry — download started, then TLS socket timeout after ~5 min; (3) `apt-get install -y chromium` — installs a snap shim, and snapd is unavailable in this VM; (4) second download retry — same TLS timeout; (5) direct `curl` of the browser zip from cdn.playwright.dev — the CDN 307-redirects to `playwright.download.prss.microsoft.com`, which the egress proxy refuses (`GatewayExceptionResponse`).
+- **Blocks:** local live execution of the route crawl and e2e specs.
+- **Workaround:** the audit scripts are complete and correct; the static phases gate locally (`audit:wiring` fully, `audit:routes` phase 1). The live crawl prints an explicit DEFERRED banner (never a fake pass) and runs for real in CI, where `AUDIT_ROUTES_REQUIRE_LIVE=1` turns a missing browser into a hard failure. `npx playwright test --list` verified the specs load (16 tests across mobile 390px + desktop 1280px).
+
 ## B-002 — `supabase start` cannot run in this VM (open; P0-02 blocked)
 
 - **Status 2026-10-04:** user chose the Supabase cloud project path — awaiting project URL, anon key, and DB password. Plan: `supabase link`, verify connectivity, `pnpm gen:types` against cloud DB, then mark P0-02 DONE and continue to P0-03.

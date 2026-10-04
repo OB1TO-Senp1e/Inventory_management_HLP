@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getCurrentProfile, getSession, resetPassword, signIn, signOut } from "./auth";
 
@@ -155,5 +155,38 @@ describe("getCurrentProfile", () => {
     });
     mockProfileQuery({ id: "u1", restaurant_id: "r1", role: "superadmin" }, null);
     await expect(getCurrentProfile()).rejects.toThrow();
+  });
+});
+
+describe("mock role (test-only session mock)", () => {
+  const KEY = "ri.mockRole";
+
+  afterEach(() => {
+    window.localStorage.removeItem(KEY);
+  });
+
+  it("synthesizes a session without touching the client", async () => {
+    window.localStorage.setItem(KEY, "owner");
+    await expect(getSession()).resolves.toEqual({
+      userId: "mock-owner-user",
+      email: "owner@example.com",
+    });
+    expect(mockedGetSupabaseClient).not.toHaveBeenCalled();
+  });
+
+  it("synthesizes a profile without querying the database", async () => {
+    window.localStorage.setItem(KEY, "staff");
+    await expect(getCurrentProfile()).resolves.toEqual({
+      id: "mock-staff-user",
+      restaurantId: "mock-restaurant",
+      role: "staff",
+    });
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("ignores an invalid mock role value", async () => {
+    window.localStorage.setItem(KEY, "superadmin");
+    mockAuth.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    await expect(getSession()).resolves.toBeNull();
   });
 });

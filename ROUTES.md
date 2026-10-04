@@ -7,6 +7,7 @@
 | ---------------------- | --------------------------------------------- | --------------------- | ------------ | ------ | ------------------------ |
 | `/login`               | `features/auth/LoginPage`                     | public                | redirect     | DONE   | `e2e/auth.spec.ts` (deferred: P0-04b) |
 | `/reset-password`      | `features/auth/ResetPasswordPage`             | public                | login        | DONE   | `e2e/auth.spec.ts` (deferred: P0-04b) |
+| `/`                    | `features/home/HomePage`                      | owner, manager, staff | AppShell nav | DONE   | `e2e/smoke.spec.ts` |
 | `/dashboard`           | `features/dashboard/DashboardPage`            | owner, manager        | AppShell nav | TODO   | `e2e/dashboard.spec.ts`  |
 | `/items`               | `features/items/ItemsPage`                    | owner, manager        | AppShell nav | TODO   | `e2e/items.spec.ts`      |
 | `/items/:id`           | `features/items/ItemDetailPage`               | owner, manager        | items list   | TODO   | `e2e/items.spec.ts`      |
@@ -24,6 +25,6 @@
 | `/audit-log`           | `features/admin/AuditLogPage`                 | owner                 | AppShell nav | TODO   | `e2e/admin.spec.ts`      |
 | `/users`               | `features/admin/UsersPage`                    | owner                 | AppShell nav | TODO   | `e2e/admin.spec.ts`      |
 | `/settings`            | `features/settings/SettingsPage`              | owner, manager        | AppShell nav | TODO   | `e2e/settings.spec.ts`   |
-| `*`                    | `components/NotFoundPage`                     | public                | —            | DONE   | `e2e/auth.spec.ts` (deferred: P0-06) |
+| `*`                    | `components/NotFoundPage`                     | public                | —            | DONE   | `e2e/smoke.spec.ts` |
 
 _Run 0: planned routes only. Components and specs are created by their tasks (P0-04 auth, P0-05 shell, then feature phases)._

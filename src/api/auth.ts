@@ -41,6 +41,35 @@ function parseOrThrow<T>(schema: z.ZodSchema<T>, input: unknown, what: string): 
   return result.data;
 }
 
+/**
+ * TEST-ONLY session mock (P0-06 audit tooling).
+ *
+ * When `localStorage` holds the key `ri.mockRole` with a valid role
+ * ("owner" | "manager" | "staff"), `getSession()` and `getCurrentProfile()`
+ * synthesize a session/profile WITHOUT any network access. This lets the
+ * route audit (`pnpm audit:routes`) and the Playwright fixtures
+ * (`e2e/fixtures.ts`) exercise role-gated pages without a live GoTrue.
+ * The key is only ever set by those harnesses (via `page.addInitScript`);
+ * it is never set in production use.
+ *
+ * RLS remains the real enforcement — this only changes which UI the router
+ * renders, never what data the client can fetch.
+ */
+const MOCK_ROLE_STORAGE_KEY = "ri.mockRole";
+
+function readMockRole(): UserRole | null {
+  try {
+    const raw = window.localStorage.getItem(MOCK_ROLE_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = userRoleSchema.safeParse(raw);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Sign in with email + password. Throws a human-readable Error on failure. */
 export async function signIn(input: SignInInput): Promise<AuthSession> {
   const parsed = parseOrThrow(signInSchema, input, "credentials");
@@ -82,6 +111,10 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
 
 /** The currently persisted session, or null when signed out. */
 export async function getSession(): Promise<AuthSession | null> {
+  const mockRole = readMockRole();
+  if (mockRole) {
+    return { userId: `mock-${mockRole}-user`, email: `${mockRole}@example.com` };
+  }
   const client = getSupabaseClient();
   const { data, error } = await client.auth.getSession();
   if (error) {
@@ -99,6 +132,14 @@ export async function getSession(): Promise<AuthSession | null> {
  * there is no session. Throws when the row is missing or the role is unknown.
  */
 export async function getCurrentProfile(): Promise<UserProfile | null> {
+  const mockRole = readMockRole();
+  if (mockRole) {
+    return {
+      id: `mock-${mockRole}-user`,
+      restaurantId: "mock-restaurant",
+      role: mockRole,
+    };
+  }
   const session = await getSession();
   if (!session) {
     return null;

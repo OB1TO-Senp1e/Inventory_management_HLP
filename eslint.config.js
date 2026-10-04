@@ -25,5 +25,14 @@ export default tseslint.config(
       "no-console": "error",
     },
   },
+  {
+    // Playwright fixtures call the `use` callback, which the React Hooks
+    // rule misreads; scripts/e2e contain no React components at all.
+    files: ["e2e/**/*.{ts,tsx}", "playwright.config.ts", "scripts/**/*.ts"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+      "react-refresh/only-export-components": "off",
+    },
+  },
   prettierConfig,
 );
