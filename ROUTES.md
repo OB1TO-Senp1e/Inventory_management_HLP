@@ -11,7 +11,7 @@
 | `/dashboard`           | `features/dashboard/DashboardPage`            | owner, manager        | AppShell nav | TODO   | `e2e/dashboard.spec.ts`  |
 | `/items`               | `features/items/ItemsPage`                    | owner, manager        | AppShell nav | DONE   | `e2e/items.spec.ts`      |
 | `/items/:id`           | `features/items/ItemDetailPage`               | owner, manager        | items list   | TODO   | `e2e/items.spec.ts`      |
-| `/suppliers`           | `features/suppliers/SuppliersPage`            | owner, manager        | AppShell nav | TODO   | `e2e/suppliers.spec.ts`  |
+| `/suppliers`           | `features/suppliers/SuppliersPage`            | owner, manager        | AppShell nav | DONE   | `e2e/suppliers.spec.ts`  |
 | `/purchase-orders`     | `features/purchasing/PurchaseOrdersPage`      | owner, manager        | AppShell nav | TODO   | `e2e/purchasing.spec.ts` |
 | `/purchase-orders/:id` | `features/purchasing/PurchaseOrderDetailPage` | owner, manager        | PO list      | TODO   | `e2e/purchasing.spec.ts` |
 | `/receiving`           | `features/stock/ReceivingPage`                | owner, manager, staff | AppShell nav | TODO   | `e2e/stock.spec.ts`      |

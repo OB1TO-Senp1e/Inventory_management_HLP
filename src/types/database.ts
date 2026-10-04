@@ -212,6 +212,62 @@ export type Database = {
           },
         ];
       };
+      suppliers: {
+        Row: {
+          active: boolean;
+          address: string | null;
+          contact_person: string | null;
+          created_at: string;
+          created_by: string | null;
+          email: string | null;
+          gstin: string | null;
+          id: string;
+          name: string;
+          notes: string | null;
+          phone: string | null;
+          restaurant_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          active?: boolean;
+          address?: string | null;
+          contact_person?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          gstin?: string | null;
+          id?: string;
+          name: string;
+          notes?: string | null;
+          phone?: string | null;
+          restaurant_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          active?: boolean;
+          address?: string | null;
+          contact_person?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          gstin?: string | null;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          phone?: string | null;
+          restaurant_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       units: {
         Row: {
           created_at: string;

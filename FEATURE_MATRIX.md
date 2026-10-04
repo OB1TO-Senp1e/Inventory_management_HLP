@@ -33,13 +33,17 @@
 | Rename storage location | `features/settings/TaxonomyDialog` | `updateLocation` | `storage_locations` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx` |
 | Archive storage location (soft delete) | `features/settings/TaxonomySection` + `components/ConfirmDialog` | `archiveLocation` | `storage_locations` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx` |
 | Delete storage location (blocked when in use) | `features/settings/DeleteTaxonomyDialog` | `deleteLocation`, `countLocationItems` | `storage_locations`, `items` | owner, manager | `src/api/taxonomy.test.ts`, `src/features/settings/hooks.test.tsx`, `supabase/tests/p1_02_taxonomy_test.sql` |
+| Suppliers list (search, filter, sort, paginate) | `features/suppliers/SuppliersPage` | `listSuppliers` | `suppliers` | owner, manager | `src/api/suppliers.test.ts`, `src/features/suppliers/hooks.test.tsx`, `src/features/suppliers/SuppliersPage.test.tsx` |
+| Create supplier | `features/suppliers/SupplierDialog` | `createSupplier` | `suppliers` | owner, manager | `src/api/suppliers.test.ts` |
+| Edit supplier | `features/suppliers/SupplierDialog` | `getSupplier`, `updateSupplier` | `suppliers` | owner, manager | `src/api/suppliers.test.ts` |
+| Archive supplier (soft delete) | `features/suppliers/SuppliersPage` + `components/ConfirmDialog` | `archiveSupplier` | `suppliers` | owner, manager | `src/api/suppliers.test.ts`, `supabase/tests/p1_03_suppliers_test.sql` |
 
 ## Planned coverage (checklist, not yet rows)
 
 - [x] Auth: sign in/out/reset → `profiles` → unit tests done in P0-04a; live GoTrue e2e (`e2e/auth.spec.ts`) deferred to P0-04b
 - [x] Items CRUD → `items` → `supabase/tests/p1_01_items_rls_test.sql` (P1-01); e2e `e2e/items.spec.ts` (deterministic specs run everywhere, live CRUD in CI)
 - [x] Categories + storage locations management → `item_categories`, `storage_locations` → `supabase/tests/p1_02_taxonomy_test.sql` (P1-02: active flag, RESTRICT deletes, RLS); e2e `e2e/settings.spec.ts` (deterministic specs run everywhere, live CRUD in CI)
-- [ ] Suppliers + price list → `suppliers`, `supplier_prices` → e2e + db tests
+- [x] Suppliers → `suppliers` → `supabase/tests/p1_03_suppliers_test.sql` (P1-03: CRUD, active-filter PO-prefill contract, RLS); e2e `e2e/suppliers.spec.ts` (deterministic specs run everywhere, live CRUD in CI). Supplier price list lands in P1-04.
 - [ ] Receiving (`receive_goods`) → `stock_movements` → RPC tests
 - [ ] Wastage/usage (`log_wastage`, `log_usage`) → `stock_movements` → RPC tests
 - [ ] Stock overview + item detail → `current_stock` view → e2e
