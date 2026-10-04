@@ -46,6 +46,8 @@
 | Export suppliers to CSV | `features/suppliers/SuppliersPage` + `lib/csv` | `listSuppliers` | `suppliers` | owner, manager | `src/lib/csv.test.ts`, `src/features/importExport/hooks.test.tsx` |
 | Import suppliers from CSV (validation preview + error report) | `components/CsvImportDialog` + `features/importExport/supplierCsv` | `createSupplier` | `suppliers` | owner, manager | `src/components/CsvImportDialog.test.tsx`, `src/features/importExport/supplierCsv.test.ts`, `src/features/importExport/hooks.test.tsx` |
 | CSV template download | `components/CsvImportDialog` | — (client only) | — | owner, manager | `src/components/CsvImportDialog.test.tsx` |
+| Set opening balance for an item | `features/items/OpeningBalanceDialog` (+ `ItemsPage` action) | `createOpeningBalance` | RPC `create_opening_balance` → `stock_movements` | owner, manager | `src/api/stock.test.ts`, `src/features/items/stockHooks.test.tsx`, `supabase/tests/p2_01_stock_ledger_test.sql` |
+| View current stock for an item | `features/items/OpeningBalanceDialog` (header) | `getCurrentStock` | view `current_stock` | owner, manager | `src/api/stock.test.ts`, `src/features/items/stockHooks.test.tsx` |
 
 ## Planned coverage (checklist, not yet rows)
 
@@ -54,6 +56,7 @@
 - [x] Categories + storage locations management → `item_categories`, `storage_locations` → `supabase/tests/p1_02_taxonomy_test.sql` (P1-02: active flag, RESTRICT deletes, RLS); e2e `e2e/settings.spec.ts` (deterministic specs run everywhere, live CRUD in CI)
 - [x] Suppliers → `suppliers` → `supabase/tests/p1_03_suppliers_test.sql` (P1-03: CRUD, active-filter PO-prefill contract, RLS); e2e `e2e/suppliers.spec.ts` (deterministic specs run everywhere, live CRUD in CI). Supplier price list → `supplier_prices` + `supplier_price_history` → `supabase/tests/p1_04_supplier_prices_test.sql` (P1-04: RLS, preferred uniqueness, history trigger); e2e `e2e/prices.spec.ts` (deterministic specs run everywhere, live CRUD in CI).
 - [x] CSV import/export (items + suppliers) → validation preview + error report → `src/lib/csv.ts`, `src/features/importExport/` (P1-05); e2e `e2e/import-export.spec.ts` (deterministic specs run everywhere, live import in CI)
+- [x] Stock ledger foundation → `stock_movements` (append-only: trigger + RLS + ACL) → `supabase/tests/p2_01_stock_ledger_test.sql` (P2-01: 32 assertions — trigger/ACL/policy layers, current_stock sums + isolation, create_opening_balance RPC); e2e `e2e/stock.spec.ts` (deterministic specs run everywhere, live flow in CI)
 - [ ] Receiving (`receive_goods`) → `stock_movements` → RPC tests
 - [ ] Wastage/usage (`log_wastage`, `log_usage`) → `stock_movements` → RPC tests
 - [ ] Stock overview + item detail → `current_stock` view → e2e

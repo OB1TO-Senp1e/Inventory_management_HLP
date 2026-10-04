@@ -44,6 +44,7 @@ export type Database = {
       items: {
         Row: {
           active: boolean;
+          avg_unit_cost: number;
           category_id: string | null;
           created_at: string;
           created_by: string | null;
@@ -58,6 +59,7 @@ export type Database = {
         };
         Insert: {
           active?: boolean;
+          avg_unit_cost?: number;
           category_id?: string | null;
           created_at?: string;
           created_by?: string | null;
@@ -72,6 +74,7 @@ export type Database = {
         };
         Update: {
           active?: boolean;
+          avg_unit_cost?: number;
           category_id?: string | null;
           created_at?: string;
           created_by?: string | null;
@@ -173,6 +176,69 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [];
+      };
+      stock_movements: {
+        Row: {
+          batch_no: string | null;
+          created_at: string;
+          created_by: string | null;
+          expiry_date: string | null;
+          id: string;
+          item_id: string;
+          movement_type: string;
+          notes: string | null;
+          quantity: number;
+          reference_id: string | null;
+          reference_type: string | null;
+          restaurant_id: string;
+          unit_cost: number | null;
+        };
+        Insert: {
+          batch_no?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          expiry_date?: string | null;
+          id?: string;
+          item_id: string;
+          movement_type: string;
+          notes?: string | null;
+          quantity: number;
+          reference_id?: string | null;
+          reference_type?: string | null;
+          restaurant_id: string;
+          unit_cost?: number | null;
+        };
+        Update: {
+          batch_no?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          expiry_date?: string | null;
+          id?: string;
+          item_id?: string;
+          movement_type?: string;
+          notes?: string | null;
+          quantity?: number;
+          reference_id?: string | null;
+          reference_type?: string | null;
+          restaurant_id?: string;
+          unit_cost?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_item_id_fkey";
+            columns: ["item_id"];
+            isOneToOne: false;
+            referencedRelation: "items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_movements_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       storage_locations: {
         Row: {
@@ -410,9 +476,36 @@ export type Database = {
       };
     };
     Views: {
-      [_ in never]: never;
+      current_stock: {
+        Row: {
+          item_id: string | null;
+          last_movement_at: string | null;
+          quantity: number | null;
+          restaurant_id: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_item_id_fkey";
+            columns: ["item_id"];
+            isOneToOne: false;
+            referencedRelation: "items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_movements_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Functions: {
+      create_opening_balance: {
+        Args: { p_item_id: string; p_quantity: number; p_unit_cost: number };
+        Returns: string;
+      };
       current_restaurant_id: { Args: Record<PropertyKey, never>; Returns: string };
       dearmor: { Args: { "": string }; Returns: string };
       gen_random_uuid: { Args: Record<PropertyKey, never>; Returns: string };

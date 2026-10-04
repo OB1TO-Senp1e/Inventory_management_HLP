@@ -10,9 +10,12 @@ import {
   Pencil,
   Search,
   Trash2,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ItemDialog } from "./ItemDialog";
+import { OpeningBalanceDialog } from "./OpeningBalanceDialog";
 import {
   CsvImportDialog,
   type ValidatedRow,
@@ -36,7 +39,6 @@ import {
   useItemLookups,
   useItems,
 } from "./hooks";
-import { ItemDialog } from "./ItemDialog";
 
 const PAGE_SIZE = 20;
 
@@ -128,6 +130,8 @@ export function ItemsPage() {
   const [page, setPage] = useState(1);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [archiveTarget, setArchiveTarget] = useState<Item | null>(null);
+  const [openingBalanceTarget, setOpeningBalanceTarget] =
+    useState<Item | null>(null);
   const [importOpen, setImportOpen] = useState(false);
 
   // Debounce the search box so we don't query on every keystroke.
@@ -225,6 +229,17 @@ export function ItemsPage() {
     }
     return (
       <div className="flex items-center justify-end gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-11 w-11"
+          onClick={() => setOpeningBalanceTarget(item)}
+          aria-label={`Set opening balance for ${item.name}`}
+          title="Set opening balance"
+        >
+          <Wallet />
+        </Button>
         <Button
           type="button"
           variant="ghost"
@@ -496,6 +511,16 @@ export function ItemsPage() {
                       variant="outline"
                       size="lg"
                       className="flex-1"
+                      onClick={() => setOpeningBalanceTarget(item)}
+                    >
+                      <Wallet aria-hidden="true" />
+                      Opening balance
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      className="flex-1"
                       onClick={() => setDialog({ mode: "edit", id: item.id })}
                     >
                       <Pencil aria-hidden="true" />
@@ -552,6 +577,13 @@ export function ItemsPage() {
         <ItemDialog
           itemId={dialog.mode === "edit" ? dialog.id : null}
           onClose={() => setDialog(null)}
+        />
+      )}
+
+      {openingBalanceTarget && (
+        <OpeningBalanceDialog
+          item={openingBalanceTarget}
+          onClose={() => setOpeningBalanceTarget(null)}
         />
       )}
 
