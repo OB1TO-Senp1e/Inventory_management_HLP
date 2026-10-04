@@ -91,9 +91,34 @@ UI development uses the test-only `ri.mockRole` localStorage hook in
 `src/api/auth.ts` (set by Playwright fixtures and `pnpm audit:routes`; never
 shipped to production) — RLS stays the real enforcement in the database.
 
+## CSV import/export
+
+The Items and Suppliers pages (owner/manager only) have **Export** and
+**Import** actions.
+
+- **Export** downloads every active record as CSV (`items-YYYY-MM-DD.csv`),
+  UTF-8 with BOM so Excel opens it correctly.
+- **Import** opens a dialog: pick a `.csv` file → every row is validated and
+  shown in a preview table (ready / error with reason) → press
+  **Import N valid rows** to save. Nothing is committed before you confirm.
+  Rows that fail at save time (e.g. duplicate names) are listed in a result
+  report; the rest still import.
+- A **Download template** button in the dialog produces a header-only CSV.
+  Headers are matched case-insensitively; extra columns are ignored.
+
+**Items columns:** `name` (required, unique), `category` (optional — category
+name, must already exist under Settings), `unit` (required — unit name or
+symbol, e.g. `kg`), `storage_location` (optional — location name, must exist
+under Settings), `par_level` (optional number, default 0), `reorder_point`
+(optional number, default 0).
+
+**Suppliers columns:** `name` (required, unique), `contact_person`, `phone`,
+`email`, `address`, `gstin` (15-character), `notes` — all optional.
+
 ## Status
 
-Runs 0–7 complete (2026-10-04): bootstrap, P0-01 repo init, P0-02 Supabase setup
+Runs 0–11 complete (2026-10-04): bootstrap, P0-01 repo init, P0-02 Supabase setup
 (BLOCKED — B-002, no Docker in this VM), P0-03 core schema, P0-04a auth UI +
-guards, P0-05 AppShell, P0-06 audit tooling, P0-07 seed data and test users.
-Next: P1-01 Items.
+guards, P0-05 AppShell, P0-06 audit tooling, P0-07 seed data and test users,
+P1-01 items, P1-02 locations/categories, P1-03 suppliers, P1-04 supplier price
+lists. Next: P1-05 CSV import/export.

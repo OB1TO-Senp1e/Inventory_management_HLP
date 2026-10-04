@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowDown,
   ArrowUp,
   ChevronsUpDown,
+  Download,
+  FileUp,
   Pencil,
   Plus,
   Search,
@@ -13,11 +15,24 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import {
+  CsvImportDialog,
+  type ValidatedRow,
+} from "@/components/CsvImportDialog";
 import { PageHeader } from "@/components/PageHeader";
 import { useAuth } from "@/features/auth/useAuth";
 import { formatNumber } from "@/lib/format";
 import type { SupplierSortColumn } from "@/schemas/supplier";
 import type { Supplier } from "@/api/suppliers";
+import {
+  useExportSuppliers,
+  useImportSuppliers,
+} from "@/features/importExport/hooks";
+import {
+  SUPPLIER_CSV_COLUMNS,
+  resolveSupplierRow,
+  type SupplierCsvInput,
+} from "@/features/importExport/supplierCsv";
 import { useArchiveSupplier, useSuppliers } from "./hooks";
 import { SupplierDialog } from "./SupplierDialog";
 
@@ -111,6 +126,20 @@ export function SuppliersPage() {
   const [page, setPage] = useState(1);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [archiveTarget, setArchiveTarget] = useState<Supplier | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const exportSuppliers = useExportSuppliers();
+  const importSuppliers = useImportSuppliers();
+
+  /** Validate CSV records against the supplier schema (no lookups needed). */
+  const validateRecords = useCallback(
+    (records: Record<string, string>[]): ValidatedRow<SupplierCsvInput>[] =>
+      records.map((raw, i) => ({
+        index: i + 1,
+        raw,
+        result: resolveSupplierRow(raw),
+      })),
+    [],
+  );
 
   // Debounce the search box so we don't query on every keystroke.
   useEffect(() => {
@@ -229,14 +258,33 @@ export function SuppliersPage() {
         description="The vendors you buy ingredients and supplies from."
         actions={
           canManage ? (
-            <Button
-              type="button"
-              size="lg"
-              onClick={() => setDialog({ mode: "create" })}
-            >
-              <Plus aria-hidden="true" />
-              Add supplier
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => exportSuppliers.mutate()}
+                disabled={exportSuppliers.isPending}
+              >
+                <Download aria-hidden="true" />
+                Export
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setImportOpen(true)}
+              >
+                <FileUp aria-hidden="true" />
+                Import
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                onClick={() => setDialog({ mode: "create" })}
+              >
+                <Plus aria-hidden="true" />
+                Add supplier
+              </Button>
+            </>
           ) : undefined
         }
       />
@@ -536,6 +584,19 @@ export function SuppliersPage() {
         destructive
         onConfirm={confirmArchive}
         onCancel={() => setArchiveTarget(null)}
+      />
+
+      <CsvImportDialog<SupplierCsvInput>
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Import suppliers"
+        description="Add many suppliers at once from a CSV file. Every row is validated first — nothing is saved until you review the preview and confirm."
+        templateFilename="suppliers-template.csv"
+        columns={SUPPLIER_CSV_COLUMNS}
+        lookupsStatus="ready"
+        onRetryLookups={() => undefined}
+        validateRecords={validateRecords}
+        importRows={(input) => importSuppliers.mutateAsync(input)}
       />
     </div>
   );

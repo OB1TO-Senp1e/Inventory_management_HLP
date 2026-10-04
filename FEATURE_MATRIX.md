@@ -41,6 +41,11 @@
 | Add / edit supplier price | `features/suppliers/PriceDialog` | `upsertPrice` | `supplier_prices`, `supplier_price_history` (trigger) | owner, manager | `src/api/prices.test.ts`, `supabase/tests/p1_04_supplier_prices_test.sql` |
 | Set preferred supplier (atomic) | `features/suppliers/SupplierPricesPage` | `setPreferredSupplier` | RPC `set_preferred_supplier`, `supplier_prices` | owner, manager | `src/api/prices.test.ts`, `supabase/tests/p1_04_supplier_prices_test.sql` |
 | Price history (date-stamped changes) | `features/suppliers/SupplierPricesPage` | `listPriceHistory` | `supplier_price_history` | owner, manager | `src/api/prices.test.ts`, `supabase/tests/p1_04_supplier_prices_test.sql` |
+| Export items to CSV | `features/items/ItemsPage` + `lib/csv` | `listItems` | `items` | owner, manager | `src/lib/csv.test.ts`, `src/features/importExport/hooks.test.tsx` |
+| Import items from CSV (validation preview + error report) | `components/CsvImportDialog` + `features/importExport/itemCsv` | `createItem` | `items`, `item_categories`, `units`, `storage_locations` | owner, manager | `src/components/CsvImportDialog.test.tsx`, `src/features/importExport/itemCsv.test.ts`, `src/features/importExport/hooks.test.tsx` |
+| Export suppliers to CSV | `features/suppliers/SuppliersPage` + `lib/csv` | `listSuppliers` | `suppliers` | owner, manager | `src/lib/csv.test.ts`, `src/features/importExport/hooks.test.tsx` |
+| Import suppliers from CSV (validation preview + error report) | `components/CsvImportDialog` + `features/importExport/supplierCsv` | `createSupplier` | `suppliers` | owner, manager | `src/components/CsvImportDialog.test.tsx`, `src/features/importExport/supplierCsv.test.ts`, `src/features/importExport/hooks.test.tsx` |
+| CSV template download | `components/CsvImportDialog` | — (client only) | — | owner, manager | `src/components/CsvImportDialog.test.tsx` |
 
 ## Planned coverage (checklist, not yet rows)
 
@@ -48,6 +53,7 @@
 - [x] Items CRUD → `items` → `supabase/tests/p1_01_items_rls_test.sql` (P1-01); e2e `e2e/items.spec.ts` (deterministic specs run everywhere, live CRUD in CI)
 - [x] Categories + storage locations management → `item_categories`, `storage_locations` → `supabase/tests/p1_02_taxonomy_test.sql` (P1-02: active flag, RESTRICT deletes, RLS); e2e `e2e/settings.spec.ts` (deterministic specs run everywhere, live CRUD in CI)
 - [x] Suppliers → `suppliers` → `supabase/tests/p1_03_suppliers_test.sql` (P1-03: CRUD, active-filter PO-prefill contract, RLS); e2e `e2e/suppliers.spec.ts` (deterministic specs run everywhere, live CRUD in CI). Supplier price list → `supplier_prices` + `supplier_price_history` → `supabase/tests/p1_04_supplier_prices_test.sql` (P1-04: RLS, preferred uniqueness, history trigger); e2e `e2e/prices.spec.ts` (deterministic specs run everywhere, live CRUD in CI).
+- [x] CSV import/export (items + suppliers) → validation preview + error report → `src/lib/csv.ts`, `src/features/importExport/` (P1-05); e2e `e2e/import-export.spec.ts` (deterministic specs run everywhere, live import in CI)
 - [ ] Receiving (`receive_goods`) → `stock_movements` → RPC tests
 - [ ] Wastage/usage (`log_wastage`, `log_usage`) → `stock_movements` → RPC tests
 - [ ] Stock overview + item detail → `current_stock` view → e2e

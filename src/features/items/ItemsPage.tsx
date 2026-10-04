@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
   ChevronsUpDown,
+  Download,
+  FileUp,
   Package,
   PackagePlus,
   Pencil,
@@ -11,11 +13,24 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import {
+  CsvImportDialog,
+  type ValidatedRow,
+} from "@/components/CsvImportDialog";
 import { PageHeader } from "@/components/PageHeader";
 import { useAuth } from "@/features/auth/useAuth";
 import { formatNumber } from "@/lib/format";
 import type { ItemSortColumn } from "@/schemas/item";
 import type { Item } from "@/api/items";
+import {
+  useExportItems,
+  useImportItems,
+} from "@/features/importExport/hooks";
+import {
+  ITEM_CSV_COLUMNS,
+  resolveItemRow,
+  type ItemCsvInput,
+} from "@/features/importExport/itemCsv";
 import {
   useArchiveItem,
   useItemLookups,
@@ -113,6 +128,7 @@ export function ItemsPage() {
   const [page, setPage] = useState(1);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [archiveTarget, setArchiveTarget] = useState<Item | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   // Debounce the search box so we don't query on every keystroke.
   useEffect(() => {
@@ -139,6 +155,23 @@ export function ItemsPage() {
   const itemsQuery = useItems(filters);
   const lookups = useItemLookups();
   const archiveMutation = useArchiveItem();
+  const exportItems = useExportItems();
+  const importItems = useImportItems();
+
+  /** Validate CSV records against the item schema (lookups resolved by name). */
+  const validateRecords = useCallback(
+    (records: Record<string, string>[]): ValidatedRow<ItemCsvInput>[] =>
+      records.map((raw, i) => ({
+        index: i + 1,
+        raw,
+        result: resolveItemRow(raw, {
+          categories: lookups.categories,
+          locations: lookups.locations,
+          units: lookups.units,
+        }),
+      })),
+    [lookups.categories, lookups.locations, lookups.units],
+  );
 
   const items = itemsQuery.data?.items ?? [];
   const total = itemsQuery.data?.total ?? 0;
@@ -225,14 +258,33 @@ export function ItemsPage() {
         description="Ingredients and supplies. Quantities are shown in each item's base unit."
         actions={
           canManage ? (
-            <Button
-              type="button"
-              size="lg"
-              onClick={() => setDialog({ mode: "create" })}
-            >
-              <PackagePlus aria-hidden="true" />
-              Add item
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => exportItems.mutate()}
+                disabled={exportItems.isPending}
+              >
+                <Download aria-hidden="true" />
+                Export
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setImportOpen(true)}
+              >
+                <FileUp aria-hidden="true" />
+                Import
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                onClick={() => setDialog({ mode: "create" })}
+              >
+                <PackagePlus aria-hidden="true" />
+                Add item
+              </Button>
+            </>
           ) : undefined
         }
       />
@@ -515,6 +567,21 @@ export function ItemsPage() {
         destructive
         onConfirm={confirmArchive}
         onCancel={() => setArchiveTarget(null)}
+      />
+
+      <CsvImportDialog<ItemCsvInput>
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Import items"
+        description="Add many items at once from a CSV file. Every row is validated first — nothing is saved until you review the preview and confirm."
+        templateFilename="items-template.csv"
+        columns={ITEM_CSV_COLUMNS}
+        lookupsStatus={
+          lookups.isLoading ? "loading" : lookups.isError ? "error" : "ready"
+        }
+        onRetryLookups={lookups.refetch}
+        validateRecords={validateRecords}
+        importRows={(input) => importItems.mutateAsync(input)}
       />
     </div>
   );

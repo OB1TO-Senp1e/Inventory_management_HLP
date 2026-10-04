@@ -14,6 +14,14 @@ vi.mock("./hooks", () => ({
   useArchiveItem: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
+// CSV import/export hooks are mocked for the same reason.
+vi.mock("@/features/importExport/hooks", () => ({
+  useExportItems: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useExportSuppliers: vi.fn(),
+  useImportItems: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useImportSuppliers: vi.fn(),
+}));
+
 const { authState } = vi.hoisted(() => ({
   authState: {
     profile: {
