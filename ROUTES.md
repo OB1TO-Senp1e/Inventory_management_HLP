@@ -16,7 +16,7 @@
 | `/purchase-orders`     | `features/purchasing/PurchaseOrdersPage`      | owner, manager        | AppShell nav | TODO   | `e2e/purchasing.spec.ts` |
 | `/purchase-orders/:id` | `features/purchasing/PurchaseOrderDetailPage` | owner, manager        | PO list      | TODO   | `e2e/purchasing.spec.ts` |
 | `/receiving`           | `features/stock/ReceivingPage`                | owner, manager, staff | AppShell nav | DONE   | `e2e/stock.spec.ts`      |
-| `/stock`               | `features/stock/StockOverviewPage`            | owner, manager        | AppShell nav | TODO   | `e2e/stock.spec.ts`      |
+| `/stock`               | `features/stock/StockOverviewPage`            | owner, manager        | AppShell nav | DONE   | `e2e/stock.spec.ts`      |
 | `/wastage`             | `features/stock/WastagePage`                  | owner, manager, staff | AppShell nav | DONE   | `e2e/stock.spec.ts`      |
 | `/recipes`             | `features/recipes/RecipesPage`                | owner, manager        | AppShell nav | TODO   | `e2e/recipes.spec.ts`    |
 | `/sales`               | `features/sales/SalesEntryPage`               | owner, manager        | AppShell nav | TODO   | `e2e/sales.spec.ts`      |

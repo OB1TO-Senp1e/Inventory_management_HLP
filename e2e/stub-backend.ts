@@ -58,7 +58,23 @@ const ITEMS = [
     units: { name: "litre", symbol: "L" },
     storage_locations: { name: "Cold Room" },
   },
+  {
+    id: "b0000000-0000-0000-0000-000000000003", restaurant_id: R, name: "Flour",
+    category_id: CATEGORIES[0].id, unit_id: UNITS[0].id, storage_location_id: LOCATIONS[0].id,
+    par_level: 100, reorder_point: 20, active: true, avg_unit_cost: 45,
+    created_at: NOW, updated_at: NOW,
+    item_categories: { name: "Vegetables" },
+    units: { name: "kilogram", symbol: "kg" },
+    storage_locations: { name: "Dry Store" },
+  },
 ];
+
+/** ISO date relative to today — keeps expiry-based specs deterministic. */
+function isoDate(daysFromToday: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromToday);
+  return d.toISOString().slice(0, 10);
+}
 
 const SUPPLIERS = [
   {
@@ -78,12 +94,50 @@ const SUPPLIER_PRICES = [
   },
 ];
 
-const CURRENT_STOCK = ITEMS.map((item, i) => ({
-  restaurant_id: R,
-  item_id: item.id,
-  quantity: [42.5, 28][i],
-  last_movement_at: NOW,
-}));
+const CURRENT_STOCK = [
+  {
+    restaurant_id: R,
+    item_id: ITEMS[0].id,
+    quantity: 42.5,
+    last_movement_at: NOW,
+  },
+  {
+    restaurant_id: R,
+    item_id: ITEMS[1].id,
+    quantity: 3, // low stock (reorder point 10)
+    last_movement_at: NOW,
+  },
+  // Flour (ITEMS[2]) has no movements → quantity 0 in the overview.
+];
+
+const STOCK_MOVEMENTS = [
+  // Tomato batch B-101: 50 in, 20 used → 30 remaining, expires in 3 days.
+  {
+    id: "a0000000-0000-0000-0000-000000000001", restaurant_id: R, item_id: ITEMS[0].id,
+    movement_type: "receipt", quantity: 50, batch_no: "B-101", expiry_date: isoDate(3),
+    unit_cost: 30, reason_code: null, reference_type: "ad_hoc", notes: null,
+    created_by: null, created_at: NOW,
+  },
+  {
+    id: "a0000000-0000-0000-0000-000000000002", restaurant_id: R, item_id: ITEMS[0].id,
+    movement_type: "usage", quantity: -20, batch_no: "B-101", expiry_date: isoDate(3),
+    unit_cost: null, reason_code: "kitchen_use", reference_type: null, notes: null,
+    created_by: null, created_at: NOW,
+  },
+  // Tomato batch B-100: fully consumed → must not count as expiring.
+  {
+    id: "a0000000-0000-0000-0000-000000000003", restaurant_id: R, item_id: ITEMS[0].id,
+    movement_type: "receipt", quantity: 10, batch_no: "B-100", expiry_date: isoDate(1),
+    unit_cost: 28, reason_code: null, reference_type: "ad_hoc", notes: null,
+    created_by: null, created_at: NOW,
+  },
+  {
+    id: "a0000000-0000-0000-0000-000000000004", restaurant_id: R, item_id: ITEMS[0].id,
+    movement_type: "usage", quantity: -10, batch_no: "B-100", expiry_date: isoDate(1),
+    unit_cost: null, reason_code: "kitchen_use", reference_type: null, notes: null,
+    created_by: null, created_at: NOW,
+  },
+];
 
 const RECEIVABLE_ITEMS = ITEMS.map((item) => ({
   item_id: item.id,
@@ -100,7 +154,7 @@ const TABLES: Record<string, Record<string, unknown>[]> = {
   supplier_prices: SUPPLIER_PRICES,
   supplier_price_history: [],
   current_stock: CURRENT_STOCK,
-  stock_movements: [],
+  stock_movements: STOCK_MOVEMENTS,
   "rpc:list_receivable_items": RECEIVABLE_ITEMS,
 };
 
@@ -113,6 +167,14 @@ async function handle(route: Route): Promise<void> {
 
   for (const [param, value] of url.searchParams) {
     if (["select", "order", "limit", "offset"].includes(param)) continue;
+    if (value === "not.is.null") {
+      rows = rows.filter((row) => row[param] !== null && row[param] !== undefined);
+      continue;
+    }
+    if (value === "is.null") {
+      rows = rows.filter((row) => row[param] === null || row[param] === undefined);
+      continue;
+    }
     const m = /^(eq|neq|ilike)\.(.*)$/.exec(value);
     if (!m) continue;
     const [, op, raw] = m;

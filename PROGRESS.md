@@ -269,3 +269,13 @@
 - Also: `.gitignore` now excludes `test-results/` and `playwright-report/`.
 - Gates re-verified: unit 345/345, typecheck, lint, test:db all green.
 - VM restarted mid-session; recovered per TOOLS.md (pnpm 9.12.0 + PostgreSQL 16 reinstall, DB rebuilt from interim setup + 12 migrations).
+
+## 2026-10-05 — P2-05 stock overview screen — DONE
+- `/stock` (owner/manager only; staff bounced at the guard): every active item with derived on-hand quantity, low-stock badge (qty ≤ reorder_point), batch-expiry badges (Expired red / Expiring soon ≤7d amber), category/location/low/expiring filters that combine (AND), item names link to `/items/:id`. Desktop table + mobile cards; loading skeleton, error+retry, empty/filtered-empty states.
+- Data: `listStockOverview()` in `src/api/stock.ts` — 3 reads (active items + category/location/unit joins, `current_stock` view, batch-tagged movements) joined client-side; no migration, no new RPC. Batch expiry = earliest expiry among batches with positive remaining qty (float-safe sums; depleted batches excluded). Items with no movements show qty 0.
+- Realtime: `subscribeToStockMovements()` → `useStockOverviewRealtime()` invalidates the overview query on any ledger INSERT (best-effort, per P2-04 pattern). Enabling realtime on `stock_movements` remains a cloud-console step at credential time.
+- `src/lib/expiry.ts` (new): `expiryStatus()` extracted from ItemDetailPage so both pages share thresholds; +4 unit tests. ItemDetailPage refactored to import it (no behavior change).
+- Tests: `src/api/stock.test.ts` (+6: join/zero-qty, depleted-batch exclusion, active filter, error surfacing, overview subscription w/o item filter); `stockHooks.test.tsx` (+5: overview delegation/gating, realtime invalidate/unsubscribe/failure-tolerance); `StockOverviewPage.test.tsx` (new, 5: badges, filter combination, loading, error+retry, realtime subscription); `supabase/tests/p2_05_stock_overview_test.sql` (new, 5 assertions); `e2e/stock.spec.ts` (+6 deterministic: render, filter combination, error state, manager access, staff bounce; +1 live flow skipped without backend). Stub extended with a 3rd item (Flour, zero stock), low-stock Milk, expiring Tomato batch, and `not.is.null` filter support.
+- Gates: typecheck ✅ · lint ✅ · test ✅ (363 passed, 37 files) · test:db ✅ (all suites incl. 5 new assertions) · build ✅ · audit:wiring ✅ (51 rows) · audit:routes ✅ (static + live crawl) · test:e2e ✅ (104 passed, 20 skipped, 0 failed — full suite green).
+- State files: TASKS.md P2-05 DONE · ROUTES.md `/stock` DONE · FEATURE_MATRIX.md updated · ARCHITECTURE.md §11 decision logged.
+- Next task: P3-01 (purchase orders lifecycle).

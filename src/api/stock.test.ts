@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseClient } from "@/lib/supabase";
-import { createOpeningBalance, getCurrentStock, listBatches, listMovements, listReceivableItems, logUsage, logWastage, receiveGoods, subscribeToItemMovements } from "./stock";
+import { createOpeningBalance, getCurrentStock, listBatches, listMovements, listReceivableItems, listStockOverview, logUsage, logWastage, receiveGoods, subscribeToItemMovements, subscribeToStockMovements } from "./stock";
 
 // No network in these tests: the client factory is mocked outright.
 vi.mock("@/lib/supabase", () => ({ getSupabaseClient: vi.fn() }));
@@ -598,5 +598,153 @@ describe("logUsage", () => {
       error: { message: "log_usage: your role cannot log usage." },
     });
     await expect(logUsage(input)).rejects.toThrow("cannot log usage");
+  });
+});
+
+describe("listStockOverview", () => {
+  const ITEM2_ID = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+
+  const itemRow = (id: string, name: string, reorderPoint: string) => ({
+    id,
+    name,
+    category_id: "c0000000-0000-0000-0000-000000000001",
+    unit_id: "a0000000-0000-0000-0000-000000000001",
+    storage_location_id: "d0000000-0000-0000-0000-000000000001",
+    par_level: "50",
+    reorder_point: reorderPoint,
+    item_categories: { name: "Vegetables" },
+    units: { name: "kilogram", symbol: "kg" },
+    storage_locations: { name: "Cold Room" },
+  });
+
+  const stockRowFor = (itemId: string, qty: string) => ({
+    restaurant_id: "11111111-1111-1111-1111-111111111111",
+    item_id: itemId,
+    quantity: qty,
+    last_movement_at: "2026-10-04T10:00:00Z",
+  });
+
+  const batchRow = (
+    itemId: string,
+    batchNo: string,
+    expiry: string | null,
+    qty: string,
+  ) => ({
+    item_id: itemId,
+    batch_no: batchNo,
+    expiry_date: expiry,
+    quantity: qty,
+  });
+
+  function mockOverviewTables(
+    items: unknown[],
+    stock: unknown[],
+    batches: unknown[],
+  ) {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "items") return chainable({ data: items, error: null });
+      if (table === "current_stock")
+        return chainable({ data: stock, error: null });
+      if (table === "stock_movements")
+        return chainable({ data: batches, error: null });
+      throw new Error(`unexpected table: ${table}`);
+    });
+  }
+
+  beforeEach(() => {
+    mockOverviewTables(
+      [itemRow(ITEM_ID, "Tomato", "10"), itemRow(ITEM2_ID, "Milk", "10")],
+      [stockRowFor(ITEM_ID, "42.5")],
+      [
+        batchRow(ITEM_ID, "B-1", "2026-12-31", "20"),
+        batchRow(ITEM_ID, "B-1", "2026-12-31", "-20"),
+        batchRow(ITEM_ID, "B-2", "2026-11-15", "22.5"),
+      ],
+    );
+  });
+
+  it("joins items with derived stock, defaulting missing stock to zero", async () => {
+    const rows = await listStockOverview();
+    expect(rows).toHaveLength(2);
+    const tomato = rows.find((r) => r.itemId === ITEM_ID);
+    expect(tomato).toMatchObject({
+      name: "Tomato",
+      categoryName: "Vegetables",
+      locationName: "Cold Room",
+      unitSymbol: "kg",
+      reorderPoint: 10,
+      quantity: 42.5,
+      lastMovementAt: "2026-10-04T10:00:00Z",
+    });
+    // Milk has no movements: quantity 0, no last movement.
+    const milk = rows.find((r) => r.itemId === ITEM2_ID);
+    expect(milk).toMatchObject({ quantity: 0, lastMovementAt: null });
+  });
+
+  it("reports the earliest expiry among batches that still hold stock", async () => {
+    const rows = await listStockOverview();
+    const tomato = rows.find((r) => r.itemId === ITEM_ID);
+    // B-1 nets to zero (20 in, 20 out) so it must not count; B-2 remains.
+    expect(tomato?.earliestExpiry).toBe("2026-11-15");
+    const milk = rows.find((r) => r.itemId === ITEM2_ID);
+    expect(milk?.earliestExpiry).toBeNull();
+  });
+
+  it("queries only active items", async () => {
+    await listStockOverview();
+    const itemsBuilder = mockFrom.mock.results[0].value as Record<
+      string,
+      unknown
+    >;
+    expect(itemsBuilder["eq"]).toHaveBeenCalledWith("active", true);
+  });
+
+  it("surfaces query errors", async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "items")
+        return chainable({
+          data: null,
+          error: { message: "boom" },
+        });
+      return chainable({ data: [], error: null });
+    });
+    await expect(listStockOverview()).rejects.toThrow("boom");
+  });
+});
+
+describe("subscribeToStockMovements", () => {
+  const mockUnsubscribe = vi.fn();
+  const mockOn = vi.fn(() => ({
+    subscribe: () => ({ unsubscribe: mockUnsubscribe }),
+  }));
+  const mockChannel = vi.fn(() => ({ on: mockOn }));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedGetSupabaseClient.mockReturnValue({
+      channel: mockChannel,
+    } as unknown as SupabaseClient);
+  });
+
+  it("subscribes to all INSERTs on stock_movements (no item filter)", () => {
+    const onMovement = vi.fn();
+    const unsubscribe = subscribeToStockMovements(onMovement);
+    expect(mockChannel).toHaveBeenCalledWith("stock-movements-overview");
+    expect(mockOn).toHaveBeenCalledWith(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "stock_movements",
+      },
+      expect.any(Function),
+    );
+    const firstCall = mockOn.mock.calls[0] as unknown as
+      | [string, unknown, () => void]
+      | undefined;
+    firstCall?.[2]?.();
+    expect(onMovement).toHaveBeenCalledTimes(1);
+    unsubscribe();
+    expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
   });
 });

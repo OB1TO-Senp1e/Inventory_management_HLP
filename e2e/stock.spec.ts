@@ -294,3 +294,108 @@ test.describe("item detail live flow", () => {
     await expect(page.getByText("Batches")).toBeVisible();
   });
 });
+
+test.describe("stock overview access", () => {
+  test.describe("as owner", () => {
+    test.use({ role: "owner" });
+
+    test("overview renders rows with quantities and status badges", async ({
+      page,
+    }) => {
+      await stubBackend(page);
+      await page.goto("/stock");
+      await expect(
+        page.getByRole("heading", { name: "Stock" }),
+      ).toBeVisible();
+      // All three stubbed items render (table on desktop, cards on mobile).
+      await expect(page.getByText(/Showing 3 of 3 items/)).toBeVisible();
+      // Milk is low stock (3 <= 10); Tomato has an expiring batch.
+      await expect(page.getByText("Low stock").first()).toBeVisible();
+      await expect(page.getByText("Expiring soon").first()).toBeVisible();
+    });
+
+    test("filters combine: category, location, low stock, expiring", async ({
+      page,
+    }) => {
+      await stubBackend(page);
+      await page.goto("/stock");
+      await expect(page.getByText(/Showing 3 of 3 items/)).toBeVisible();
+
+      // Dairy → only Milk.
+      await page.getByLabel("Category").selectOption({ label: "Dairy" });
+      await expect(page.getByText(/Showing 1 of 3 items/)).toBeVisible();
+
+      // Low stock only keeps Milk (3 <= 10).
+      await page.getByLabel("Low stock only").check();
+      await expect(page.getByText(/Showing 1 of 3 items/)).toBeVisible();
+
+      // Expiring soon excludes Milk (no batches) → empty.
+      await page.getByLabel("Expiring soon").check();
+      await expect(
+        page.getByText("No items match these filters."),
+      ).toBeVisible();
+
+      // Back to all: clear via the empty-state action.
+      await page
+        .getByRole("button", { name: "Clear filters" })
+        .last()
+        .click();
+      await expect(page.getByText(/Showing 3 of 3 items/)).toBeVisible();
+    });
+
+    test("without a backend the error state offers a retry", async ({
+      page,
+    }) => {
+      await page.goto("/stock");
+      // React Query retries (~7s backoff) before the error state renders.
+      await expect(page.getByRole("alert")).toHaveText(/could not load stock/i, {
+        timeout: 20000,
+      });
+      await expect(
+        page.getByRole("button", { name: "Retry" }),
+      ).toBeVisible();
+    });
+  });
+
+  test.describe("as manager", () => {
+    test.use({ role: "manager" });
+
+    test("manager reaches the stock overview", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/stock");
+      await expect(
+        page.getByRole("heading", { name: "Stock" }),
+      ).toBeVisible();
+    });
+  });
+
+  test.describe("as staff", () => {
+    test.use({ role: "staff" });
+
+    test("staff is bounced off the stock overview (owner/manager only)", async ({
+      page,
+    }) => {
+      await page.goto("/stock");
+      await expect(page).toHaveURL(/\/$/);
+      await expect(
+        page.getByRole("heading", { name: "Stock" }),
+      ).not.toBeVisible();
+    });
+  });
+});
+
+test.describe("stock overview live flow", () => {
+  test.skip(!LIVE, "needs a live Supabase backend (E2E_LIVE_SUPABASE=1)");
+  test.use({ role: "owner" });
+
+  test("overview lists items with derived quantities", async ({ page }) => {
+    await page.goto("/stock");
+    await expect(
+      page.getByRole("heading", { name: "Stock" }),
+    ).toBeVisible();
+    // Seeded data has items; the exact rows depend on the live backend.
+    await expect(page.getByText(/Showing \d+ of \d+ items/)).toBeVisible({
+      timeout: 20000,
+    });
+  });
+});

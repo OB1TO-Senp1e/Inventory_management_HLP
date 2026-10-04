@@ -3,7 +3,7 @@ import { renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/toast/ToastProvider";
-import { createOpeningBalance, getCurrentStock, listBatches, listMovements, subscribeToItemMovements } from "@/api/stock";
+import { createOpeningBalance, getCurrentStock, listBatches, listMovements, listStockOverview, subscribeToItemMovements, subscribeToStockMovements } from "@/api/stock";
 import { itemsQueryKey } from "@/features/items/hooks";
 import {
   LEDGER_PAGE_SIZE,
@@ -12,6 +12,8 @@ import {
   useCurrentStock,
   useItemBatches,
   useItemMovements,
+  useStockOverview,
+  useStockOverviewRealtime,
   useStockRealtime,
 } from "./stockHooks";
 
@@ -22,7 +24,9 @@ vi.mock("@/api/stock", () => ({
   getCurrentStock: vi.fn(),
   listBatches: vi.fn(),
   listMovements: vi.fn(),
+  listStockOverview: vi.fn(),
   subscribeToItemMovements: vi.fn(),
+  subscribeToStockMovements: vi.fn(),
 }));
 
 const { authState } = vi.hoisted(() => ({
@@ -44,6 +48,8 @@ const mockedCreateOpeningBalance = vi.mocked(createOpeningBalance);
 const mockedListMovements = vi.mocked(listMovements);
 const mockedListBatches = vi.mocked(listBatches);
 const mockedSubscribeToItemMovements = vi.mocked(subscribeToItemMovements);
+const mockedListStockOverview = vi.mocked(listStockOverview);
+const mockedSubscribeToStockMovements = vi.mocked(subscribeToStockMovements);
 
 let queryClient: QueryClient;
 
@@ -242,5 +248,63 @@ describe("useStockRealtime", () => {
     expect(() =>
       renderHook(() => useStockRealtime(ITEM_ID), { wrapper }),
     ).not.toThrow();
+  });
+});
+
+describe("useStockOverview", () => {
+  it("delegates to listStockOverview and is disabled without a profile", async () => {
+    mockedListStockOverview.mockResolvedValue([]);
+    const { result } = renderHook(() => useStockOverview(), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedListStockOverview).toHaveBeenCalledTimes(1);
+    expect(result.current.data).toEqual([]);
+
+    authState.profile = null;
+    mockedListStockOverview.mockClear();
+    renderHook(() => useStockOverview(), { wrapper });
+    expect(mockedListStockOverview).not.toHaveBeenCalled();
+  });
+});
+
+describe("useStockOverviewRealtime", () => {
+  it("subscribes on mount and invalidates the overview on new movements", async () => {
+    const movementCallbacks: Array<() => void> = [];
+    mockedSubscribeToStockMovements.mockImplementation((cb) => {
+      movementCallbacks.push(cb);
+      return vi.fn();
+    });
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    renderHook(() => useStockOverviewRealtime(), { wrapper });
+    expect(mockedSubscribeToStockMovements).toHaveBeenCalledWith(
+      expect.any(Function),
+    );
+    movementCallbacks[0]?.();
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: [...stockQueryKey, "overview"],
+      }),
+    );
+    invalidateSpy.mockRestore();
+  });
+
+  it("unsubscribes on unmount and survives subscription failure", () => {
+    const unsubscribe = vi.fn();
+    mockedSubscribeToStockMovements.mockReturnValue(unsubscribe);
+    const { unmount } = renderHook(() => useStockOverviewRealtime(), {
+      wrapper,
+    });
+    unmount();
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+
+    mockedSubscribeToStockMovements.mockImplementation(() => {
+      throw new Error("no supabase config");
+    });
+    expect(() => renderHook(() => useStockOverviewRealtime(), { wrapper })).not.toThrow();
+  });
+
+  it("does nothing without a restaurant profile", () => {
+    authState.profile = null;
+    renderHook(() => useStockOverviewRealtime(), { wrapper });
+    expect(mockedSubscribeToStockMovements).not.toHaveBeenCalled();
   });
 });

@@ -28,7 +28,7 @@
 - [DONE] P2-02 | RPC receive_goods (batch, expiry, cost, weighted average) + receiving UI (ad hoc) | depends: P2-01 | acceptance: ad hoc receipt posts ledger rows, updates avg cost, shows batch/expiry; e2e receipt flow passes both viewports
 - [DONE] P2-03 | RPC log_wastage / log_usage with reason codes + UI | depends: P2-01 | acceptance: wastage/usage with reason code posts movement; staff can log; invalid qty rejected; reason required
 - [DONE] P2-04 | Item detail page: stock level, ledger history, batches, expiry | depends: P2-02, P2-03 | acceptance: detail shows live stock, paginated ledger, batch/expiry list; realtime update on new movement
-- [IN_PROGRESS] P2-05 | Stock overview screen: filter by category/location/low/expiring, realtime updates | depends: P2-04 | acceptance: filters combine correctly; low/expiring badges; realtime insert updates list without refresh
+- [DONE] P2-05 | Stock overview screen: filter by category/location/low/expiring, realtime updates | depends: P2-04 | acceptance: filters combine correctly; low/expiring badges; realtime insert updates list without refresh
 
 ## Phase 3 — Purchasing
 

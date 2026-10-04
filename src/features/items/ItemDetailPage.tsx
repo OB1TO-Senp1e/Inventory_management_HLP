@@ -21,6 +21,7 @@ import {
   formatINR,
   formatNumber,
 } from "@/lib/format";
+import { expiryStatus } from "@/lib/expiry";
 import { cn } from "@/lib/utils";
 
 const MOVEMENT_LABELS: Record<MovementType, string> = {
@@ -54,23 +55,6 @@ const MOVEMENT_BADGE_CLASSES: Record<MovementType, string> = {
 function prettifyCode(code: string): string {
   const spaced = code.split("_").join(" ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
-type ExpiryStatus = "expired" | "soon" | "ok" | "none";
-
-function expiryStatus(expiry: string | null): ExpiryStatus {
-  if (!expiry) {
-    return "none";
-  }
-  const today = new Date().toISOString().slice(0, 10);
-  if (expiry < today) {
-    return "expired";
-  }
-  const daysLeft =
-    (new Date(`${expiry}T00:00:00`).getTime() -
-      new Date(`${today}T00:00:00`).getTime()) /
-    86_400_000;
-  return daysLeft <= 7 ? "soon" : "ok";
 }
 
 function MovementBadge({ type }: { type: MovementType }) {

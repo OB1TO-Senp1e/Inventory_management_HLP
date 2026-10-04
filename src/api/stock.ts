@@ -454,3 +454,168 @@ export function subscribeToItemMovements(
     void channel.unsubscribe();
   };
 }
+
+const overviewItemRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category_id: z.string().nullable(),
+  unit_id: z.string(),
+  storage_location_id: z.string().nullable(),
+  par_level: z.coerce.number(),
+  reorder_point: z.coerce.number(),
+  item_categories: z.object({ name: z.string() }).nullable(),
+  units: z.object({ name: z.string(), symbol: z.string() }),
+  storage_locations: z.object({ name: z.string() }).nullable(),
+});
+
+const overviewBatchRowSchema = z.object({
+  item_id: z.string(),
+  batch_no: z.string(),
+  expiry_date: z.string().nullable(),
+  quantity: z.coerce.number(),
+});
+
+export interface StockOverviewRow {
+  itemId: string;
+  name: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  locationId: string | null;
+  locationName: string | null;
+  unitSymbol: string;
+  reorderPoint: number;
+  parLevel: number;
+  /** Derived quantity; 0 when the item has no movements yet. */
+  quantity: number;
+  lastMovementAt: string | null;
+  /**
+   * Earliest expiry among the item's batches that still hold stock
+   * (positive remaining quantity). Null when no tracked batch has stock.
+   */
+  earliestExpiry: string | null;
+}
+
+/**
+ * Every active item with its derived stock, for the stock overview screen
+ * (P2-05). Three reads joined client-side — fine for v1 volumes; the
+ * `current_stock` view stays the read contract (the client never sums the
+ * ledger itself) and batch expiry aggregates mirror `listBatches`.
+ *
+ * No cost columns: the overview shows quantities only, so it stays safe
+ * for every role that may reach the page (owner/manager today).
+ */
+export async function listStockOverview(): Promise<StockOverviewRow[]> {
+  const client = getSupabaseClient();
+  const [itemsRes, stockRes, batchRes] = await Promise.all([
+    client
+      .from("items")
+      .select(
+        "id, name, category_id, unit_id, storage_location_id, par_level, " +
+          "reorder_point, item_categories(name), units(name, symbol), " +
+          "storage_locations(name)",
+      )
+      .eq("active", true)
+      .order("name"),
+    client.from("current_stock").select("item_id, quantity, last_movement_at"),
+    client
+      .from("stock_movements")
+      .select("item_id, batch_no, expiry_date, quantity")
+      .not("batch_no", "is", null),
+  ]);
+  if (itemsRes.error) {
+    throw new Error(itemsRes.error.message);
+  }
+  if (stockRes.error) {
+    throw new Error(stockRes.error.message);
+  }
+  if (batchRes.error) {
+    throw new Error(batchRes.error.message);
+  }
+  const itemRows = z.array(overviewItemRowSchema).parse(itemsRes.data);
+  const stockRows = z.array(currentStockRowSchema).parse(stockRes.data);
+  const batchRows = z.array(overviewBatchRowSchema).parse(batchRes.data);
+
+  const stockByItem = new Map(
+    stockRows.map((row) => [row.item_id, toCurrentStock(row)]),
+  );
+
+  // Per (item, batch): remaining qty (float-safe) + earliest expiry.
+  const batchAgg = new Map<
+    string,
+    { itemId: string; quantity: number; earliestExpiry: string | null }
+  >();
+  for (const row of batchRows) {
+    const key = `${row.item_id}${row.batch_no}`;
+    const existing = batchAgg.get(key);
+    if (!existing) {
+      batchAgg.set(key, {
+        itemId: row.item_id,
+        quantity: row.quantity,
+        earliestExpiry: row.expiry_date,
+      });
+    } else {
+      existing.quantity =
+        Math.round((existing.quantity + row.quantity) * 1e6) / 1e6;
+      if (
+        row.expiry_date &&
+        (!existing.earliestExpiry || row.expiry_date < existing.earliestExpiry)
+      ) {
+        existing.earliestExpiry = row.expiry_date;
+      }
+    }
+  }
+  const expiryByItem = new Map<string, string>();
+  for (const agg of batchAgg.values()) {
+    if (agg.quantity <= 0 || !agg.earliestExpiry) {
+      continue;
+    }
+    const current = expiryByItem.get(agg.itemId);
+    if (!current || agg.earliestExpiry < current) {
+      expiryByItem.set(agg.itemId, agg.earliestExpiry);
+    }
+  }
+
+  return itemRows.map((row) => {
+    const stock = stockByItem.get(row.id);
+    return {
+      itemId: row.id,
+      name: row.name,
+      categoryId: row.category_id,
+      categoryName: row.item_categories?.name ?? null,
+      locationId: row.storage_location_id,
+      locationName: row.storage_locations?.name ?? null,
+      unitSymbol: row.units.symbol,
+      reorderPoint: row.reorder_point,
+      parLevel: row.par_level,
+      quantity: stock?.quantity ?? 0,
+      lastMovementAt: stock?.lastMovementAt ?? null,
+      earliestExpiry: expiryByItem.get(row.id) ?? null,
+    };
+  });
+}
+
+/**
+ * Subscribe to ALL new ledger movements via a realtime channel (no item
+ * filter — the overview watches every item). The caller invalidates the
+ * overview query so the screen updates without a refresh. Best-effort like
+ * `subscribeToItemMovements`: silent without realtime, page works via
+ * refetch. Returns an unsubscribe function.
+ */
+export function subscribeToStockMovements(onMovement: () => void): () => void {
+  const client = getSupabaseClient();
+  const channel = client
+    .channel("stock-movements-overview")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "stock_movements",
+      },
+      () => onMovement(),
+    )
+    .subscribe();
+  return () => {
+    void channel.unsubscribe();
+  };
+}

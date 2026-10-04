@@ -7,7 +7,9 @@ import {
   getCurrentStock,
   listBatches,
   listMovements,
+  listStockOverview,
   subscribeToItemMovements,
+  subscribeToStockMovements,
 } from "@/api/stock";
 import { itemsQueryKey } from "@/features/items/hooks";
 import type { CreateOpeningBalanceInput } from "@/schemas/stock";
@@ -118,4 +120,48 @@ export function useStockRealtime(itemId: string | null) {
       unsubscribe?.();
     };
   }, [itemId, restaurantId, queryClient]);
+}
+
+/**
+ * Stock overview rows for every active item (P2-05): derived quantity,
+ * low-stock inputs (reorder point), and earliest batch expiry. One query —
+ * the API joins items + current_stock + batch expiries client-side.
+ */
+export function useStockOverview() {
+  const restaurantId = useRestaurantId();
+  return useQuery({
+    queryKey: [...stockQueryKey, "overview"],
+    queryFn: () => listStockOverview(),
+    enabled: restaurantId !== null,
+  });
+}
+
+/**
+ * Realtime updates for the stock overview: on every new ledger movement
+ * (any item), the overview query is invalidated so the screen refreshes
+ * without a reload. Best-effort like `useStockRealtime` — silent without
+ * a backend or without realtime enabled on the table.
+ */
+export function useStockOverviewRealtime() {
+  const queryClient = useQueryClient();
+  const restaurantId = useRestaurantId();
+  useEffect(() => {
+    if (restaurantId === null) {
+      return;
+    }
+    let unsubscribe: (() => void) | undefined;
+    try {
+      unsubscribe = subscribeToStockMovements(() => {
+        void queryClient.invalidateQueries({
+          queryKey: [...stockQueryKey, "overview"],
+        });
+      });
+    } catch {
+      // No Supabase config (audit crawl / backend-less dev): realtime is
+      // unavailable; the page works without it.
+    }
+    return () => {
+      unsubscribe?.();
+    };
+  }, [restaurantId, queryClient]);
 }
