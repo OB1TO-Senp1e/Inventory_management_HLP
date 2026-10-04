@@ -111,3 +111,54 @@ test.describe("purchase orders live flow", () => {
     // lines + totals, then clean up.
   });
 });
+
+test.describe("PO lifecycle (P3-02)", () => {
+  test.describe("as owner", () => {
+    test.use({ role: "owner" });
+
+    test("draft PO shows Send and Cancel, hides Receive", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/purchase-orders/d0000000-0000-0000-0000-000000000001");
+      await expect(page.getByRole("heading", { name: /purchase order/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /^send$/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /cancel order/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /^receive$/i })).toHaveCount(0);
+    });
+
+    test("send flow confirms and toasts", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/purchase-orders/d0000000-0000-0000-0000-000000000001");
+      await page.getByRole("button", { name: /^send$/i }).click();
+      await expect(page.getByRole("alertdialog")).toBeVisible();
+      await page.getByRole("button", { name: "Send order" }).click();
+      // The send RPC stub returns void → success toast.
+      await expect(page.getByText(/purchase order sent/i)).toBeVisible();
+    });
+
+    test("sent PO shows Receive and Cancel with received/pending line quantities", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/purchase-orders/d0000000-0000-0000-0000-000000000002");
+      await expect(page.getByRole("button", { name: /^receive$/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /cancel order/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /^send$/i })).toHaveCount(0);
+      // 20 ordered, 8 received → "(12 pending)".
+      await expect(page.getByText("(12 pending)")).toBeVisible();
+    });
+
+    test("receive form prefills remaining and validates before posting", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/purchase-orders/d0000000-0000-0000-0000-000000000002");
+      await page.getByRole("button", { name: /^receive$/i }).click();
+      const qtyInput = page.getByLabel(/qty receiving \(kg\)/i);
+      await expect(qtyInput).toHaveValue("12");
+      // Over-receive guard: entering more than pending blocks the post.
+      await qtyInput.fill("99");
+      await page.getByRole("button", { name: /post receipt/i }).click();
+      await expect(page.getByText(/only 12 remaining/i)).toBeVisible();
+      // Valid quantity posts against the stubbed RPC → success toast.
+      await qtyInput.fill("12");
+      await page.getByRole("button", { name: /post receipt/i }).click();
+      await expect(page.getByText(/receipt posted/i)).toBeVisible();
+    });
+  });
+});

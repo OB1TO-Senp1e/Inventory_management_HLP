@@ -33,7 +33,7 @@
 ## Phase 3 — Purchasing
 
 - [DONE] P3-01 | Purchase orders: schema, create/edit draft, line items, supplier prefill from price list | depends: P1-04, P2-01 | acceptance: draft PO with lines created; supplier prefill pulls latest price; totals in ₹ en-IN
-- [TODO] P3-02 | PO lifecycle: send, partial receive, full receive via receive_goods, cancel | depends: P3-01, P2-02 | acceptance: status transitions draft→sent→partially_received→received→cancelled enforced; partial receive updates remaining qty
+- [DONE] P3-02 | PO lifecycle: send, partial receive, full receive via receive_goods, cancel | depends: P3-01, P2-02 | acceptance: status transitions draft→sent→partially_received→received→cancelled enforced; partial receive updates remaining qty
 - [TODO] P3-03 | Reorder suggestions: items at/below reorder point grouped by preferred supplier, one-click draft PO | depends: P3-01, P2-05 | acceptance: suggestions list matches low-stock items; one click creates draft PO per supplier with correct lines
 - [TODO] P3-04 | PO print/PDF view | depends: P3-02 | acceptance: print view renders PO with totals/GST; browser print produces clean single-doc output
 

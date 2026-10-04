@@ -1,14 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/toast/useToast";
 import { useAuth } from "@/features/auth/useAuth";
+import { itemsQueryKey } from "@/features/items/hooks";
+import { stockQueryKey } from "@/features/items/stockHooks";
 import {
   addPurchaseOrderLine,
+  cancelPurchaseOrder,
   createPurchaseOrder,
   getPurchaseOrder,
   listPurchaseOrders,
+  receivePurchaseOrder,
   removePurchaseOrderLine,
+  sendPurchaseOrder,
   updatePurchaseOrder,
   type ListPurchaseOrdersInput,
+  type ReceivePurchaseOrderInput,
 } from "@/api/purchasing";
 import type {
   CreatePurchaseOrderInput,
@@ -152,3 +158,62 @@ export function useRemovePurchaseOrderLine() {
 }
 
 export type { PurchaseOrderStatus };
+
+/** Send a draft PO (draft → sent). */
+export function useSendPurchaseOrder() {
+  const { success, error } = useToast();
+  const invalidate = useInvalidatePOs();
+  return useMutation({
+    mutationFn: (id: string) => sendPurchaseOrder(id),
+    onSuccess: (_, id) => {
+      invalidate(id);
+      success("Purchase order sent to the supplier.");
+    },
+    onError: (err: unknown) => {
+      error(err instanceof Error ? err.message : "Could not send the purchase order.");
+    },
+  });
+}
+
+/** Cancel a draft or sent PO. */
+export function useCancelPurchaseOrder() {
+  const { success, error } = useToast();
+  const invalidate = useInvalidatePOs();
+  return useMutation({
+    mutationFn: (id: string) => cancelPurchaseOrder(id),
+    onSuccess: (_, id) => {
+      invalidate(id);
+      success("Purchase order cancelled.");
+    },
+    onError: (err: unknown) => {
+      error(err instanceof Error ? err.message : "Could not cancel the purchase order.");
+    },
+  });
+}
+
+/**
+ * Receive against a sent/partially_received PO. Posts receipt movements
+ * (cost = the PO's snapshotted unit prices), so the stock overview and
+ * item queries are invalidated alongside the PO queries.
+ */
+export function useReceivePurchaseOrder() {
+  const { success, error } = useToast();
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidatePOs();
+  return useMutation({
+    mutationFn: (input: ReceivePurchaseOrderInput) => receivePurchaseOrder(input),
+    onSuccess: (result, input) => {
+      invalidate(input.id);
+      void queryClient.invalidateQueries({ queryKey: stockQueryKey });
+      void queryClient.invalidateQueries({ queryKey: itemsQueryKey });
+      success(
+        result.status === "received"
+          ? "All lines received — purchase order closed."
+          : "Receipt posted — purchase order partially received.",
+      );
+    },
+    onError: (err: unknown) => {
+      error(err instanceof Error ? err.message : "Could not post the receipt.");
+    },
+  });
+}

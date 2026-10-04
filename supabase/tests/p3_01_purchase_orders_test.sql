@@ -260,16 +260,14 @@ begin
   perform pg_temp.assert_true('draft PO header editable',
     (select notes from public.purchase_orders where id = v_po_id) = 'updated while draft');
 
-  -- Simulate P3-02 moving the PO out of draft: flip the status as
-  -- superuser with the guard trigger temporarily disabled.
-  reset role;
-  alter table public.purchase_orders disable trigger trg_purchase_orders_draft_only;
-  update public.purchase_orders set status = 'sent' where id = v_po_id;
-  alter table public.purchase_orders enable trigger trg_purchase_orders_draft_only;
+  -- Move the PO out of draft via the real P3-02 send RPC.
   set role authenticated;
   perform set_config('request.jwt.claims',
     '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","restaurant_id":"11111111-1111-1111-1111-111111111111","role":"manager"}',
     true);
+  perform public.send_purchase_order(v_po_id);
+  perform pg_temp.assert_true('PO sent via RPC',
+    (select status from public.purchase_orders where id = v_po_id) = 'sent');
 
   -- Header edit on sent PO rejected.
   begin
@@ -299,14 +297,15 @@ begin
   perform pg_temp.assert_true('line delete on sent PO rejected', v_failed);
 
   -- received_quantity can never exceed quantity (even on a draft).
-  reset role;
-  alter table public.purchase_orders disable trigger trg_purchase_orders_draft_only;
-  update public.purchase_orders set status = 'draft' where id = v_po_id;
-  alter table public.purchase_orders enable trigger trg_purchase_orders_draft_only;
-  set role authenticated;
+  -- Use a fresh draft PO: the sent PO above cannot return to draft
+  -- (the status guard correctly rejects sent → draft).
   perform set_config('request.jwt.claims',
     '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","restaurant_id":"11111111-1111-1111-1111-111111111111","role":"manager"}',
     true);
+  select public.create_purchase_order(
+    '63000000-0000-0000-0000-000000000001', current_date, null, null,
+    '[{"item_id":"61000000-0000-0000-0000-000000000001","quantity":4,"unit_price":30}]'::jsonb
+  ) into v_po_id;
   begin
     update public.purchase_order_lines
     set received_quantity = 999 where po_id = v_po_id;

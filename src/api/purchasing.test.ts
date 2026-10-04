@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseClient } from "@/lib/supabase";
 import {
   addPurchaseOrderLine,
+  cancelPurchaseOrder,
   createPurchaseOrder,
   getPurchaseOrder,
   listPurchaseOrders,
+  receivePurchaseOrder,
   removePurchaseOrderLine,
+  sendPurchaseOrder,
   updatePurchaseOrder,
 } from "./purchasing";
 
@@ -224,5 +227,135 @@ describe("addPurchaseOrderLine / removePurchaseOrderLine", () => {
     mockFrom.mockReturnValue(builder);
     await removePurchaseOrderLine("dddddddd-dddd-dddd-dddd-dddddddddddd");
     expect(builder["delete"]).toHaveBeenCalled();
+  });
+});
+
+describe("sendPurchaseOrder / cancelPurchaseOrder", () => {
+  it("calls the send RPC with the PO id", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    await sendPurchaseOrder(PO_ID);
+    expect(mockRpc).toHaveBeenCalledWith("send_purchase_order", { p_po_id: PO_ID });
+  });
+
+  it("calls the cancel RPC with the PO id", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    await cancelPurchaseOrder(PO_ID);
+    expect(mockRpc).toHaveBeenCalledWith("cancel_purchase_order", { p_po_id: PO_ID });
+  });
+
+  it("rejects invalid ids before any network call", async () => {
+    await expect(sendPurchaseOrder("not-a-uuid")).rejects.toThrow();
+    await expect(cancelPurchaseOrder("not-a-uuid")).rejects.toThrow();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces RPC errors", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "only draft purchase orders can be sent" } });
+    await expect(sendPurchaseOrder(PO_ID)).rejects.toThrow(/only draft/);
+    mockRpc.mockResolvedValue({ data: null, error: { message: "only draft or sent" } });
+    await expect(cancelPurchaseOrder(PO_ID)).rejects.toThrow(/draft or sent/);
+  });
+});
+
+describe("receivePurchaseOrder", () => {
+  const LINE_ID = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+
+  it("calls the receive RPC with snake_case payloads and parses the result", async () => {
+    mockRpc.mockResolvedValue({
+      data: {
+        po_id: PO_ID,
+        status: "partially_received",
+        lines: [
+          {
+            po_line_id: LINE_ID,
+            item_id: ITEM_ID,
+            quantity: 10,
+            received_quantity: 6,
+          },
+        ],
+      },
+      error: null,
+    });
+    const result = await receivePurchaseOrder({
+      id: PO_ID,
+      lines: [
+        {
+          poLineId: LINE_ID,
+          quantity: 6,
+          batchNo: "B-001",
+          expiryDate: "2026-12-31",
+          notes: "first drop",
+        },
+      ],
+    });
+    expect(result.poId).toBe(PO_ID);
+    expect(result.status).toBe("partially_received");
+    expect(result.lines).toEqual([
+      { poLineId: LINE_ID, itemId: ITEM_ID, quantity: 10, receivedQuantity: 6 },
+    ]);
+    expect(mockRpc).toHaveBeenCalledWith("receive_purchase_order", {
+      p_po_id: PO_ID,
+      p_lines: [
+        {
+          po_line_id: LINE_ID,
+          quantity: 6,
+          batch_no: "B-001",
+          expiry_date: "2026-12-31",
+          notes: "first drop",
+        },
+      ],
+    });
+  });
+
+  it("trims blanks to null and rejects empty lines before any network call", async () => {
+    mockRpc.mockResolvedValue({
+      data: { po_id: PO_ID, status: "partially_received", lines: [] },
+      error: null,
+    });
+    await receivePurchaseOrder({
+      id: PO_ID,
+      lines: [{ poLineId: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", quantity: 2, batchNo: "  " }],
+    });
+    expect(mockRpc).toHaveBeenCalledWith(
+      "receive_purchase_order",
+      expect.objectContaining({
+        p_lines: [
+          {
+            po_line_id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+            quantity: 2,
+            batch_no: null,
+            expiry_date: null,
+            notes: null,
+          },
+        ],
+      }),
+    );
+    await expect(receivePurchaseOrder({ id: PO_ID, lines: [] })).rejects.toThrow(
+      /at least one line/,
+    );
+  });
+
+  it("rejects non-positive quantities before any network call", async () => {
+    mockRpc.mockClear();
+    await expect(
+      receivePurchaseOrder({
+        id: PO_ID,
+        lines: [{ poLineId: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", quantity: 0 }],
+      }),
+    ).rejects.toThrow(/greater than zero/);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces RPC errors (e.g. over-receive)", async () => {
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: "would exceed the ordered quantity" },
+    });
+    await expect(
+      receivePurchaseOrder({
+        id: PO_ID,
+        lines: [{ poLineId: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", quantity: 99 }],
+      }),
+    ).rejects.toThrow(/exceed the ordered quantity/);
   });
 });

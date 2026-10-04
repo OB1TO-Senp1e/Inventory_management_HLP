@@ -157,6 +157,17 @@ const PURCHASE_ORDERS = [
     updated_at: NOW,
     suppliers: { name: SUPPLIERS[0].name },
   },
+  {
+    id: "d0000000-0000-0000-0000-000000000002",
+    supplier_id: SUPPLIERS[0].id,
+    status: "sent",
+    order_date: "2026-10-04",
+    expected_date: "2026-10-11",
+    notes: null,
+    created_at: NOW,
+    updated_at: NOW,
+    suppliers: { name: SUPPLIERS[0].name },
+  },
 ];
 
 const PURCHASE_ORDER_LINES = [
@@ -180,7 +191,41 @@ const PURCHASE_ORDER_LINES = [
     notes: null,
     items: { name: ITEMS[1].name, units: { symbol: "L" } },
   },
+  {
+    id: "e0000000-0000-0000-0000-000000000003",
+    po_id: PURCHASE_ORDERS[1].id,
+    item_id: ITEMS[0].id,
+    quantity: 20,
+    unit_price: 31,
+    received_quantity: 8,
+    notes: null,
+    items: { name: ITEMS[0].name, units: { symbol: "kg" } },
+  },
 ];
+
+/**
+ * Lifecycle RPC stubs. `send`/`cancel` return void (null body);
+ * `receive` echoes a canned partially_received result. These let the
+ * deterministic specs exercise the send/cancel/receive UI flows without
+ * a backend; the real RPC semantics are covered by supabase/tests and
+ * the live e2e flow.
+ */
+const RPC_STUBS: Record<string, unknown> = {
+  "rpc:send_purchase_order": null,
+  "rpc:cancel_purchase_order": null,
+  "rpc:receive_purchase_order": {
+    po_id: PURCHASE_ORDERS[1].id,
+    status: "partially_received",
+    lines: [
+      {
+        po_line_id: "e0000000-0000-0000-0000-000000000003",
+        item_id: ITEMS[0].id,
+        quantity: 20,
+        received_quantity: 20,
+      },
+    ],
+  },
+};
 
 const TABLES: Record<string, Record<string, unknown>[]> = {
   item_categories: CATEGORIES,
@@ -202,6 +247,17 @@ async function handle(route: Route): Promise<void> {
   const url = new URL(route.request().url());
   const seg = url.pathname.split("/").filter(Boolean);
   const key = seg[2] === "rpc" ? `rpc:${seg[3]}` : seg[2];
+
+  // Lifecycle RPC stubs return their canned payload directly.
+  if (key in RPC_STUBS) {
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(RPC_STUBS[key]),
+    });
+    return;
+  }
+
   let rows = [...(TABLES[key] ?? [])];
 
   for (const [param, value] of url.searchParams) {

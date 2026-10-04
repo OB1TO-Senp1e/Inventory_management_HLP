@@ -11,7 +11,7 @@ import {
 } from "@/schemas/purchaseOrder";
 
 /**
- * Purchasing API (P3-01) — the ONLY module allowed to touch the
+ * Purchasing API (P3-01, P3-02) — the ONLY module allowed to touch the
  * `purchase_orders` and `purchase_order_lines` tables. All inputs are
  * Zod-validated before any client call; all outputs are Zod-validated
  * before they reach components.
@@ -19,8 +19,15 @@ import {
  * Draft creation goes through the `create_purchase_order` RPC so the PO
  * header + lines are inserted atomically (SECURITY INVOKER — the caller's
  * RLS applies). Draft edits use direct table writes; the database's
- * draft-only triggers reject any change to a non-draft PO (P3-02 owns the
- * status-transition state machine).
+ * status-transition trigger rejects illegal edits.
+ *
+ * Lifecycle (P3-02): send/cancel/receive go through SECURITY DEFINER RPCs
+ * (`send_purchase_order`, `cancel_purchase_order`,
+ * `receive_purchase_order`) so status transitions, line receives, and the
+ * ledger postings happen atomically with the database enforcing tenant +
+ * role from JWT claims. Receiving posts receipt movements via
+ * `receive_goods` (tagged purchase_order/<po_id>) using each line's
+ * snapshotted unit price as the cost.
  *
  * Staff have no RLS policies on either table (costs) — every staff query
  * is denied by the database.
@@ -320,4 +327,122 @@ export async function removePurchaseOrderLine(rawLineId: unknown): Promise<void>
   if (error) {
     throw friendlyError(error);
   }
+}
+
+/** One line on a PO receive: how much of the line arrived now. */
+export const receivePurchaseOrderLineSchema = z.object({
+  poLineId: z.string().uuid(),
+  // Quantity received in this receipt (base unit). Must be > 0 and must
+  // not push the line's cumulative received_quantity past its ordered
+  // quantity — the RPC enforces the cap; this is the client pre-check.
+  quantity: z.coerce.number().positive("Receive quantity must be greater than zero."),
+  batchNo: z
+    .string()
+    .trim()
+    .max(60, "Batch number must be 60 characters or fewer.")
+    .optional(),
+  expiryDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid expiry date.")
+    .optional(),
+  notes: z
+    .string()
+    .trim()
+    .max(500, "Notes must be 500 characters or fewer.")
+    .optional(),
+});
+
+const receivePurchaseOrderSchema = z.object({
+  id: z.string().uuid(),
+  lines: z
+    .array(receivePurchaseOrderLineSchema)
+    .min(1, "Receive at least one line."),
+});
+
+export type ReceivePurchaseOrderInput = z.infer<typeof receivePurchaseOrderSchema>;
+
+export interface ReceivePurchaseOrderResult {
+  poId: string;
+  status: PurchaseOrderStatus;
+  lines: Array<{
+    poLineId: string;
+    itemId: string;
+    quantity: number;
+    receivedQuantity: number;
+  }>;
+}
+
+const receiveResultLineSchema = z.object({
+  po_line_id: z.string(),
+  item_id: z.string(),
+  quantity: z.coerce.number(),
+  received_quantity: z.coerce.number(),
+});
+
+const receiveResultSchema = z.object({
+  po_id: z.string(),
+  status: purchaseOrderStatusSchema,
+  lines: z.array(receiveResultLineSchema),
+});
+
+/**
+ * Send a draft PO (draft → sent). The RPC requires at least one line.
+ */
+export async function sendPurchaseOrder(rawId: unknown): Promise<void> {
+  const id = z.string().uuid().parse(rawId);
+  const client = getSupabaseClient();
+  const { error } = await client.rpc("send_purchase_order", { p_po_id: id });
+  if (error) {
+    throw friendlyError(error);
+  }
+}
+
+/**
+ * Cancel a draft or sent PO. received/cancelled are terminal.
+ */
+export async function cancelPurchaseOrder(rawId: unknown): Promise<void> {
+  const id = z.string().uuid().parse(rawId);
+  const client = getSupabaseClient();
+  const { error } = await client.rpc("cancel_purchase_order", { p_po_id: id });
+  if (error) {
+    throw friendlyError(error);
+  }
+}
+
+/**
+ * Receive against a sent/partially_received PO. Posts receipt movements
+ * (cost = each line's snapshotted PO unit price), bumps received_quantity,
+ * and flips the PO to partially_received/received — atomically in the RPC.
+ * Returns the new status plus per-line received quantities for the receipt
+ * report.
+ */
+export async function receivePurchaseOrder(
+  rawInput: unknown,
+): Promise<ReceivePurchaseOrderResult> {
+  const input = receivePurchaseOrderSchema.parse(rawInput);
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc("receive_purchase_order", {
+    p_po_id: input.id,
+    p_lines: input.lines.map((l) => ({
+      po_line_id: l.poLineId,
+      quantity: l.quantity,
+      batch_no: l.batchNo?.trim() ? l.batchNo.trim() : null,
+      expiry_date: l.expiryDate ?? null,
+      notes: l.notes?.trim() ? l.notes.trim() : null,
+    })),
+  });
+  if (error) {
+    throw friendlyError(error);
+  }
+  const result = receiveResultSchema.parse(data);
+  return {
+    poId: result.po_id,
+    status: result.status,
+    lines: result.lines.map((l) => ({
+      poLineId: l.po_line_id,
+      itemId: l.item_id,
+      quantity: l.quantity,
+      receivedQuantity: l.received_quantity,
+    })),
+  };
 }
