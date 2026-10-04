@@ -1,11 +1,10 @@
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { signIn } from "@/api/auth";
 import { signInSchema, type SignInInput } from "@/schemas/auth";
 import { Button } from "@/components/ui/button";
-import { Toast, type ToastKind } from "./Toast";
+import { useToast } from "@/components/toast/useToast";
 
 const inputClass =
   "h-11 w-full rounded-md border border-input bg-background px-3 text-sm " +
@@ -14,7 +13,7 @@ const inputClass =
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [toast, setToast] = useState<{ kind: ToastKind; message: string } | null>(null);
+  const { error: notifyError } = useToast();
 
   const rawFrom = (location.state as { from?: string } | null)?.from;
   const from = rawFrom && rawFrom !== "/login" && rawFrom !== "/reset-password" ? rawFrom : "/";
@@ -26,15 +25,13 @@ export function LoginPage() {
   } = useForm<SignInInput>({ resolver: zodResolver(signInSchema) });
 
   const onSubmit = async (values: SignInInput) => {
-    setToast(null);
     try {
       await signIn(values);
       navigate(from, { replace: true });
     } catch (err) {
-      setToast({
-        kind: "error",
-        message: err instanceof Error ? err.message : "Sign in failed. Please try again.",
-      });
+      notifyError(
+        err instanceof Error ? err.message : "Sign in failed. Please try again.",
+      );
     }
   };
 
@@ -98,10 +95,6 @@ export function LoginPage() {
           </Link>
         </p>
       </div>
-
-      {toast && (
-        <Toast kind={toast.kind} message={toast.message} onDismiss={() => setToast(null)} />
-      )}
     </main>
   );
 }

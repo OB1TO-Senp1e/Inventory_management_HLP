@@ -12,6 +12,12 @@
 | Session restore + role load        | `features/auth/AuthProvider` | `getSession`, `getCurrentProfile`, `onAuthStateChange` | `profiles` | owner, manager, staff | `src/api/auth.test.ts` |
 | Protected route redirect           | `routes/ProtectedRoute` | `getSession` (via AuthProvider) | `profiles` | owner, manager, staff | `src/routes/guards.test.tsx` |
 | Role-based route guard             | `routes/RoleGuard` (+ `routes/access.ts` map) | `getCurrentProfile` (via AuthProvider) | `profiles` | owner, manager, staff | `src/routes/guards.test.tsx` |
+| App shell layout + role navigation | `components/layout/AppShell` (+ `AppNav`, `routes/nav.ts`) | — (client only; role via AuthProvider) | `profiles` (role) | owner, manager, staff | `src/components/layout/AppShell.test.tsx`, `src/routes/nav.test.ts` |
+| Toast notifications (success/error) | `components/toast/ToastProvider` (+ `useToast`) | — | — | owner, manager, staff | `src/components/toast/ToastProvider.test.tsx` |
+| Route error boundary | `components/ErrorBoundary` | — | — | owner, manager, staff | `src/components/ErrorBoundary.test.tsx` |
+| 404 page | `components/NotFoundPage` | — | — | public | `src/components/NotFoundPage.test.tsx` |
+| Breadcrumbs + page header | `components/layout/Breadcrumbs`, `components/PageHeader` | — | — | owner, manager, staff | `src/components/layout/Breadcrumbs.test.tsx`, `src/components/PageHeader.test.tsx` |
+| Role-aware landing | `features/home/HomePage` | — | `profiles` (role) | owner, manager, staff | `src/features/home/HomePage.test.tsx` |
 
 ## Planned coverage (checklist, not yet rows)
 

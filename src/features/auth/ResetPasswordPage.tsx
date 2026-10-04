@@ -5,14 +5,14 @@ import { Link } from "react-router-dom";
 import { resetPassword } from "@/api/auth";
 import { resetPasswordSchema, type ResetPasswordInput } from "@/schemas/auth";
 import { Button } from "@/components/ui/button";
-import { Toast, type ToastKind } from "./Toast";
+import { useToast } from "@/components/toast/useToast";
 
 const inputClass =
   "h-11 w-full rounded-md border border-input bg-background px-3 text-sm " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function ResetPasswordPage() {
-  const [toast, setToast] = useState<{ kind: ToastKind; message: string } | null>(null);
+  const { success: notifySuccess, error: notifyError } = useToast();
   const [sent, setSent] = useState(false);
 
   const {
@@ -22,16 +22,16 @@ export function ResetPasswordPage() {
   } = useForm<ResetPasswordInput>({ resolver: zodResolver(resetPasswordSchema) });
 
   const onSubmit = async (values: ResetPasswordInput) => {
-    setToast(null);
     try {
       await resetPassword(values);
       setSent(true);
-      setToast({ kind: "success", message: "If that email is registered, a reset link is on its way." });
+      notifySuccess("If that email is registered, a reset link is on its way.");
     } catch (err) {
-      setToast({
-        kind: "error",
-        message: err instanceof Error ? err.message : "Could not send the reset email. Please try again.",
-      });
+      notifyError(
+        err instanceof Error
+          ? err.message
+          : "Could not send the reset email. Please try again.",
+      );
     }
   };
 
@@ -81,10 +81,6 @@ export function ResetPasswordPage() {
           </Link>
         </p>
       </div>
-
-      {toast && (
-        <Toast kind={toast.kind} message={toast.message} onDismiss={() => setToast(null)} />
-      )}
     </main>
   );
 }

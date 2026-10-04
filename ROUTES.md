@@ -24,6 +24,6 @@
 | `/audit-log`           | `features/admin/AuditLogPage`                 | owner                 | AppShell nav | TODO   | `e2e/admin.spec.ts`      |
 | `/users`               | `features/admin/UsersPage`                    | owner                 | AppShell nav | TODO   | `e2e/admin.spec.ts`      |
 | `/settings`            | `features/settings/SettingsPage`              | owner, manager        | AppShell nav | TODO   | `e2e/settings.spec.ts`   |
-| `*`                    | `components/NotFoundPage`                     | public                | —            | TODO   | `e2e/auth.spec.ts`       |
+| `*`                    | `components/NotFoundPage`                     | public                | —            | DONE   | `e2e/auth.spec.ts` (deferred: P0-06) |
 
 _Run 0: planned routes only. Components and specs are created by their tasks (P0-04 auth, P0-05 shell, then feature phases)._
