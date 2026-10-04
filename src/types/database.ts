@@ -118,6 +118,53 @@ export type Database = {
           },
         ];
       };
+      menu_items: {
+        Row: {
+          active: boolean;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          id: string;
+          name: string;
+          restaurant_id: string;
+          updated_at: string;
+          yield_quantity: number;
+          yield_unit: string;
+        };
+        Insert: {
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          name: string;
+          restaurant_id: string;
+          updated_at?: string;
+          yield_quantity: number;
+          yield_unit: string;
+        };
+        Update: {
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          name?: string;
+          restaurant_id?: string;
+          updated_at?: string;
+          yield_quantity?: number;
+          yield_unit?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "menu_items_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           created_at: string;
@@ -267,6 +314,71 @@ export type Database = {
             columns: ["supplier_id"];
             isOneToOne: false;
             referencedRelation: "suppliers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      recipe_ingredients: {
+        Row: {
+          created_at: string;
+          id: string;
+          item_id: string;
+          menu_item_id: string;
+          notes: string | null;
+          quantity: number;
+          restaurant_id: string;
+          unit_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          item_id: string;
+          menu_item_id: string;
+          notes?: string | null;
+          quantity: number;
+          restaurant_id: string;
+          unit_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          item_id?: string;
+          menu_item_id?: string;
+          notes?: string | null;
+          quantity?: number;
+          restaurant_id?: string;
+          unit_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recipe_ingredients_item_id_fkey";
+            columns: ["item_id"];
+            isOneToOne: false;
+            referencedRelation: "items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recipe_ingredients_menu_item_id_fkey";
+            columns: ["menu_item_id"];
+            isOneToOne: false;
+            referencedRelation: "menu_items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recipe_ingredients_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recipe_ingredients_unit_id_fkey";
+            columns: ["unit_id"];
+            isOneToOne: false;
+            referencedRelation: "units";
             referencedColumns: ["id"];
           },
         ];
@@ -553,6 +665,58 @@ export type Database = {
             columns: ["restaurant_id"];
             isOneToOne: false;
             referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      unit_conversions: {
+        Row: {
+          created_at: string;
+          factor: number;
+          from_unit_id: string;
+          id: string;
+          restaurant_id: string;
+          to_unit_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          factor: number;
+          from_unit_id: string;
+          id?: string;
+          restaurant_id: string;
+          to_unit_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          factor?: number;
+          from_unit_id?: string;
+          id?: string;
+          restaurant_id?: string;
+          to_unit_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "unit_conversions_from_unit_id_fkey";
+            columns: ["from_unit_id"];
+            isOneToOne: false;
+            referencedRelation: "units";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "unit_conversions_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "unit_conversions_to_unit_id_fkey";
+            columns: ["to_unit_id"];
+            isOneToOne: false;
+            referencedRelation: "units";
             referencedColumns: ["id"];
           },
         ];

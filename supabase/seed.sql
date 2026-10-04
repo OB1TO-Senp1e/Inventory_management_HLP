@@ -79,6 +79,26 @@ values
 on conflict (restaurant_id, symbol) do nothing;
 
 -- ---------------------------------------------------------------------------
+-- Sample unit conversions (P4-01; explicit factors, one-hop)
+-- ---------------------------------------------------------------------------
+
+insert into public.unit_conversions (restaurant_id, from_unit_id, to_unit_id, factor)
+select
+  'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5',
+  f.id, t.id, v.factor
+from (values
+  ('g',  'kg', 0.001),
+  ('kg', 'g',  1000),
+  ('ml', 'L',  0.001),
+  ('L',  'ml', 1000)
+) as v(from_symbol, to_symbol, factor)
+join public.units f
+  on f.restaurant_id = 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5' and f.symbol = v.from_symbol
+join public.units t
+  on t.restaurant_id = 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5' and t.symbol = v.to_symbol
+on conflict (restaurant_id, from_unit_id, to_unit_id) do nothing;
+
+-- ---------------------------------------------------------------------------
 -- Sanity check (visible in psql output; errors fail the run)
 -- ---------------------------------------------------------------------------
 

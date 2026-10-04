@@ -27,6 +27,7 @@ const NOW = "2026-10-04T08:30:00.000Z";
 const UNITS = [
   { id: "a0000000-0000-0000-0000-000000000001", restaurant_id: R, name: "kilogram", symbol: "kg", active: true },
   { id: "a0000000-0000-0000-0000-000000000002", restaurant_id: R, name: "litre", symbol: "L", active: true },
+  { id: "a0000000-0000-0000-0000-000000000003", restaurant_id: R, name: "gram", symbol: "g", active: true },
 ];
 
 const CATEGORIES = [
@@ -249,6 +250,68 @@ const RPC_STUBS: Record<string, unknown> = {
   },
 };
 
+const MENU_ITEMS = [
+  {
+    id: "f0000000-0000-0000-0000-000000000001",
+    restaurant_id: R,
+    name: "Butter Chicken",
+    description: "Creamy tomato curry",
+    yield_quantity: 4,
+    yield_unit: "servings",
+    active: true,
+    created_at: NOW,
+    updated_at: NOW,
+    recipe_ingredients: [{ count: 2 }],
+  },
+  {
+    id: "f0000000-0000-0000-0000-000000000002",
+    restaurant_id: R,
+    name: "Dal Makhani",
+    description: null,
+    yield_quantity: 6,
+    yield_unit: "servings",
+    active: true,
+    created_at: NOW,
+    updated_at: NOW,
+    recipe_ingredients: [{ count: 1 }],
+  },
+];
+
+const RECIPE_INGREDIENTS = [
+  {
+    id: "f0000000-0000-0000-0000-000000000011",
+    restaurant_id: R,
+    menu_item_id: MENU_ITEMS[0].id,
+    item_id: ITEMS[0].id,
+    quantity: 2,
+    unit_id: UNITS[0].id,
+    notes: null,
+    items: { name: ITEMS[0].name, units: { symbol: "kg" } },
+    units: { symbol: "kg" },
+  },
+  {
+    id: "f0000000-0000-0000-0000-000000000012",
+    restaurant_id: R,
+    menu_item_id: MENU_ITEMS[0].id,
+    item_id: ITEMS[1].id,
+    quantity: 1,
+    unit_id: UNITS[1].id,
+    notes: null,
+    items: { name: ITEMS[1].name, units: { symbol: "L" } },
+    units: { symbol: "L" },
+  },
+];
+
+const UNIT_CONVERSIONS = [
+  {
+    id: "f0000000-0000-0000-0000-000000000021",
+    restaurant_id: R,
+    from_unit_id: "a0000000-0000-0000-0000-000000000003",
+    to_unit_id: UNITS[0].id,
+    factor: 0.001,
+  },
+];
+
 const TABLES: Record<string, Record<string, unknown>[]> = {
   item_categories: CATEGORIES,
   storage_locations: LOCATIONS,
@@ -262,6 +325,9 @@ const TABLES: Record<string, Record<string, unknown>[]> = {
   "rpc:list_receivable_items": RECEIVABLE_ITEMS,
   purchase_orders: PURCHASE_ORDERS,
   purchase_order_lines: PURCHASE_ORDER_LINES,
+  menu_items: MENU_ITEMS,
+  recipe_ingredients: RECIPE_INGREDIENTS,
+  unit_conversions: UNIT_CONVERSIONS,
   restaurants: [{ id: R, name: "Testaurant", created_at: NOW, updated_at: NOW }],
 };
 
