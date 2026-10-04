@@ -96,20 +96,20 @@ All writes that change stock go through RPCs. The client never computes stock; i
 
 ## 7. Role matrix
 
-| Capability | owner | manager | staff |
-|---|---|---|---|
-| User management | ✅ | ❌ | ❌ |
-| Audit log / reports / costs | ✅ | ✅ (no user mgmt) | ❌ (no costs, no reports) |
-| Items, suppliers, price lists | ✅ | ✅ | ❌ |
-| Purchase orders (create/send/receive) | ✅ | ✅ | ❌ |
-| Receive stock (ad hoc + against PO) | ✅ | ✅ | ✅ |
-| Log usage / wastage | ✅ | ✅ | ✅ |
-| Recipes & menu items | ✅ | ✅ | ❌ |
-| Sales entry | ✅ | ✅ | ❌ |
-| Stock counts (perform assigned) | ✅ | ✅ | ✅ (assigned only) |
-| Approve count adjustments | ✅ | ✅ | ❌ |
-| Dashboard & reports | ✅ | ✅ | ❌ (limited ops view only) |
-| CSV import/export | ✅ | ✅ | ❌ |
+| Capability                            | owner | manager           | staff                      |
+| ------------------------------------- | ----- | ----------------- | -------------------------- |
+| User management                       | ✅    | ❌                | ❌                         |
+| Audit log / reports / costs           | ✅    | ✅ (no user mgmt) | ❌ (no costs, no reports)  |
+| Items, suppliers, price lists         | ✅    | ✅                | ❌                         |
+| Purchase orders (create/send/receive) | ✅    | ✅                | ❌                         |
+| Receive stock (ad hoc + against PO)   | ✅    | ✅                | ✅                         |
+| Log usage / wastage                   | ✅    | ✅                | ✅                         |
+| Recipes & menu items                  | ✅    | ✅                | ❌                         |
+| Sales entry                           | ✅    | ✅                | ❌                         |
+| Stock counts (perform assigned)       | ✅    | ✅                | ✅ (assigned only)         |
+| Approve count adjustments             | ✅    | ✅                | ❌                         |
+| Dashboard & reports                   | ✅    | ✅                | ❌ (limited ops view only) |
+| CSV import/export                     | ✅    | ✅                | ❌                         |
 
 Enforcement: **RLS is the authority**. UI hides disallowed actions per role, but every table/RPC has role-keyed policies tested for all three roles.
 
@@ -145,8 +145,9 @@ Views: `current_stock`, `low_stock_alerts` (≤ reorder point), `expiring_soon` 
 ## 11. Decisions log
 
 - 2026-10-04 (Run 0): Fixed stack adopted as specified. Single-restaurant v1; no POS/barcode/multi-outlet. Ledger + RPC architecture chosen for auditability. Locale India defaults.
-- *(append new decisions here, newest last)*
+- 2026-10-04 (Run 1 / P0-01): React pinned to 18.3 (template defaulted to 19); TypeScript 5.7 (dropped `erasableSyntaxOnly`, a 5.8+ option); shadcn/ui wired manually without CLI; ESLint 9 flat config with `--max-warnings 0`; pnpm 9.12.0. All deps are fixed-stack items — no new dependency justifications needed.
+- _(append new decisions here, newest last)_
 
 ## 12. Dependency justifications
 
-- *(one line per non-stack dependency, added when introduced)*
+- _(one line per non-stack dependency, added when introduced)_

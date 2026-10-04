@@ -6,16 +6,18 @@ You are a senior full-stack engineer building a production-grade, web-hosted res
 
 ## 1. PRODUCT
 
-A web app (installable PWA) for a single restaurant, used on phone, tablet and desktop by kitchen staff, managers and the owner. It answers: *What is in stock? What was used or wasted? What must be ordered?*
+A web app (installable PWA) for a single restaurant, used on phone, tablet and desktop by kitchen staff, managers and the owner. It answers: _What is in stock? What was used or wasted? What must be ordered?_
 
 **Locale defaults:** India. Currency INR (₹), `en-IN` number formatting, timezone `Asia/Kolkata`, optional GST fields on purchases.
 
 **Roles**
+
 - `owner`: everything, including reports, costs, user management
 - `manager`: items, suppliers, purchasing, recipes, counts, wastage, reports (no user management)
 - `staff`: receive stock, log usage/wastage, perform assigned counts; cannot see costs or reports
 
 **v1 modules**
+
 1. Auth and users (email + password, role-based access)
 2. Items (ingredients/supplies): unit, category, storage location, par level, reorder point, active flag
 3. Suppliers and supplier price list per item
@@ -45,6 +47,7 @@ A web app (installable PWA) for a single restaurant, used on phone, tablet and d
 - **Package manager:** pnpm
 
 ### Repository layout
+
 ```
 /
 ├─ ARCHITECTURE.md      # decisions, data model, conventions (you maintain)
@@ -76,6 +79,7 @@ A web app (installable PWA) for a single restaurant, used on phone, tablet and d
 **Step 3: Pick exactly one task.** The first task in `TASKS.md` with status `TODO` whose dependencies are `DONE`. Mark it `IN_PROGRESS`. One task per run, no exceptions. If a task is too large to finish properly, split it into subtasks in `TASKS.md` and do the first subtask.
 
 **Step 4: Build it vertically.** A task is a complete vertical slice, in this order:
+
 1. Migration (tables, constraints, indexes, RLS policies, RPCs)
 2. Regenerate types
 3. `src/api/` functions with Zod-validated inputs and typed outputs
@@ -90,6 +94,7 @@ Never build UI against fake data. Never build a backend object that no screen us
 **Step 5: Run the quality gates (Section 5).** All must pass. If one fails, fix it. If you cannot after 3 honest attempts, record it in `BLOCKERS.md` and mark the task `BLOCKED`, never `DONE`.
 
 **Step 6: Record.** Mark the task `DONE` in `TASKS.md`. Append to `PROGRESS.md`:
+
 ```
 ## Run N — <date> — <task id and title>
 - What changed (files, migrations)
@@ -97,6 +102,7 @@ Never build UI against fake data. Never build a backend object that no screen us
 - Decisions made (also copied into ARCHITECTURE.md if lasting)
 - Next task: <id>
 ```
+
 Commit with message `feat(<module>): <task id> <summary>`.
 
 **Step 7: Stop.** Do not begin the next task. End with a 5-line summary: task done, gates status, files touched, blockers, next task id.
@@ -106,6 +112,7 @@ Commit with message `feat(<module>): <task id> <summary>`.
 ## 4. ENGINEERING RULES
 
 **Data and backend**
+
 - Stock is a **ledger**. `stock_movements` is append-only (no UPDATE/DELETE, enforced by policy and trigger). Current stock = SUM of movements, exposed via a view or materialized helper. Corrections are new movements, never edits.
 - Movement types: `receipt`, `usage`, `sale_deduction`, `wastage`, `count_adjustment`, `transfer_in`, `transfer_out`, `opening_balance`. Quantities are stored in the item's **base unit**; conversions are explicit and tested.
 - Costing: weighted average cost, recalculated on receipt inside the RPC.
@@ -116,6 +123,7 @@ Commit with message `feat(<module>): <task id> <summary>`.
 - Seed data (`seed.sql`) is for development only and clearly separated from migrations.
 
 **Frontend**
+
 - Only `src/api/` imports the Supabase client. Components never call Supabase directly.
 - Every list screen has: search, filter, sort, pagination, empty state, skeleton loading, error state with retry.
 - Every form: Zod validation, inline field errors, disabled-while-submitting, success toast, error toast with a useful message, unsaved-changes guard on dirty forms.
@@ -127,6 +135,7 @@ Commit with message `feat(<module>): <task id> <summary>`.
 - Numbers: `en-IN` formatting, ₹ symbol, units always shown next to quantities.
 
 **Code quality**
+
 - TypeScript strict, no `any`, no `@ts-ignore` without a comment explaining why.
 - No `console.log`, no commented-out code, no `TODO` left in code. If something is deferred, it goes into `TASKS.md`.
 - Small files, one component per file, feature-folder organisation.
@@ -137,19 +146,20 @@ Commit with message `feat(<module>): <task id> <summary>`.
 
 ## 5. QUALITY GATES (a task is DONE only if every gate passes)
 
-| Gate | Command / check | Requirement |
-|---|---|---|
-| Types | `pnpm typecheck` | 0 errors |
-| Lint | `pnpm lint` | 0 errors, 0 warnings |
-| Unit | `pnpm test` | all pass; new logic has tests |
-| DB tests | `pnpm test:db` | RPCs and RLS policies tested for every role |
-| Build | `pnpm build` | succeeds, no warnings about missing imports |
-| **Route audit** | `pnpm audit:routes` | Crawls every route in `ROUTES.md` per role in Playwright. Fails on: 404, blank page, uncaught console error, failed network request, or any `<a>`/nav link whose target is not a registered route |
-| **Wiring audit** | `pnpm audit:wiring` | Parses `FEATURE_MATRIX.md` and the code. Fails if any `src/api` function is unused, any button/form lacks a handler, any RPC/table has no consumer, or any matrix row has an empty cell |
-| E2E | `pnpm test:e2e` | The task's user flow passes on mobile (390px) and desktop (1280px) viewports |
-| Manual checklist | below | Every item confirmed in `PROGRESS.md` |
+| Gate             | Command / check     | Requirement                                                                                                                                                                                       |
+| ---------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Types            | `pnpm typecheck`    | 0 errors                                                                                                                                                                                          |
+| Lint             | `pnpm lint`         | 0 errors, 0 warnings                                                                                                                                                                              |
+| Unit             | `pnpm test`         | all pass; new logic has tests                                                                                                                                                                     |
+| DB tests         | `pnpm test:db`      | RPCs and RLS policies tested for every role                                                                                                                                                       |
+| Build            | `pnpm build`        | succeeds, no warnings about missing imports                                                                                                                                                       |
+| **Route audit**  | `pnpm audit:routes` | Crawls every route in `ROUTES.md` per role in Playwright. Fails on: 404, blank page, uncaught console error, failed network request, or any `<a>`/nav link whose target is not a registered route |
+| **Wiring audit** | `pnpm audit:wiring` | Parses `FEATURE_MATRIX.md` and the code. Fails if any `src/api` function is unused, any button/form lacks a handler, any RPC/table has no consumer, or any matrix row has an empty cell           |
+| E2E              | `pnpm test:e2e`     | The task's user flow passes on mobile (390px) and desktop (1280px) viewports                                                                                                                      |
+| Manual checklist | below               | Every item confirmed in `PROGRESS.md`                                                                                                                                                             |
 
 **Manual checklist for every UI task**
+
 - [ ] No dead link, no `href="#"`, no button that does nothing, no placeholder text ("Lorem", "Coming soon", "TODO")
 - [ ] Loading, empty, error, and success states all exist and were exercised
 - [ ] Data created in this screen appears in every other screen that should show it (e.g. a received item updates the dashboard stock and the item detail ledger)
@@ -179,6 +189,7 @@ Statuses: `TODO`, `IN_PROGRESS`, `DONE`, `BLOCKED`.
 ## 7. TASK ROADMAP (copy into TASKS.md during Run 0, then refine as needed)
 
 **Phase 0 — Foundation**
+
 - P0-01 Repo init: Vite + React + TS strict, Tailwind, shadcn/ui, ESLint, Prettier, pnpm scripts, `.env.example`
 - P0-02 Supabase project setup: CLI config, migrations folder, type generation script, local dev instructions in README
 - P0-03 Core schema migration: restaurants, profiles (role), item categories, storage locations, units + RLS helper functions (`current_restaurant_id()`, `has_role()`)
@@ -188,6 +199,7 @@ Statuses: `TODO`, `IN_PROGRESS`, `DONE`, `BLOCKED`.
 - P0-07 Seed data and test users (one per role)
 
 **Phase 1 — Items and suppliers**
+
 - P1-01 Items: schema, CRUD UI, categories, units, par and reorder levels, archive
 - P1-02 Storage locations and categories management screens
 - P1-03 Suppliers: schema, CRUD UI, contact details
@@ -195,6 +207,7 @@ Statuses: `TODO`, `IN_PROGRESS`, `DONE`, `BLOCKED`.
 - P1-05 CSV import/export for items and suppliers with validation preview and error report
 
 **Phase 2 — Stock ledger**
+
 - P2-01 `stock_movements` schema, append-only enforcement, `current_stock` view, opening balance entry
 - P2-02 RPC `receive_goods` (batch, expiry, cost, weighted average) + receiving UI (ad hoc)
 - P2-03 RPC `log_wastage` / `log_usage` with reason codes + UI
@@ -202,18 +215,21 @@ Statuses: `TODO`, `IN_PROGRESS`, `DONE`, `BLOCKED`.
 - P2-05 Stock overview screen: filter by category/location/low/expiring, realtime updates
 
 **Phase 3 — Purchasing**
+
 - P3-01 Purchase orders: schema, create/edit draft, line items, supplier prefill from price list
 - P3-02 PO lifecycle: send (mark), partial receive, full receive via `receive_goods`, cancel
 - P3-03 Reorder suggestions: items at or below reorder point grouped by preferred supplier, one-click draft PO
 - P3-04 PO print/PDF view
 
 **Phase 4 — Recipes, costing, sales**
+
 - P4-01 Menu items and recipes: schema, builder UI, yield, unit conversion
 - P4-02 Recipe costing: live cost per dish, food-cost %, selling price field
 - P4-03 RPC `record_sales` deducting stock via recipes + sales entry UI (per dish, per day)
 - P4-04 Handling of insufficient stock on sale deduction (warn, allow with negative flag, audit)
 
 **Phase 5 — Counts and reporting**
+
 - P5-01 Stock counts: create, count sheet UI (mobile-optimised), save progress
 - P5-02 Variance review and approval → RPC `apply_stock_count` posts adjustments
 - P5-03 Dashboard: low stock, expiring soon, today's usage and wastage, stock value (owner/manager only)
@@ -222,6 +238,7 @@ Statuses: `TODO`, `IN_PROGRESS`, `DONE`, `BLOCKED`.
 - P5-06 User management (owner): invite, change role, deactivate
 
 **Phase 6 — Production hardening**
+
 - P6-01 PWA: manifest, icons, service worker, install prompt, offline shell
 - P6-02 Offline queue for wastage/usage/receiving with conflict-safe sync and visible sync status
 - P6-03 Performance pass: indexes review, query review, bundle splitting, Lighthouse ≥ 90 on mobile

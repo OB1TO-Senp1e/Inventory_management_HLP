@@ -10,4 +10,4 @@
 - **Blocks:** P0-02 (Supabase cloud project), P0-05 (branding/theme), P0-07 (realistic seed data), P6-06 (deployment).
 - **Workaround:** Proceed with neutral default theme, local Supabase, and sample seed data until provided.
 
-*(Add new blockers below, newest last. Mark resolved with date when cleared.)*
+_(Add new blockers below, newest last. Mark resolved with date when cleared.)_

@@ -8,3 +8,10 @@
 - Gates: n/a (bootstrap only)
 - Decisions made: Single-restaurant v1; fixed stack as specified; ledger + RPC architecture; India locale defaults (INR, en-IN, Asia/Kolkata).
 - Next task: P0-01 (Repo init)
+
+## Run 1 — 2026-10-04 — P0-01 Repo init
+
+- What changed: Scaffolded Vite + React 18.3 + TS strict app via pnpm. Added Tailwind 3.4 (+ shadcn/ui theme tokens, Button primitive, components.json), React Router 7, TanStack Query 5, React Hook Form + Zod, Recharts, lucide-react, Supabase JS client factory (src/lib/supabase.ts). ESLint 9 flat config (0 errors/0 warnings enforced) + Prettier. Scripts: dev, build, typecheck, lint, test (vitest), preview. .env.example with Supabase placeholders. Minimal starter UI (SetupStatus) + formatINR unit test. State files kept at repo root.
+- Gates: typecheck ✅ lint ✅ (0 errors, 0 warnings) test ✅ (3 passed) build ✅
+- Decisions made: React pinned to 18.3 (fixed stack; template defaulted to 19); TypeScript 5.7 (template's 6.x unsupported by tooling — dropped erasableSyntaxOnly); shadcn wired manually (no CLI) with one documented eslint-disable for buttonVariants; pnpm 9.12.0.
+- Next task: P0-02 (Supabase project setup)

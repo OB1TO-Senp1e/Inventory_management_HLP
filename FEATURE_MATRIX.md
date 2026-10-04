@@ -4,9 +4,9 @@
 > No empty cells allowed once a row is DONE. The wiring audit (P0-06) parses this file.
 > Run 0: structure only — rows are added as tasks complete their vertical slices.
 
-| screen/action | component | api function | DB object | RLS roles | test file |
-|---|---|---|---|---|---|
-| *(rows added from P0-01 onward)* | — | — | — | — | — |
+| screen/action                    | component | api function | DB object | RLS roles | test file |
+| -------------------------------- | --------- | ------------ | --------- | --------- | --------- |
+| _(rows added from P0-01 onward)_ | —         | —            | —         | —         | —         |
 
 ## Planned coverage (checklist, not yet rows)
 

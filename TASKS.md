@@ -5,7 +5,7 @@
 
 ## Phase 0 — Foundation
 
-- [TODO] P0-01 | Repo init: Vite + React + TS strict, Tailwind, shadcn/ui, ESLint, Prettier, pnpm scripts, .env.example | depends: — | acceptance: pnpm install && pnpm typecheck && pnpm lint && pnpm build all pass on fresh clone
+- [DONE] P0-01 | Repo init: Vite + React + TS strict, Tailwind, shadcn/ui, ESLint, Prettier, pnpm scripts, .env.example | depends: — | acceptance: pnpm install && pnpm typecheck && pnpm lint && pnpm build all pass on fresh clone
 - [TODO] P0-02 | Supabase project setup: CLI config, migrations folder, type generation script, local dev README | depends: P0-01 | acceptance: supabase start works locally; pnpm gen:types produces src/types/database.ts; README documents local dev
 - [TODO] P0-03 | Core schema migration: restaurants, profiles (role), categories, storage locations, units + RLS helpers | depends: P0-02 | acceptance: migration applies cleanly; current_restaurant_id() and has_role() work; RLS denies cross-restaurant reads (db test)
 - [TODO] P0-04 | Auth: sign in, sign out, password reset, session persistence, protected routes, role guard | depends: P0-03 | acceptance: sign in/out/reset flows pass on 390px+1280px; unauthenticated route redirects; role guard blocks staff from /reports
