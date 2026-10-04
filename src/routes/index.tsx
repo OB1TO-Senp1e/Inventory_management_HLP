@@ -13,6 +13,7 @@ import { ItemsPage } from "@/features/items/ItemsPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { SuppliersPage } from "@/features/suppliers/SuppliersPage";
 import { SupplierPricesPage } from "@/features/suppliers/SupplierPricesPage";
+import { ReceivingPage } from "@/features/stock/ReceivingPage";
 import { routeAccess } from "./access";
 import type { UserRole } from "@/schemas/role";
 
@@ -33,6 +34,7 @@ const builtSections: Record<string, ReactNode> = {
   "/settings": <SettingsPage />,
   "/suppliers": <SuppliersPage />,
   "/suppliers/:id/prices": <SupplierPricesPage />,
+  "/receiving": <ReceivingPage />,
 };
 
 /**

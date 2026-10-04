@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseClient } from "@/lib/supabase";
-import { createOpeningBalance, getCurrentStock } from "./stock";
+import { createOpeningBalance, getCurrentStock, receiveGoods } from "./stock";
 
 // No network in these tests: the client factory is mocked outright.
 vi.mock("@/lib/supabase", () => ({ getSupabaseClient: vi.fn() }));
@@ -161,5 +161,114 @@ describe("getCurrentStock", () => {
       chainable({ data: null, error: { message: "boom" } }),
     );
     await expect(getCurrentStock({ itemId: ITEM_ID })).rejects.toThrow("boom");
+  });
+});
+
+describe("receiveGoods", () => {
+  const lineInput = {
+    itemId: ITEM_ID,
+    quantity: 10,
+    unitCost: 40,
+    batchNo: "B-001",
+    expiryDate: "2026-12-31",
+    notes: "first delivery",
+  };
+
+  const rpcRow = {
+    movement_id: MOVEMENT_ID,
+    item_id: ITEM_ID,
+    quantity: "10",
+    unit_cost: "40",
+    old_avg_cost: "0",
+    new_avg_cost: "40",
+  };
+
+  it("calls the RPC with snake_case line params and parses the result", async () => {
+    mockRpc.mockResolvedValue({ data: [rpcRow], error: null });
+    const result = await receiveGoods({ lines: [lineInput] });
+    expect(mockRpc).toHaveBeenCalledWith("receive_goods", {
+      p_lines: [
+        {
+          item_id: ITEM_ID,
+          quantity: 10,
+          unit_cost: 40,
+          batch_no: "B-001",
+          expiry_date: "2026-12-31",
+          notes: "first delivery",
+        },
+      ],
+    });
+    expect(result.lines).toEqual([
+      {
+        movementId: MOVEMENT_ID,
+        itemId: ITEM_ID,
+        quantity: 10,
+        unitCost: 40,
+        oldAvgCost: 0,
+        newAvgCost: 40,
+      },
+    ]);
+  });
+
+  it("normalizes blank optional fields to null", async () => {
+    mockRpc.mockResolvedValue({ data: [rpcRow], error: null });
+    await receiveGoods({
+      lines: [
+        { itemId: ITEM_ID, quantity: 5, unitCost: 20, batchNo: "", expiryDate: "", notes: "" },
+      ],
+    });
+    const params = mockRpc.mock.calls[0][1] as {
+      p_lines: Array<Record<string, unknown>>;
+    };
+    expect(params.p_lines[0]).toMatchObject({
+      batch_no: null,
+      expiry_date: null,
+      notes: null,
+    });
+  });
+
+  it("rejects an empty receipt before any RPC call", async () => {
+    await expect(receiveGoods({ lines: [] })).rejects.toThrow(
+      "at least one line",
+    );
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a zero quantity before any RPC call", async () => {
+    await expect(
+      receiveGoods({ lines: [{ ...lineInput, quantity: 0 }] }),
+    ).rejects.toThrow("greater than zero");
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a negative unit cost before any RPC call", async () => {
+    await expect(
+      receiveGoods({ lines: [{ ...lineInput, unitCost: -1 }] }),
+    ).rejects.toThrow("cannot be negative");
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a past expiry date before any RPC call", async () => {
+    await expect(
+      receiveGoods({ lines: [{ ...lineInput, expiryDate: "2020-01-01" }] }),
+    ).rejects.toThrow("in the past");
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed expiry date before any RPC call", async () => {
+    await expect(
+      receiveGoods({ lines: [{ ...lineInput, expiryDate: "tomorrow" }] }),
+    ).rejects.toThrow("YYYY-MM-DD");
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces RPC errors verbatim (friendly line-numbered messages)", async () => {
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: "receive_goods: line 2: quantity must be greater than zero" },
+    });
+    await expect(receiveGoods({ lines: [lineInput, lineInput] })).rejects.toThrow(
+      "receive_goods: line 2",
+    );
   });
 });

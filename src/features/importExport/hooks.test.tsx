@@ -75,6 +75,7 @@ function makeItem(name: string): Item {
     parLevel: 0,
     reorderPoint: 0,
     active: true,
+    avgUnitCost: 0,
     createdAt: "",
     updatedAt: "",
   };

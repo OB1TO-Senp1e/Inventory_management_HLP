@@ -54,6 +54,7 @@ const sampleItem: Item = {
   parLevel: 10,
   reorderPoint: 4,
   active: true,
+  avgUnitCost: 0,
   createdAt: "",
   updatedAt: "",
 };

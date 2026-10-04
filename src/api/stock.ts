@@ -3,8 +3,10 @@ import { getSupabaseClient } from "@/lib/supabase";
 import {
   createOpeningBalanceSchema,
   getCurrentStockSchema,
+  receiveGoodsSchema,
   type CreateOpeningBalanceInput,
   type GetCurrentStockInput,
+  type ReceiveGoodsInput,
 } from "@/schemas/stock";
 
 /**
@@ -67,7 +69,6 @@ export async function getCurrentStock(
 export interface OpeningBalanceResult {
   movementId: string;
 }
-
 /**
  * Post the one-time opening balance for an item via the
  * `create_opening_balance` RPC. Owner/manager only (the RPC enforces this;
@@ -93,4 +94,70 @@ export async function createOpeningBalance(
   }
   const movementId = z.string().uuid().parse(data);
   return { movementId };
+}
+
+export interface ReceiveGoodsLineResult {
+  movementId: string;
+  itemId: string;
+  quantity: number;
+  unitCost: number;
+  oldAvgCost: number;
+  newAvgCost: number;
+}
+
+export interface ReceiveGoodsResult {
+  lines: ReceiveGoodsLineResult[];
+}
+
+const receiveGoodsLineResultSchema = z.object({
+  movement_id: z.string().uuid(),
+  item_id: z.string().uuid(),
+  quantity: z.coerce.number(),
+  unit_cost: z.coerce.number(),
+  old_avg_cost: z.coerce.number(),
+  new_avg_cost: z.coerce.number(),
+});
+
+function toReceiveGoodsLineResult(
+  row: z.infer<typeof receiveGoodsLineResultSchema>,
+): ReceiveGoodsLineResult {
+  return {
+    movementId: row.movement_id,
+    itemId: row.item_id,
+    quantity: row.quantity,
+    unitCost: row.unit_cost,
+    oldAvgCost: row.old_avg_cost,
+    newAvgCost: row.new_avg_cost,
+  };
+}
+
+/**
+ * Post an ad hoc receipt via the `receive_goods` RPC. All lines post
+ * atomically; the RPC raises a friendly, line-numbered error when any line
+ * is invalid. The returned per-line old→new average costs feed the receipt
+ * report — the client never recomputes cost.
+ *
+ * Roles: owner, manager, staff (the RPC enforces this; the route guard
+ * already limits the page to those three roles).
+ */
+export async function receiveGoods(
+  rawInput: unknown,
+): Promise<ReceiveGoodsResult> {
+  const input: ReceiveGoodsInput = receiveGoodsSchema.parse(rawInput);
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc("receive_goods", {
+    p_lines: input.lines.map((line) => ({
+      item_id: line.itemId,
+      quantity: line.quantity,
+      unit_cost: line.unitCost,
+      batch_no: line.batchNo ?? null,
+      expiry_date: line.expiryDate ?? null,
+      notes: line.notes ?? null,
+    })),
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  const lines = z.array(receiveGoodsLineResultSchema).parse(data);
+  return { lines: lines.map(toReceiveGoodsLineResult) };
 }

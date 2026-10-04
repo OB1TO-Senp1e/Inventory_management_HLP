@@ -136,6 +136,7 @@ describe("itemToCsvRow", () => {
       parLevel: 10,
       reorderPoint: 4,
       active: true,
+      avgUnitCost: 0,
       createdAt: "",
       updatedAt: "",
     } satisfies Item;
@@ -165,6 +166,7 @@ describe("itemToCsvRow", () => {
       parLevel: 0,
       reorderPoint: 0,
       active: true,
+      avgUnitCost: 0,
       createdAt: "",
       updatedAt: "",
     } satisfies Item;

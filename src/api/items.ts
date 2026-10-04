@@ -34,6 +34,8 @@ export interface Item {
   parLevel: number;
   reorderPoint: number;
   active: boolean;
+  /** Weighted-average unit cost in the base unit (INR). Maintained by ledger RPCs. */
+  avgUnitCost: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -62,6 +64,8 @@ const itemRowSchema = z.object({
   par_level: z.coerce.number(),
   reorder_point: z.coerce.number(),
   active: z.boolean(),
+  // Added in P2-01; defaulted so older mocked rows in tests still parse.
+  avg_unit_cost: z.coerce.number().optional().default(0),
   created_at: z.string(),
   updated_at: z.string(),
   item_categories: z.object({ name: z.string() }).nullable(),
@@ -85,6 +89,7 @@ function toItem(row: ItemRow): Item {
     parLevel: row.par_level,
     reorderPoint: row.reorder_point,
     active: row.active,
+    avgUnitCost: row.avg_unit_cost,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

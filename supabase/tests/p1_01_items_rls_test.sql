@@ -131,7 +131,10 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- T3: staff of A — NO access to items at all (read, write, archive)
+-- T3: staff of A — read-only: sees active own-restaurant items (receiving /
+-- usage / wastage pickers); no writes. (Policy added in P2-02: staff need
+-- item visibility to receive stock per the role matrix; management UI
+-- stays owner/manager-only via the route guard.)
 -- ---------------------------------------------------------------------------
 
 do $$
@@ -143,7 +146,14 @@ begin
     true);
 
   select count(*) into v_count from public.items;
-  perform pg_temp.assert_true('staff select returns 0 rows', v_count = 0);
+  perform pg_temp.assert_true('staff select returns active own-restaurant items (Tomato only)', v_count = 1);
+
+  perform pg_temp.assert_true('staff does not see the archived Onion',
+    not exists (select 1 from public.items where name = 'Onion'));
+
+  select count(*) into v_count from public.items
+   where restaurant_id = '22222222-2222-2222-2222-222222222222';
+  perform pg_temp.assert_true('staff sees 0 cross-restaurant items', v_count = 0);
 
   begin
     insert into public.items (restaurant_id, name, unit_id)
