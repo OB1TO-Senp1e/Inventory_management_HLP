@@ -12,7 +12,7 @@
 - [TODO] P0-04b | Live auth e2e against Supabase cloud (deferred until credentials) | depends: P0-02 | acceptance: sign in/out/reset flows pass on 390px+1280px against real GoTrue; unauthenticated route redirects
 - [DONE] P0-05 | AppShell: responsive layout, navigation per role, breadcrumbs, toast system, error boundary, 404 page, theme tokens | depends: P0-04a | acceptance: nav renders per role; 404 page shows on unknown route; no overflow at 360/768/1280
 - [DONE] P0-06 | Audit tooling: audit-routes.ts, audit-wiring.ts, Playwright config with 3 role fixtures, CI workflow | depends: P0-05 | acceptance: pnpm audit:routes and pnpm audit:wiring run and fail correctly on a deliberate gap; CI runs all gates
-- [TODO] P0-07 | Seed data and test users (one per role) | depends: P0-03 | acceptance: seed.sql loads 1 restaurant, 3 users (owner/manager/staff), sample categories/locations/units; dev login documented
+- [DONE] P0-07 | Seed data and test users (one per role) | depends: P0-03 | acceptance: seed.sql loads 1 restaurant, 3 users (owner/manager/staff), sample categories/locations/units; dev login documented
 
 ## Phase 1 — Items and suppliers
 

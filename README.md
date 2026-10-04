@@ -56,6 +56,44 @@ Schema changes live **only** in `supabase/migrations/` as timestamped SQL files
 (`supabase migration new <name>`). Never edit a migration that has already run —
 add a new one. After applying, run `pnpm gen:types`.
 
+### Seed data (dev only)
+
+`supabase/seed.sql` loads sample data for development — 1 restaurant, 3 users
+(one per role), sample categories, locations, and units. It is idempotent
+(`ON CONFLICT DO NOTHING`), dev-only, and never touches the `auth` schema, so
+it runs unchanged on Supabase cloud.
+
+| Command | What it does |
+|---|---|
+| `pnpm db:seed` | Apply the seed to the interim local DB (native PostgreSQL) |
+| `supabase db reset` | On real Supabase: re-applies migrations + `seed.sql` automatically |
+| SQL editor | On Supabase cloud: paste `supabase/seed.sql` into the SQL editor |
+
+## Test users
+
+Three fixed test users, one per role (created by `pnpm db:seed`):
+
+| Role | UUID | Suggested login email |
+|---|---|---|
+| owner | `11111111-1111-4111-8111-111111111111` | `owner@demo.local` |
+| manager | `22222222-2222-4222-8222-222222222222` | `manager@demo.local` |
+| staff | `33333333-3333-4333-8333-333333333333` | `staff@demo.local` |
+
+What each role can do is defined by the role matrix in `ARCHITECTURE.md` §7
+(RLS is the authority; the UI only hides what a role can't do).
+
+**Honest note:** real login passwords and GoTrue users don't exist yet — the
+Supabase cloud project hasn't been created (B-001). When it arrives: sign the
+three users up with the emails above, then insert matching `profiles` rows via
+the SQL editor using the UUIDs from their `auth.users` records (or the fixed
+UUIDs above, if you create the auth users with those IDs). Until then, role-based
+UI development uses the test-only `ri.mockRole` localStorage hook in
+`src/api/auth.ts` (set by Playwright fixtures and `pnpm audit:routes`; never
+shipped to production) — RLS stays the real enforcement in the database.
+
 ## Status
 
-Run 1 complete (2026-10-04): P0-01 repo init. Next: P0-02 Supabase project setup.
+Runs 0–7 complete (2026-10-04): bootstrap, P0-01 repo init, P0-02 Supabase setup
+(BLOCKED — B-002, no Docker in this VM), P0-03 core schema, P0-04a auth UI +
+guards, P0-05 AppShell, P0-06 audit tooling, P0-07 seed data and test users.
+Next: P1-01 Items.

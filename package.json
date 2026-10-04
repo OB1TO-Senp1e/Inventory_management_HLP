@@ -49,6 +49,7 @@
     "audit:routes": "tsx scripts/audit-routes.ts",
     "audit:wiring": "tsx scripts/audit-wiring.ts",
     "build": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.e2e.json && vite build",
+    "db:seed": "bash scripts/db-seed.sh",
     "dev": "vite",
     "gen:types": "supabase gen types typescript --local > src/types/database.ts",
     "gen:types:interim": "supabase gen types typescript --db-url \"host=/var/run/postgresql user=root dbname=restaurant_inventory\" --schema public > src/types/database.ts && prettier --write src/types/database.ts",

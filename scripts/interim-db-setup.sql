@@ -16,6 +16,21 @@ create table if not exists auth.users (
 comment on table auth.users is
   'INTERIM stub mirroring Supabase auth.users(id). Production FK targets stay valid.';
 
+-- ---------------------------------------------------------------------------
+-- INTERIM ONLY — stub auth.users rows for the P0-07 seed profiles.
+-- seed.sql (supabase/seed.sql) must stay auth-schema-free so it runs
+-- unchanged on Supabase cloud; on cloud, create the real GoTrue users first
+-- (README "Test users") and skip this section entirely.
+-- Idempotent: safe to re-run (this whole file is re-applied if extended).
+-- ---------------------------------------------------------------------------
+
+insert into auth.users (id)
+values
+  ('11111111-1111-4111-8111-111111111111'), -- owner (P0-07 seed)
+  ('22222222-2222-4222-8222-222222222222'), -- manager (P0-07 seed)
+  ('33333333-3333-4333-8333-333333333333')  -- staff (P0-07 seed)
+on conflict (id) do nothing;
+
 -- Mirror Supabase''s PostgREST roles so RLS policies (TO authenticated)
 -- can be exercised locally via SET ROLE.
 do $$
