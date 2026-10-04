@@ -16,7 +16,7 @@
 
 ## Phase 1 — Items and suppliers
 
-- [TODO] P1-01 | Items: schema, CRUD UI, categories, units, par and reorder levels, archive | depends: P0-07 | acceptance: create/edit/archive item with validation; list has search/filter/sort/pagination/empty states; RLS per role tested
+- [DONE] P1-01 | Items: schema, CRUD UI, categories, units, par and reorder levels, archive | depends: P0-07 | acceptance: create/edit/archive item with validation; list has search/filter/sort/pagination/empty states; RLS per role tested
 - [TODO] P1-02 | Storage locations and categories management screens | depends: P1-01 | acceptance: CRUD for locations/categories; item form dropdowns reflect changes; delete blocked when in use (or archived)
 - [TODO] P1-03 | Suppliers: schema, CRUD UI, contact details | depends: P0-07 | acceptance: supplier CRUD with validation; list search/filter; archived suppliers hidden from PO prefill
 - [TODO] P1-04 | Supplier price list per item (with price history table) | depends: P1-01, P1-03 | acceptance: set price per item/supplier; history shows every change with date; preferred supplier flagged

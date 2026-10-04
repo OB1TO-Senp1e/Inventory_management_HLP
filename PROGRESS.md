@@ -79,3 +79,24 @@
 - Gates: typecheck ✅ lint ✅ (0 errors, 0 warnings) test ✅ (63 passed) test:db ✅ (30 assertions) build ✅ + seed loads cleanly into interim DB (1 restaurant, 3 profiles / 3 distinct roles, 7 categories, 4 locations, 5 units) and re-runs idempotently.
 - Decisions made: fixed UUIDs (documented, matchable by future GoTrue users and e2e fixtures); `created_by` seeded as the owner UUID (audit metadata, no FK); neutral sample data per B-001 workaround.
 - Next task: P1-01 (Items: schema, CRUD UI, categories, units, par and reorder levels, archive)
+
+## Run 8 — 2026-10-04 — P1-01 Items vertical slice
+
+- What changed:
+  - `supabase/migrations/20261004155702_items.sql` — `items` table (uuid PK, restaurant_id FK cascade, name unique per restaurant, category_id/unit_id/storage_location_id FKs, par_level/reorder_point numeric >= 0, active default true, standard audit cols, updated_at trigger); CHECK/unique/FK constraints; indexes on all FKs + (restaurant_id, active); RLS: owner/manager full CRUD in own restaurant, staff denied entirely; grants to authenticated.
+  - `src/types/database.ts` regenerated via `pnpm gen:types:interim` (never hand-written).
+  - `src/schemas/item.ts` — Zod: create/update/list-input schemas, sort-column enum, friendly messages.
+  - `src/api/items.ts` — ONLY DB access: listItems (server-side search/filter/sort/pagination, LIKE-escaped), getItem, createItem (restaurantId from caller profile), updateItem (partial patch), archiveItem (active=false), listItemCategories/listStorageLocations/listUnits; Zod-validated in/out; duplicate-name → friendly error.
+  - `src/features/items/hooks.ts` — useItems/useItem/useCreateItem/useUpdateItem/useArchiveItem/useItemLookups (TanStack Query; profile-gated; toasts; invalidation).
+  - `src/features/items/ItemsPage.tsx` — PageHeader + debounced search, category/status filters, sortable table (desktop) / cards (mobile, no horizontal scroll), skeleton/empty ("No items yet — add your first item.")/error+retry states, pagination, en-IN numbers with unit symbols, archive via confirm dialog; management actions hidden from staff.
+  - `src/features/items/ItemDialog.tsx` — RHF+Zod create/edit form (name, category, unit, location, par, reorder with unit suffix), inline errors, disabled-while-submitting, unsaved-changes guard (confirm + beforeunload), a11y dialog semantics.
+  - `src/components/ConfirmDialog.tsx` — shared destructive-action dialog (alertdialog, Escape/overlay cancel, focus on Cancel).
+  - `src/lib/format.ts` — added `formatNumber` (en-IN grouping).
+  - `src/routes/index.tsx` — `/items` now renders ItemsPage (was 404); `/items/:id` stays 404 until P2-04; no dead links to it.
+  - Tests: `src/api/items.test.ts` (19: validation, query construction, friendly errors), `src/features/items/hooks.test.tsx` (8: delegation, restaurant-id injection, toasts, profile gating), `src/features/items/ItemsPage.test.tsx` (6: states, staff gating), `src/lib/format.test.ts` (+3); `supabase/tests/p1_01_items_rls_test.sql` (23 assertions: owner/manager CRUD, staff denied all, cross-restaurant isolation, constraints); `e2e/items.spec.ts` (5 deterministic specs + 1 live CRUD skipped without E2E_LIVE_SUPABASE=1).
+  - ROUTES.md `/items` → DONE; FEATURE_MATRIX.md +5 rows (no empty cells).
+- Gates: typecheck ✅ · lint ✅ (0 errors, 0 warnings) · test ✅ (98 passed, 15 files) · test:db ✅ (p0_03 + p1_01, all assertions) · build ✅ · audit:wiring ✅ (17 rows, 2 api modules) · audit:routes static ✅ (live crawl deferred per B-003, banner shown, CI-gated)
+- Decisions made: unit required (RESTRICT), category/location optional (SET NULL); staff zero items access (RLS); restaurantId from auth profile; soft-delete only; e2e live-CRUD skip pattern. (ARCHITECTURE.md §11 updated.)
+- Manual checklist: no dead links/placeholders; loading/empty/error/success states exercised in tests; role matrix enforced by guard + RLS (tested); responsive via breakpoint dual-render, touch targets ≥44px, no horizontal scroll (static verification — no browser in VM, same as P0-05).
+- Blockers: none new. B-001 (branding/credentials), B-002 (Docker), B-003 (no browser) still open.
+- Next task: P1-02 (Storage locations and categories management screens)

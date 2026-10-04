@@ -38,6 +38,80 @@ export type Database = {
           },
         ];
       };
+      items: {
+        Row: {
+          active: boolean;
+          category_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          name: string;
+          par_level: number;
+          reorder_point: number;
+          restaurant_id: string;
+          storage_location_id: string | null;
+          unit_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          active?: boolean;
+          category_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          name: string;
+          par_level?: number;
+          reorder_point?: number;
+          restaurant_id: string;
+          storage_location_id?: string | null;
+          unit_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          active?: boolean;
+          category_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          name?: string;
+          par_level?: number;
+          reorder_point?: number;
+          restaurant_id?: string;
+          storage_location_id?: string | null;
+          unit_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "items_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: false;
+            referencedRelation: "item_categories";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "items_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "items_storage_location_id_fkey";
+            columns: ["storage_location_id"];
+            isOneToOne: false;
+            referencedRelation: "storage_locations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "items_unit_id_fkey";
+            columns: ["unit_id"];
+            isOneToOne: false;
+            referencedRelation: "units";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           created_at: string;

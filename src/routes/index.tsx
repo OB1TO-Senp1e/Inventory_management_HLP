@@ -1,4 +1,5 @@
 import { Route, Routes } from "react-router-dom";
+import type { ReactNode } from "react";
 import { AuthProvider } from "@/features/auth/AuthProvider";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { ResetPasswordPage } from "@/features/auth/ResetPasswordPage";
@@ -8,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { AppShell } from "@/components/layout/AppShell";
 import { HomePage } from "@/features/home/HomePage";
+import { ItemsPage } from "@/features/items/ItemsPage";
 import { routeAccess } from "./access";
 import type { UserRole } from "@/schemas/role";
 
@@ -16,6 +18,16 @@ type RoleEntry = [string, { roles: UserRole[] }];
 function isRoleEntry(entry: [string, { public: true } | { roles: UserRole[] }]): entry is RoleEntry {
   return "roles" in entry[1];
 }
+
+/**
+ * Sections whose pages have shipped. Each feature task adds its page here;
+ * unbuilt sections keep rendering the designed 404 until their task lands.
+ * (Detail routes like /items/:id stay 404 until their own task — never link
+ * to them from list screens.)
+ */
+const builtSections: Record<string, ReactNode> = {
+  "/items": <ItemsPage />,
+};
 
 /**
  * One guarded route per planned section. Sections whose pages land in their
@@ -32,7 +44,7 @@ function sectionRoutes() {
         element={
           <RoleGuard allowedRoles={access.roles}>
             <ErrorBoundary key={path}>
-              <NotFoundPage />
+              {builtSections[path] ?? <NotFoundPage />}
             </ErrorBoundary>
           </RoleGuard>
         }

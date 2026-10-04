@@ -18,11 +18,16 @@
 | 404 page | `components/NotFoundPage` | — | — | public | `src/components/NotFoundPage.test.tsx` |
 | Breadcrumbs + page header | `components/layout/Breadcrumbs`, `components/PageHeader` | — | — | owner, manager, staff | `src/components/layout/Breadcrumbs.test.tsx`, `src/components/PageHeader.test.tsx` |
 | Role-aware landing | `features/home/HomePage` | — | `profiles` (role) | owner, manager, staff | `src/features/home/HomePage.test.tsx` |
+| Items list (search, filter, sort, paginate) | `features/items/ItemsPage` | `listItems` | `items`, `item_categories`, `units`, `storage_locations` | owner, manager | `src/api/items.test.ts`, `src/features/items/hooks.test.tsx`, `src/features/items/ItemsPage.test.tsx` |
+| Create item | `features/items/ItemDialog` | `createItem` | `items` | owner, manager | `src/api/items.test.ts` |
+| Edit item | `features/items/ItemDialog` | `getItem`, `updateItem` | `items` | owner, manager | `src/api/items.test.ts` |
+| Archive item (soft delete) | `features/items/ItemsPage` + `components/ConfirmDialog` | `archiveItem` | `items` | owner, manager | `src/api/items.test.ts` |
+| Item form lookups (categories, units, locations) | `features/items/ItemDialog` | `listItemCategories`, `listStorageLocations`, `listUnits` | `item_categories`, `storage_locations`, `units` | owner, manager | `src/api/items.test.ts` |
 
 ## Planned coverage (checklist, not yet rows)
 
 - [x] Auth: sign in/out/reset → `profiles` → unit tests done in P0-04a; live GoTrue e2e (`e2e/auth.spec.ts`) deferred to P0-04b
-- [ ] Items CRUD → `items` → `supabase/tests/items_rls_test.sql`
+- [x] Items CRUD → `items` → `supabase/tests/p1_01_items_rls_test.sql` (P1-01); e2e `e2e/items.spec.ts` (deterministic specs run everywhere, live CRUD in CI)
 - [ ] Suppliers + price list → `suppliers`, `supplier_prices` → e2e + db tests
 - [ ] Receiving (`receive_goods`) → `stock_movements` → RPC tests
 - [ ] Wastage/usage (`log_wastage`, `log_usage`) → `stock_movements` → RPC tests
