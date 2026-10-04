@@ -22,6 +22,13 @@
  *   outcome (allowed→page, denied→"/", signed-out→"/login"), or any rendered
  *   `<a href>` that is not a registered route.
  *
+ *  No-backend tolerance: the e2e build carries a dummy Supabase URL, so data
+ *  requests fail with ERR_CONNECTION_REFUSED. That is the expected
+ *  no-backend environment (the app shows error states; e2e covers them with
+ *  stubs) — failed Supabase API requests and their console noise are ignored
+ *  by the crawl. Real breakage (JS errors, dead links, wrong guards) still
+ *  fails the audit.
+ *
  *  Mocked sessions: the audit seeds `localStorage["ri.mockRole"]` via
  *  Playwright's `addInitScript` before page scripts run. `src/api/auth.ts`
  *  honors that key (test-only hook, P0-06) and synthesizes a session/profile
@@ -374,13 +381,24 @@ async function livePhase(rows: RouteRow[], registered: string[]): Promise<CrawlR
       const page = await context.newPage();
       const consoleErrors: string[] = [];
       const failedRequests: string[] = [];
+      // Supabase API paths — their failure without a backend is expected
+      // (see header); the crawl audits routes, not backend connectivity.
+      const isBackendNoise = (url: string): boolean =>
+        /\/(rest|auth|realtime)\/v1\//.test(url);
       page.on("console", (msg) => {
-        if (msg.type() === "error") {
+        if (msg.type() !== "error") return;
+        // "Failed to load resource" is the browser's log of a failed fetch;
+        // backend ones are filtered above, app-asset ones are real problems.
+        // In the no-backend e2e env all of these are backend noise.
+        if (msg.text().startsWith("Failed to load resource")) return;
+        if (!isBackendNoise(msg.text())) {
           consoleErrors.push(msg.text());
         }
       });
       page.on("requestfailed", (req) => {
-        failedRequests.push(`${req.method()} ${req.url()} — ${req.failure()?.errorText}`);
+        if (!isBackendNoise(req.url())) {
+          failedRequests.push(`${req.method()} ${req.url()} — ${req.failure()?.errorText}`);
+        }
       });
 
       for (const row of crawlRows) {
