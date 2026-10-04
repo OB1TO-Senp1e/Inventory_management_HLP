@@ -1,9 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthContext, type AuthContextValue } from "@/features/auth/AuthContext";
 import type { UserRole } from "@/schemas/role";
 import { AppShell } from "./AppShell";
+
+// Breadcrumb detail-name lookups are irrelevant to shell nav tests and need
+// no providers here.
+vi.mock("@/features/items/hooks", () => ({
+  useItem: () => ({ data: undefined }),
+}));
+vi.mock("@/features/suppliers/hooks", () => ({
+  useSupplier: () => ({ data: undefined }),
+}));
 
 function signedInValue(role: UserRole): AuthContextValue {
   return {

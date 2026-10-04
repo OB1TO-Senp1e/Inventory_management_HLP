@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatINR, formatNumber } from "./format";
+import { formatDate, formatINR, formatNumber } from "./format";
 
 describe("formatINR", () => {
   it("formats an amount in en-IN rupee style", () => {
@@ -27,5 +27,15 @@ describe("formatNumber", () => {
 
   it("keeps up to two decimal places", () => {
     expect(formatNumber(2.5)).toBe("2.5");
+  });
+});
+
+describe("formatDate", () => {
+  it("formats a date-only string without timezone day-shift", () => {
+    expect(formatDate("2026-12-31")).toBe("31 Dec 2026");
+  });
+
+  it("passes through full ISO strings", () => {
+    expect(formatDate("2026-01-05T10:00:00Z")).toBe("5 Jan 2026");
   });
 });

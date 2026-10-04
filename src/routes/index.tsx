@@ -10,6 +10,7 @@ import { NotFoundPage } from "@/components/NotFoundPage";
 import { AppShell } from "@/components/layout/AppShell";
 import { HomePage } from "@/features/home/HomePage";
 import { ItemsPage } from "@/features/items/ItemsPage";
+import { ItemDetailPage } from "@/features/items/ItemDetailPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { SuppliersPage } from "@/features/suppliers/SuppliersPage";
 import { SupplierPricesPage } from "@/features/suppliers/SupplierPricesPage";
@@ -27,11 +28,10 @@ function isRoleEntry(entry: [string, { public: true } | { roles: UserRole[] }]):
 /**
  * Sections whose pages have shipped. Each feature task adds its page here;
  * unbuilt sections keep rendering the designed 404 until their task lands.
- * (Detail routes like /items/:id stay 404 until their own task — never link
- * to them from list screens.)
  */
 const builtSections: Record<string, ReactNode> = {
   "/items": <ItemsPage />,
+  "/items/:id": <ItemDetailPage />,
   "/settings": <SettingsPage />,
   "/suppliers": <SuppliersPage />,
   "/suppliers/:id/prices": <SupplierPricesPage />,

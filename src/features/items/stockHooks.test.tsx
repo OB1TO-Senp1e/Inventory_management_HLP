@@ -3,12 +3,16 @@ import { renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/toast/ToastProvider";
-import { createOpeningBalance, getCurrentStock } from "@/api/stock";
+import { createOpeningBalance, getCurrentStock, listBatches, listMovements, subscribeToItemMovements } from "@/api/stock";
 import { itemsQueryKey } from "@/features/items/hooks";
 import {
+  LEDGER_PAGE_SIZE,
   stockQueryKey,
   useCreateOpeningBalance,
   useCurrentStock,
+  useItemBatches,
+  useItemMovements,
+  useStockRealtime,
 } from "./stockHooks";
 
 // The API module is mocked: these tests verify hook wiring (delegation,
@@ -16,6 +20,9 @@ import {
 vi.mock("@/api/stock", () => ({
   createOpeningBalance: vi.fn(),
   getCurrentStock: vi.fn(),
+  listBatches: vi.fn(),
+  listMovements: vi.fn(),
+  subscribeToItemMovements: vi.fn(),
 }));
 
 const { authState } = vi.hoisted(() => ({
@@ -34,6 +41,9 @@ vi.mock("@/features/auth/useAuth", () => ({
 
 const mockedGetCurrentStock = vi.mocked(getCurrentStock);
 const mockedCreateOpeningBalance = vi.mocked(createOpeningBalance);
+const mockedListMovements = vi.mocked(listMovements);
+const mockedListBatches = vi.mocked(listBatches);
+const mockedSubscribeToItemMovements = vi.mocked(subscribeToItemMovements);
 
 let queryClient: QueryClient;
 
@@ -135,5 +145,102 @@ describe("useCreateOpeningBalance", () => {
     result.current.mutate({ itemId: "item-1", quantity: 10, unitCost: 5 });
     await waitFor(() => expect(result.current.isError).toBe(true));
     await screen.findByText(/quantity must be greater than zero/);
+  });
+});
+
+const ITEM_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+
+describe("useItemMovements", () => {
+  it("delegates to listMovements with the page and page size", async () => {
+    mockedListMovements.mockResolvedValue({ movements: [], total: 0 });
+    const { result } = renderHook(() => useItemMovements(ITEM_ID, 2), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(mockedListMovements).toHaveBeenCalledWith({
+      itemId: ITEM_ID,
+      page: 2,
+      pageSize: LEDGER_PAGE_SIZE,
+    });
+    expect(result.current.data).toEqual({ movements: [], total: 0 });
+  });
+
+  it("does not query without an item id or restaurant profile", () => {
+    renderHook(() => useItemMovements(null, 1), { wrapper });
+    expect(mockedListMovements).not.toHaveBeenCalled();
+    authState.profile = null;
+    renderHook(() => useItemMovements(ITEM_ID, 1), { wrapper });
+    expect(mockedListMovements).not.toHaveBeenCalled();
+  });
+});
+
+describe("useItemBatches", () => {
+  it("delegates to listBatches", async () => {
+    mockedListBatches.mockResolvedValue([]);
+    const { result } = renderHook(() => useItemBatches(ITEM_ID), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(mockedListBatches).toHaveBeenCalledWith({ itemId: ITEM_ID });
+  });
+
+  it("does not query without an item id", () => {
+    renderHook(() => useItemBatches(null), { wrapper });
+    expect(mockedListBatches).not.toHaveBeenCalled();
+  });
+});
+
+describe("useStockRealtime", () => {
+  it("subscribes on mount and invalidates stock queries on new movements", async () => {
+    const movementCallbacks: Array<() => void> = [];
+    mockedSubscribeToItemMovements.mockImplementation((_id, cb) => {
+      movementCallbacks.push(cb);
+      return vi.fn();
+    });
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    renderHook(() => useStockRealtime(ITEM_ID), { wrapper });
+    expect(mockedSubscribeToItemMovements).toHaveBeenCalledWith(
+      ITEM_ID,
+      expect.any(Function),
+    );
+    // A new ledger insert invalidates current stock, ledger and batches.
+    movementCallbacks[0]?.();
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: [...stockQueryKey, "current", ITEM_ID],
+      }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: [...stockQueryKey, "movements", ITEM_ID],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: [...stockQueryKey, "batches", ITEM_ID],
+    });
+    invalidateSpy.mockRestore();
+  });
+
+  it("unsubscribes on unmount", () => {
+    const unsubscribe = vi.fn();
+    mockedSubscribeToItemMovements.mockReturnValue(unsubscribe);
+    const { unmount } = renderHook(() => useStockRealtime(ITEM_ID), {
+      wrapper,
+    });
+    unmount();
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("does nothing without an item id or restaurant profile", () => {
+    renderHook(() => useStockRealtime(null), { wrapper });
+    expect(mockedSubscribeToItemMovements).not.toHaveBeenCalled();
+    authState.profile = null;
+    renderHook(() => useStockRealtime(ITEM_ID), { wrapper });
+    expect(mockedSubscribeToItemMovements).not.toHaveBeenCalled();
+  });
+
+  it("survives a subscription failure (realtime is best-effort)", () => {
+    mockedSubscribeToItemMovements.mockImplementation(() => {
+      throw new Error("no supabase config");
+    });
+    expect(() =>
+      renderHook(() => useStockRealtime(ITEM_ID), { wrapper }),
+    ).not.toThrow();
   });
 });

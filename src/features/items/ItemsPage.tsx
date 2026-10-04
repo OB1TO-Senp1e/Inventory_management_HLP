@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ArrowDown,
   ArrowUp,
@@ -446,7 +447,14 @@ export function ItemsPage() {
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id} className="border-b last:border-0 hover:bg-muted/30">
-                    <td className="px-4 py-3 font-medium">{item.name}</td>
+                    <td className="px-4 py-3 font-medium">
+                      <Link
+                        to={`/items/${item.id}`}
+                        className="underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {item.name}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {item.categoryName ?? "—"}
                     </td>
@@ -482,7 +490,14 @@ export function ItemsPage() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-medium">{item.name}</p>
+                    <p className="truncate font-medium">
+                      <Link
+                        to={`/items/${item.id}`}
+                        className="underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {item.name}
+                      </Link>
+                    </p>
                     <p className="mt-0.5 text-sm text-muted-foreground">
                       {item.categoryName ?? "No category"} · {item.unitName} (
                       {item.unitSymbol})

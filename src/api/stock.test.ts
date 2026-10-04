@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseClient } from "@/lib/supabase";
-import { createOpeningBalance, getCurrentStock, listReceivableItems, logUsage, logWastage, receiveGoods } from "./stock";
+import { createOpeningBalance, getCurrentStock, listBatches, listMovements, listReceivableItems, logUsage, logWastage, receiveGoods, subscribeToItemMovements } from "./stock";
 
 // No network in these tests: the client factory is mocked outright.
 vi.mock("@/lib/supabase", () => ({ getSupabaseClient: vi.fn() }));
@@ -11,11 +11,13 @@ const mockedGetSupabaseClient = vi.mocked(getSupabaseClient);
 interface QueryResult {
   data: unknown;
   error: { code?: string; message: string } | null;
+  count?: number;
 }
 
 /**
  * Thenable chainable mock: every builder method returns the builder itself
- * and awaiting it resolves the canned result.
+ * and awaiting it resolves the canned result (including `count` for
+ * count:"exact" queries).
  */
 function chainable(result: QueryResult): Record<string, unknown> {
   const builder: Record<string, unknown> = {};
@@ -23,8 +25,10 @@ function chainable(result: QueryResult): Record<string, unknown> {
     "select",
     "insert",
     "eq",
+    "not",
     "order",
     "limit",
+    "range",
     "single",
     "maybeSingle",
   ]) {
@@ -305,6 +309,191 @@ describe("listReceivableItems", () => {
   it("rejects malformed rows before they reach components", async () => {
     mockRpc.mockResolvedValue({ data: [{ item_id: "not-a-uuid" }], error: null });
     await expect(listReceivableItems()).rejects.toThrow();
+  });
+});
+
+describe("listMovements", () => {
+  const movementRow = {
+    id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+    item_id: ITEM_ID,
+    movement_type: "receipt",
+    quantity: "10",
+    batch_no: "B-1",
+    expiry_date: "2026-12-31",
+    unit_cost: "40",
+    reason_code: null,
+    reference_type: "ad_hoc",
+    notes: null,
+    created_by: "user-1",
+    created_at: "2026-10-04T10:00:00Z",
+  };
+
+  it("queries newest-first with server-side pagination", async () => {
+    mockFrom.mockReturnValue(
+      chainable({ data: [movementRow], error: null, count: 45 }),
+    );
+    const result = await listMovements({ itemId: ITEM_ID, page: 2 });
+    expect(mockFrom).toHaveBeenCalledWith("stock_movements");
+    const q = mockFrom.mock.results[0].value as Record<string, unknown>;
+    expect(q.eq as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      "item_id",
+      ITEM_ID,
+    );
+    expect(q.order as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      "created_at",
+      { ascending: false },
+    );
+    // Page 2 of 20 -> rows 20..39.
+    expect(q.range as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(20, 39);
+    expect(result.total).toBe(45);
+    expect(result.movements).toEqual([
+      expect.objectContaining({
+        id: movementRow.id,
+        movementType: "receipt",
+        quantity: 10,
+        batchNo: "B-1",
+      }),
+    ]);
+  });
+
+  it("defaults to page 1 with page size 20", async () => {
+    mockFrom.mockReturnValue(
+      chainable({ data: [], error: null, count: 0 }),
+    );
+    await listMovements({ itemId: ITEM_ID });
+    const q = mockFrom.mock.results[0].value as Record<string, unknown>;
+    expect(q.range as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(0, 19);
+  });
+
+  it("rejects a bad item id and non-positive pages before any query", async () => {
+    await expect(listMovements({ itemId: "bad" })).rejects.toThrow();
+    await expect(listMovements({ itemId: ITEM_ID, page: 0 })).rejects.toThrow();
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("fails loudly on an unknown movement type (DB/client drift)", async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [{ ...movementRow, movement_type: "teleport" }],
+        error: null,
+        count: 1,
+      }),
+    );
+    await expect(listMovements({ itemId: ITEM_ID })).rejects.toThrow();
+  });
+
+  it("surfaces query errors", async () => {
+    mockFrom.mockReturnValue(
+      chainable({ data: null, error: { message: "boom" } }),
+    );
+    await expect(listMovements({ itemId: ITEM_ID })).rejects.toThrow("boom");
+  });
+});
+
+describe("listBatches", () => {
+  const row = (
+    batchNo: string,
+    expiry: string | null,
+    qty: string,
+    at: string,
+  ) => ({
+    batch_no: batchNo,
+    expiry_date: expiry,
+    quantity: qty,
+    created_at: at,
+  });
+
+  it("aggregates per-batch totals client-side", async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [
+          row("B-2", "2026-12-31", "5", "2026-10-03T10:00:00Z"),
+          row("B-1", "2026-11-30", "10", "2026-10-02T10:00:00Z"),
+          row("B-1", "2026-10-15", "-3", "2026-10-04T10:00:00Z"),
+        ],
+        error: null,
+      }),
+    );
+    const result = await listBatches({ itemId: ITEM_ID });
+    const q = mockFrom.mock.results[0].value as Record<string, unknown>;
+    expect(q.not as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      "batch_no",
+      "is",
+      null,
+    );
+    expect(result).toEqual([
+      {
+        batchNo: "B-1",
+        quantity: 7,
+        earliestExpiry: "2026-10-15",
+        lastMovementAt: "2026-10-04T10:00:00Z",
+      },
+      {
+        batchNo: "B-2",
+        quantity: 5,
+        earliestExpiry: "2026-12-31",
+        lastMovementAt: "2026-10-03T10:00:00Z",
+      },
+    ]);
+  });
+
+  it("returns an empty list when no batch was ever recorded", async () => {
+    mockFrom.mockReturnValue(chainable({ data: [], error: null }));
+    await expect(listBatches({ itemId: ITEM_ID })).resolves.toEqual([]);
+  });
+
+  it("rejects a bad item id before any query", async () => {
+    await expect(listBatches({ itemId: "bad" })).rejects.toThrow();
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+});
+
+describe("subscribeToItemMovements", () => {
+  const mockUnsubscribe = vi.fn();
+  const mockOn = vi.fn(() => ({
+    subscribe: () => ({ unsubscribe: mockUnsubscribe }),
+  }));
+  const mockChannel = vi.fn(() => ({ on: mockOn }));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedGetSupabaseClient.mockReturnValue({
+      channel: mockChannel,
+    } as unknown as SupabaseClient);
+  });
+
+  it("subscribes to INSERTs on stock_movements filtered by item", () => {
+    const onMovement = vi.fn();
+    const unsubscribe = subscribeToItemMovements(ITEM_ID, onMovement);
+    expect(mockChannel).toHaveBeenCalledWith(
+      `stock-movements-item-${ITEM_ID}`,
+    );
+    expect(mockOn).toHaveBeenCalledWith(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "stock_movements",
+        filter: `item_id=eq.${ITEM_ID}`,
+      },
+      expect.any(Function),
+    );
+    // Firing the postgres_changes callback notifies the caller…
+    const firstCall = mockOn.mock.calls[0] as unknown as
+      | [string, unknown, () => void]
+      | undefined;
+    const callback = firstCall?.[2];
+    expect(callback).toBeInstanceOf(Function);
+    callback?.();
+    expect(onMovement).toHaveBeenCalledTimes(1);
+    // …and the returned function unsubscribes the channel.
+    unsubscribe();
+    expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an invalid item id before touching the client", () => {
+    expect(() => subscribeToItemMovements("bad", vi.fn())).toThrow();
+    expect(mockChannel).not.toHaveBeenCalled();
   });
 });
 

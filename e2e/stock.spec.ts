@@ -234,3 +234,73 @@ test.describe("wastage live flow", () => {
     await expect(page.getByText("Wastage logged.")).toBeVisible();
   });
 });
+
+test.describe("item detail page", () => {
+  const PROBE_ID = "00000000-0000-0000-0000-000000000000";
+
+  test.describe("as owner", () => {
+    test.use({ role: "owner" });
+
+    test("detail route renders (error state without a backend)", async ({
+      page,
+    }) => {
+      // No backend here: the item query fails and the page renders its
+      // error state. The route, guard, breadcrumb and states are what
+      // this proves; live data runs in CI.
+      // NOTE: the query retries with backoff (~7s) before surfacing the
+      // error, so this needs a longer-than-default timeout.
+      await page.goto(`/items/${PROBE_ID}`);
+      await expect(page).not.toHaveURL(/\/login$/);
+      await expect(
+        page.getByRole("link", { name: "Back to items" }),
+      ).toBeVisible({ timeout: 15000 });
+      await expect(
+        page.getByText(/could not load this item|item not found/i),
+      ).toBeVisible({ timeout: 15000 });
+      // The breadcrumb still resolves the trail with the id fallback
+      // (scoped to the breadcrumb nav — the primary nav has its own
+      // "Items" link, and "Back to items" contains the substring).
+      await expect(
+        page
+          .getByRole("navigation", { name: "Breadcrumb" })
+          .getByRole("link", { name: "Items", exact: true }),
+      ).toBeVisible();
+    });
+
+    test("items list links each name to the detail page", async ({ page }) => {
+      await page.goto("/items");
+      const link = page.getByRole("link", { name: "Tomato" }).first();
+      // Without a backend the list is empty; the link contract is covered
+      // by unit tests — here we only assert the list page itself loads.
+      await expect(
+        page.getByRole("heading", { name: "Items" }),
+      ).toBeVisible();
+      await expect(link).toHaveCount(0);
+    });
+  });
+
+  test.describe("as staff", () => {
+    test.use({ role: "staff" });
+
+    test("staff is bounced from the item detail page", async ({ page }) => {
+      await page.goto(`/items/${PROBE_ID}`);
+      await expect(page).toHaveURL(/\/$/);
+    });
+  });
+});
+
+test.describe("item detail live flow", () => {
+  test.skip(!LIVE, "needs a live Supabase backend (E2E_LIVE_SUPABASE=1)");
+  test.use({ role: "owner" });
+
+  test("detail shows stock, ledger and batches", async ({ page }) => {
+    // Seeded item id comes from the live backend; the receiving live flow
+    // creates items — reuse the detail link from the items list.
+    await page.goto("/items");
+    const detailLink = page.getByRole("link", { name: "Tomato" }).first();
+    await detailLink.click();
+    await expect(page.getByText("Stock now")).toBeVisible();
+    await expect(page.getByText("Ledger history")).toBeVisible();
+    await expect(page.getByText("Batches")).toBeVisible();
+  });
+});

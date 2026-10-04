@@ -37,6 +37,37 @@ export const getCurrentStockSchema = z.object({
 export type GetCurrentStockInput = z.infer<typeof getCurrentStockSchema>;
 
 /**
+ * Item detail page (P2-04). The ledger is read-only here: paginated
+ * newest-first movement history plus a client-aggregated batch list.
+ * Batch totals are summed client-side from the item's batch-tagged
+ * movements — fine for v1 volumes; a DB-side aggregation can replace it
+ * if an item ever accumulates thousands of batches.
+ */
+export const movementTypeSchema = z.enum([
+  "receipt",
+  "usage",
+  "sale_deduction",
+  "wastage",
+  "count_adjustment",
+  "transfer_in",
+  "transfer_out",
+  "opening_balance",
+]);
+export type MovementType = z.infer<typeof movementTypeSchema>;
+
+export const listMovementsSchema = z.object({
+  itemId: uuidSchema,
+  page: z.coerce.number().int().min(1, "Page must be at least 1.").default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type ListMovementsInput = z.infer<typeof listMovementsSchema>;
+
+export const listBatchesSchema = z.object({
+  itemId: uuidSchema,
+});
+export type ListBatchesInput = z.infer<typeof listBatchesSchema>;
+
+/**
  * Ad hoc goods receiving (P2-02). One receipt = one `receive_goods` RPC call
  * with 1..N lines. Quantities are in the item's BASE UNIT (unit conversion
  * lands in P2-05 — the UI labels every quantity field with the base unit).

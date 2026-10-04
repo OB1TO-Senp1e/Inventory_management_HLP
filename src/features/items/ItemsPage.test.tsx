@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Item } from "@/api/items";
 import { ItemsPage } from "./ItemsPage";
@@ -59,6 +60,14 @@ const sampleItem: Item = {
   updatedAt: "",
 };
 
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <ItemsPage />
+    </MemoryRouter>,
+  );
+}
+
 const lookupsValue = {
   categories: [{ id: "c1", name: "Vegetables" }],
   locations: [],
@@ -86,7 +95,7 @@ describe("ItemsPage", () => {
       isError: false,
       refetch: vi.fn(),
     } as never);
-    render(<ItemsPage />);
+    renderPage();
     expect(screen.getByLabelText("Loading items")).toBeInTheDocument();
   });
 
@@ -98,7 +107,7 @@ describe("ItemsPage", () => {
       isError: true,
       refetch,
     } as never);
-    render(<ItemsPage />);
+    renderPage();
     expect(screen.getByRole("alert")).toHaveTextContent("Could not load items.");
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(refetch).toHaveBeenCalled();
@@ -111,7 +120,7 @@ describe("ItemsPage", () => {
       isError: false,
       refetch: vi.fn(),
     } as never);
-    render(<ItemsPage />);
+    renderPage();
     expect(
       screen.getByText("No items yet — add your first item."),
     ).toBeInTheDocument();
@@ -128,13 +137,28 @@ describe("ItemsPage", () => {
       isError: false,
       refetch: vi.fn(),
     } as never);
-    render(<ItemsPage />);
+    renderPage();
     // Rendered twice: once in the desktop table, once in the mobile card
     // (CSS hides one per breakpoint; jsdom keeps both in the DOM).
     expect(screen.getAllByText("Tomato")).toHaveLength(2);
     // Unit symbol appears next to par/reorder levels (desktop + mobile markup).
     expect(screen.getAllByText("kg").length).toBeGreaterThan(0);
     expect(screen.getByText(/Showing 1–1 of 1 items/)).toBeInTheDocument();
+  });
+
+  it("links each item name to its detail page", () => {
+    mockedUseItems.mockReturnValue({
+      data: { items: [sampleItem], total: 1 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+    renderPage();
+    const links = screen.getAllByRole("link", { name: "Tomato" });
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link).toHaveAttribute("href", "/items/item-1");
+    }
   });
 
   it("hides management actions from staff", () => {
@@ -149,7 +173,7 @@ describe("ItemsPage", () => {
       isError: false,
       refetch: vi.fn(),
     } as never);
-    render(<ItemsPage />);
+    renderPage();
     expect(
       screen.queryByRole("button", { name: /add item/i }),
     ).not.toBeInTheDocument();
@@ -175,7 +199,7 @@ describe("ItemsPage", () => {
       isError: false,
       refetch: vi.fn(),
     } as never);
-    render(<ItemsPage />);
+    renderPage();
     expect(
       screen.getByRole("button", { name: /add item/i }),
     ).toBeInTheDocument();

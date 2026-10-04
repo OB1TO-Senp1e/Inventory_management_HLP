@@ -3,13 +3,19 @@ import { getSupabaseClient } from "@/lib/supabase";
 import {
   createOpeningBalanceSchema,
   getCurrentStockSchema,
+  listBatchesSchema,
+  listMovementsSchema,
   logUsageSchema,
   logWastageSchema,
+  movementTypeSchema,
   receiveGoodsSchema,
   type CreateOpeningBalanceInput,
   type GetCurrentStockInput,
+  type ListBatchesInput,
+  type ListMovementsInput,
   type LogUsageInput,
   type LogWastageInput,
+  type MovementType,
   type ReceiveGoodsInput,
 } from "@/schemas/stock";
 
@@ -255,4 +261,196 @@ export async function receiveGoods(
   }
   const lines = z.array(receiveGoodsLineResultSchema).parse(data);
   return { lines: lines.map(toReceiveGoodsLineResult) };
+}
+
+const MOVEMENT_SELECT =
+  "id, item_id, movement_type, quantity, batch_no, expiry_date, unit_cost, " +
+  "reason_code, reference_type, notes, created_by, created_at";
+
+const movementRowSchema = z.object({
+  id: z.string().uuid(),
+  item_id: z.string().uuid(),
+  // Validated against the enum: if the DB CHECK and this drift apart,
+  // parsing fails loudly instead of rendering an unknown type.
+  movement_type: movementTypeSchema,
+  quantity: z.coerce.number(),
+  batch_no: z.string().nullable(),
+  expiry_date: z.string().nullable(),
+  unit_cost: z.coerce.number().nullable(),
+  reason_code: z.string().nullable(),
+  reference_type: z.string().nullable(),
+  notes: z.string().nullable(),
+  created_by: z.string().nullable(),
+  created_at: z.string(),
+});
+
+export interface StockMovement {
+  id: string;
+  itemId: string;
+  movementType: MovementType;
+  quantity: number;
+  batchNo: string | null;
+  expiryDate: string | null;
+  unitCost: number | null;
+  reasonCode: string | null;
+  referenceType: string | null;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+function toStockMovement(
+  row: z.infer<typeof movementRowSchema>,
+): StockMovement {
+  return {
+    id: row.id,
+    itemId: row.item_id,
+    movementType: row.movement_type,
+    quantity: row.quantity,
+    batchNo: row.batch_no,
+    expiryDate: row.expiry_date,
+    unitCost: row.unit_cost,
+    reasonCode: row.reason_code,
+    referenceType: row.reference_type,
+    notes: row.notes,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+export interface ListMovementsResult {
+  movements: StockMovement[];
+  total: number;
+}
+
+/**
+ * Paginated ledger history for one item, newest first (created_at desc,
+ * id desc as a stable tiebreak). Read-only — the ledger is append-only.
+ * Tenant isolation comes from RLS; staff may read (they need history
+ * context for their own logging), but this page itself is owner/manager-only.
+ */
+export async function listMovements(
+  rawInput: unknown,
+): Promise<ListMovementsResult> {
+  const input: ListMovementsInput = listMovementsSchema.parse(rawInput);
+  const client = getSupabaseClient();
+  const from = (input.page - 1) * input.pageSize;
+  const to = from + input.pageSize - 1;
+  const { data, error, count } = await client
+    .from("stock_movements")
+    .select(MOVEMENT_SELECT, { count: "exact" })
+    .eq("item_id", input.itemId)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to);
+  if (error) {
+    throw new Error(error.message);
+  }
+  const movements = z.array(movementRowSchema).parse(data);
+  return {
+    movements: movements.map(toStockMovement),
+    total: count ?? 0,
+  };
+}
+
+const batchRowSchema = z.object({
+  batch_no: z.string(),
+  expiry_date: z.string().nullable(),
+  quantity: z.coerce.number(),
+  created_at: z.string(),
+});
+
+export interface ItemBatch {
+  batchNo: string;
+  quantity: number;
+  earliestExpiry: string | null;
+  lastMovementAt: string;
+}
+
+/**
+ * Per-batch totals for one item, aggregated client-side from its
+ * batch-tagged movements (total qty, earliest expiry, latest movement).
+ * Fine for v1 volumes; RLS keeps it tenant-isolated like everything else.
+ */
+export async function listBatches(
+  rawInput: unknown,
+): Promise<ItemBatch[]> {
+  const input: ListBatchesInput = listBatchesSchema.parse(rawInput);
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .from("stock_movements")
+    .select("batch_no, expiry_date, quantity, created_at")
+    .eq("item_id", input.itemId)
+    .not("batch_no", "is", null)
+    .order("created_at", { ascending: false });
+  if (error) {
+    throw new Error(error.message);
+  }
+  const rows = z.array(batchRowSchema).parse(data);
+  const byBatch = new Map<
+    string,
+    { quantity: number; earliestExpiry: string | null; lastMovementAt: string }
+  >();
+  for (const row of rows) {
+    const existing = byBatch.get(row.batch_no);
+    if (!existing) {
+      byBatch.set(row.batch_no, {
+        quantity: row.quantity,
+        earliestExpiry: row.expiry_date,
+        lastMovementAt: row.created_at,
+      });
+    } else {
+      // numeric quantities arrive as JS numbers — round the running total
+      // so binary float addition can't produce 42.5000000001.
+      existing.quantity =
+        Math.round((existing.quantity + row.quantity) * 1e6) / 1e6;
+      if (
+        row.expiry_date &&
+        (!existing.earliestExpiry || row.expiry_date < existing.earliestExpiry)
+      ) {
+        existing.earliestExpiry = row.expiry_date;
+      }
+      if (row.created_at > existing.lastMovementAt) {
+        existing.lastMovementAt = row.created_at;
+      }
+    }
+  }
+  return [...byBatch.entries()]
+    .map(([batchNo, agg]) => ({ batchNo, ...agg }))
+    .sort((a, b) => a.batchNo.localeCompare(b.batchNo));
+}
+
+/**
+ * Subscribe to new ledger movements for one item via a realtime channel.
+ * The callback fires on every INSERT into `stock_movements` for the item;
+ * the caller (a hook) invalidates the derived queries. Realtime must be
+ * enabled for the table on the Supabase project — without it the channel
+ * stays silent and the page still works through normal refetch, so this is
+ * best-effort. Returns an unsubscribe function.
+ *
+ * Only this module touches the Supabase client: components use the
+ * `useStockRealtime` hook in `@/features/items/stockHooks`.
+ */
+export function subscribeToItemMovements(
+  itemId: string,
+  onMovement: () => void,
+): () => void {
+  const parsedId = z.string().uuid("Invalid identifier.").parse(itemId);
+  const client = getSupabaseClient();
+  const channel = client
+    .channel(`stock-movements-item-${parsedId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "stock_movements",
+        filter: `item_id=eq.${parsedId}`,
+      },
+      () => onMovement(),
+    )
+    .subscribe();
+  return () => {
+    void channel.unsubscribe();
+  };
 }

@@ -33,3 +33,18 @@ export function formatDateTime(iso: string): string {
     timeZone: "Asia/Kolkata",
   }).format(new Date(iso));
 }
+
+/**
+ * Formats an ISO date (YYYY-MM-DD, e.g. a batch expiry) as an en-IN date
+ * in Asia/Kolkata (e.g. "12 Oct 2026"). The `T00:00:00` suffix pins a
+ * date-only string to midnight so timezones can't shift the day.
+ */
+export function formatDate(isoDate: string): string {
+  const pinned = isoDate.length === 10 ? `${isoDate}T00:00:00` : isoDate;
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  }).format(new Date(pinned));
+}

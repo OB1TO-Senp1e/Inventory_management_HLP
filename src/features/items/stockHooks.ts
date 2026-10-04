@@ -1,7 +1,14 @@
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/toast/useToast";
 import { useAuth } from "@/features/auth/useAuth";
-import { createOpeningBalance, getCurrentStock } from "@/api/stock";
+import {
+  createOpeningBalance,
+  getCurrentStock,
+  listBatches,
+  listMovements,
+  subscribeToItemMovements,
+} from "@/api/stock";
 import { itemsQueryKey } from "@/features/items/hooks";
 import type { CreateOpeningBalanceInput } from "@/schemas/stock";
 
@@ -46,4 +53,69 @@ export function useCreateOpeningBalance() {
       toastError(err.message);
     },
   });
+}
+
+/** Ledger page size for the item detail history (P2-04). */
+export const LEDGER_PAGE_SIZE = 20;
+
+/**
+ * Paginated ledger history for one item, newest first. Keeps the previous
+ * page's rows while the next page loads (no layout flash on pagination).
+ */
+export function useItemMovements(itemId: string | null, page: number) {
+  const restaurantId = useRestaurantId();
+  return useQuery({
+    queryKey: [...stockQueryKey, "movements", itemId, page],
+    queryFn: () =>
+      listMovements({ itemId: itemId as string, page, pageSize: LEDGER_PAGE_SIZE }),
+    enabled: restaurantId !== null && itemId !== null,
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** Per-batch totals for one item (aggregated client-side in the API). */
+export function useItemBatches(itemId: string | null) {
+  const restaurantId = useRestaurantId();
+  return useQuery({
+    queryKey: [...stockQueryKey, "batches", itemId],
+    queryFn: () => listBatches({ itemId: itemId as string }),
+    enabled: restaurantId !== null && itemId !== null,
+  });
+}
+
+/**
+ * Realtime ledger updates for one item: on every new movement, the
+ * current-stock, ledger and batch queries for the item are invalidated so
+ * the detail page updates without a refresh. Best-effort — without a
+ * Supabase backend (or without realtime enabled on the table) the
+ * subscription never fires and the page simply works through refetch.
+ */
+export function useStockRealtime(itemId: string | null) {
+  const queryClient = useQueryClient();
+  const restaurantId = useRestaurantId();
+  useEffect(() => {
+    if (itemId === null || restaurantId === null) {
+      return;
+    }
+    let unsubscribe: (() => void) | undefined;
+    try {
+      unsubscribe = subscribeToItemMovements(itemId, () => {
+        void queryClient.invalidateQueries({
+          queryKey: [...stockQueryKey, "current", itemId],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: [...stockQueryKey, "movements", itemId],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: [...stockQueryKey, "batches", itemId],
+        });
+      });
+    } catch {
+      // No Supabase config (audit crawl / backend-less dev): realtime is
+      // unavailable; the page works without it.
+    }
+    return () => {
+      unsubscribe?.();
+    };
+  }, [itemId, restaurantId, queryClient]);
 }

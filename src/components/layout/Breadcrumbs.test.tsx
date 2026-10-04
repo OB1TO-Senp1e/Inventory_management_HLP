@@ -1,7 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { Breadcrumbs } from "./Breadcrumbs";
+import { useItem } from "@/features/items/hooks";
+import { useSupplier } from "@/features/suppliers/hooks";
+
+// The detail-name lookups are mocked: these tests verify crumb labels and
+// link behavior, not data fetching.
+vi.mock("@/features/items/hooks", () => ({ useItem: vi.fn() }));
+vi.mock("@/features/suppliers/hooks", () => ({ useSupplier: vi.fn() }));
+
+const mockedUseItem = vi.mocked(useItem);
+const mockedUseSupplier = vi.mocked(useSupplier);
 
 function renderAt(path: string) {
   return render(
@@ -10,6 +20,17 @@ function renderAt(path: string) {
     </MemoryRouter>,
   );
 }
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  // No entity loaded by default: crumbs fall back to the raw segment.
+  mockedUseItem.mockReturnValue({ data: undefined } as ReturnType<
+    typeof useItem
+  >);
+  mockedUseSupplier.mockReturnValue({ data: undefined } as ReturnType<
+    typeof useSupplier
+  >);
+});
 
 describe("Breadcrumbs", () => {
   it("shows only Home as current on the landing page", () => {
@@ -56,6 +77,37 @@ describe("Breadcrumbs", () => {
     const middle = within(nav).getByText("Abc 123");
     expect(middle).not.toHaveAttribute("aria-current");
     expect(within(nav).queryByRole("link", { name: "Abc 123" })).not.toBeInTheDocument();
+    expect(within(nav).getByText("Prices")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("resolves the item id crumb to the item name", () => {
+    mockedUseItem.mockReturnValue({
+      data: { name: "Tomato" },
+    } as ReturnType<typeof useItem>);
+    renderAt("/items/abc-123");
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(nav).getByText("Tomato")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(nav).queryByText("Abc 123")).not.toBeInTheDocument();
+  });
+
+  it("resolves the supplier id crumb to the supplier name (still plain text)", () => {
+    mockedUseSupplier.mockReturnValue({
+      data: { name: "Fresh Farms Produce" },
+    } as ReturnType<typeof useSupplier>);
+    renderAt("/suppliers/abc-123/prices");
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    const middle = within(nav).getByText("Fresh Farms Produce");
+    // The supplier id segment has no registered route: name shown, not linked.
+    expect(middle).not.toHaveAttribute("aria-current");
+    expect(
+      within(nav).queryByRole("link", { name: "Fresh Farms Produce" }),
+    ).not.toBeInTheDocument();
     expect(within(nav).getByText("Prices")).toHaveAttribute(
       "aria-current",
       "page",

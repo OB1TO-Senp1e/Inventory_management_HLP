@@ -3,11 +3,34 @@ import { Link, useLocation } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { isRegisteredPath } from "@/routes/access";
 import { navLabelForPath } from "@/routes/nav";
+import { useItem } from "@/features/items/hooks";
+import { useSupplier } from "@/features/suppliers/hooks";
 import { cn } from "@/lib/utils";
 
 interface Crumb {
   label: string;
   to: string | null;
+}
+
+interface DetailTarget {
+  kind: "item" | "supplier";
+  id: string;
+}
+
+/**
+ * Detail routes whose `:id` segment should resolve to the entity's name in
+ * the crumb: /items/:id and /suppliers/:id/prices. Returns null elsewhere.
+ */
+function detailTargetFor(pathname: string): DetailTarget | null {
+  const itemMatch = /^\/items\/([^/]+)$/.exec(pathname);
+  if (itemMatch) {
+    return { kind: "item", id: itemMatch[1] };
+  }
+  const supplierMatch = /^\/suppliers\/([^/]+)\/prices$/.exec(pathname);
+  if (supplierMatch) {
+    return { kind: "supplier", id: supplierMatch[1] };
+  }
+  return null;
 }
 
 /**
@@ -16,9 +39,24 @@ interface Crumb {
  * path is a registered route; segments with no route (e.g. the supplier id
  * in "/suppliers/:id/prices", which has no detail page) render as plain
  * text so the trail never links to a 404.
+ *
+ * On the two detail routes the `:id` segment resolves to the entity's name
+ * (via the same cached detail queries the pages use); while loading — or
+ * when the fetch fails — the raw segment is shown as before.
  */
 export function Breadcrumbs() {
   const location = useLocation();
+  const detail = detailTargetFor(location.pathname);
+  const itemQuery = useItem(detail?.kind === "item" ? detail.id : null);
+  const supplierQuery = useSupplier(
+    detail?.kind === "supplier" ? detail.id : null,
+  );
+  const detailName =
+    detail?.kind === "item"
+      ? itemQuery.data?.name
+      : detail?.kind === "supplier"
+        ? supplierQuery.data?.name
+        : undefined;
 
   const crumbs = useMemo<Crumb[]>(() => {
     const segments = location.pathname.split("/").filter(Boolean);
@@ -28,12 +66,15 @@ export function Breadcrumbs() {
       acc += `/${segment}`;
       const isLast = index === segments.length - 1;
       items.push({
-        label: navLabelForPath(acc),
+        label:
+          detail && segment === detail.id && detailName
+            ? detailName
+            : navLabelForPath(acc),
         to: isLast || !isRegisteredPath(acc) ? null : acc,
       });
     });
     return items;
-  }, [location.pathname]);
+  }, [location.pathname, detail, detailName]);
 
   return (
     <nav aria-label="Breadcrumb" className="min-w-0">
