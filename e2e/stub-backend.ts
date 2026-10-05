@@ -415,6 +415,67 @@ async function handle(route: Route): Promise<void> {
     return;
   }
 
+  // P4-04: preview_sales_deductions computes deductions from the canned
+  // recipes against canned current stock, so the over-sale specs can assert
+  // the real warning dialog with zero backend. Tomato: 4 kg on hand, Milk:
+  // 2 L on hand. Butter Chicken (yield 4) deducts 2 kg Tomato + 1 L Milk
+  // per 4 dishes — 12 dishes flags both (Tomato projects to -2 kg);
+  // 6 dishes (the aggregation spec) stays within stock.
+  if (key === "rpc:preview_sales_deductions") {
+    const body = (await route.request().postDataJSON()) as {
+      p_lines: { menu_item_id: string; dishes: number }[];
+    };
+    const PREVIEW_STOCK: Record<string, number> = {
+      [ITEMS[0].id]: 4,
+      [ITEMS[1].id]: 2,
+    };
+    const byItem = new Map<
+      string,
+      { name: string; unit: string; deduction: number }
+    >();
+    for (const line of body.p_lines ?? []) {
+      const dish = MENU_ITEMS.find((m) => m.id === line.menu_item_id);
+      if (!dish) {
+        continue;
+      }
+      for (const ing of RECIPE_INGREDIENTS.filter(
+        (r) => r.menu_item_id === dish.id,
+      )) {
+        // The canned recipes use base units only (factor 1), same as the
+        // one-hop conversion the real RPC applies.
+        const deduction = (line.dishes * ing.quantity) / dish.yield_quantity;
+        const prev = byItem.get(ing.item_id);
+        if (prev) {
+          prev.deduction += deduction;
+        } else {
+          byItem.set(ing.item_id, {
+            name: ing.items.name,
+            unit: ing.units.symbol,
+            deduction,
+          });
+        }
+      }
+    }
+    const rows = [...byItem.entries()].map(([item_id, v]) => {
+      const current = PREVIEW_STOCK[item_id] ?? 0;
+      return {
+        item_id,
+        item_name: v.name,
+        unit_symbol: v.unit,
+        current_quantity: current,
+        deduction_quantity: v.deduction,
+        projected_quantity: current - v.deduction,
+        would_go_negative: current - v.deduction < 0,
+      };
+    });
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(rows),
+    });
+    return;
+  }
+
   let rows = [...(TABLES[key] ?? [])];
 
   // P4-02: the recipe detail select asks for full ingredient rows while the

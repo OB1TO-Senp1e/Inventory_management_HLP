@@ -1,6 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/toast/useToast";
-import { recordSales, type RecordSalesResult } from "@/api/sales";
+import {
+  previewSalesDeductions,
+  recordSales,
+  type RecordSalesResult,
+  type SalesPreviewItem,
+} from "@/api/sales";
 import { itemsQueryKey } from "@/features/items/hooks";
 import { stockQueryKey } from "@/features/items/stockHooks";
 import { recipesQueryKey } from "@/features/recipes/hooks";
@@ -45,6 +50,22 @@ export function useRecordSales() {
           `${result.ingredients.length} ${ingWord} deducted.`,
       );
     },
+    onError: (err) => {
+      toastError(err.message);
+    },
+  });
+}
+
+/**
+ * Preview the deductions for a sales entry BEFORE posting (P4-04). The
+ * entry form calls `mutateAsync` on submit; rows with `wouldGoNegative`
+ * drive the explicit-confirm dialog. Errors toast — the entry simply does
+ * not proceed. No success toast: a preview is not an action.
+ */
+export function usePreviewSalesDeductions() {
+  const { error: toastError } = useToast();
+  return useMutation<SalesPreviewItem[], Error, RecordSalesInput>({
+    mutationFn: (input) => previewSalesDeductions(input),
     onError: (err) => {
       toastError(err.message);
     },

@@ -4,21 +4,24 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/toast/ToastProvider";
 import { SalesEntryPage } from "./SalesEntryPage";
-import { useRecordSales } from "./hooks";
+import { usePreviewSalesDeductions, useRecordSales } from "./hooks";
 import { useMenuItems } from "@/features/recipes/hooks";
 
 vi.mock("./hooks", () => ({
   useRecordSales: vi.fn(),
+  usePreviewSalesDeductions: vi.fn(),
 }));
 
 // The real useMenuItems needs an auth session + backend; mock it — these
-// tests verify the page's wiring (rows, validation, aggregation, reset).
+// tests verify the page's wiring (rows, validation, aggregation, reset,
+// over-sale confirm flow).
 vi.mock("@/features/recipes/hooks", () => ({
   useMenuItems: vi.fn(),
 }));
 
 const mockedUseMenuItems = vi.mocked(useMenuItems);
 const mockedUseRecordSales = vi.mocked(useRecordSales);
+const mockedUsePreviewSalesDeductions = vi.mocked(usePreviewSalesDeductions);
 
 const DISH_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const DISH_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -52,6 +55,7 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 const mutate = vi.fn();
+const previewMutateAsync = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -65,6 +69,12 @@ beforeEach(() => {
     mutate,
     isPending: false,
   } as unknown as ReturnType<typeof useRecordSales>);
+  // Default: nothing would go negative — the entry posts without a dialog.
+  previewMutateAsync.mockResolvedValue([]);
+  mockedUsePreviewSalesDeductions.mockReturnValue({
+    mutateAsync: previewMutateAsync,
+    isPending: false,
+  } as unknown as ReturnType<typeof usePreviewSalesDeductions>);
 });
 
 describe("SalesEntryPage", () => {
@@ -179,5 +189,92 @@ describe("SalesEntryPage", () => {
     render(<SalesEntryPage />, { wrapper });
     fireEvent.click(screen.getByRole("button", { name: /retry/i }));
     expect(refetch).toHaveBeenCalled();
+  });
+});
+
+describe("over-sale confirmation", () => {
+  const flaggedPreview = [
+    {
+      itemId: "item-1",
+      itemName: "Tomatoes",
+      unitSymbol: "kg",
+      currentQuantity: 2,
+      deductionQuantity: 4,
+      projectedQuantity: -2,
+      wouldGoNegative: true,
+    },
+  ];
+
+  function fillOneRow() {
+    fireEvent.change(screen.getByLabelText(/dish 1/i), {
+      target: { value: DISH_A },
+    });
+    fireEvent.change(screen.getByLabelText(/dishes sold \(butter chicken\)/i), {
+      target: { value: "8" },
+    });
+  }
+
+  it("asks for explicit confirmation listing the flagged items", async () => {
+    previewMutateAsync.mockResolvedValue(flaggedPreview);
+    render(<SalesEntryPage />, { wrapper });
+    fillOneRow();
+    fireEvent.click(screen.getByRole("button", { name: /record sales/i }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent(/insufficient stock/i);
+    expect(dialog).toHaveTextContent(/tomatoes/i);
+    expect(dialog).toHaveTextContent(/-2/);
+    // The entry is NOT posted before explicit confirmation.
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("posts the entry when the over-sale is explicitly confirmed", async () => {
+    previewMutateAsync.mockResolvedValue(flaggedPreview);
+    render(<SalesEntryPage />, { wrapper });
+    fillOneRow();
+    fireEvent.click(screen.getByRole("button", { name: /record sales/i }));
+    const confirmButton = await screen.findByRole("button", {
+      name: /record sale anyway/i,
+    });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => {
+      expect(mutate).toHaveBeenCalledWith(
+        {
+          saleDate: expect.any(String),
+          lines: [{ menuItemId: DISH_A, dishes: 8 }],
+        },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+    });
+  });
+
+  it("aborts the entry when the dialog is cancelled", async () => {
+    previewMutateAsync.mockResolvedValue(flaggedPreview);
+    render(<SalesEntryPage />, { wrapper });
+    fillOneRow();
+    fireEvent.click(screen.getByRole("button", { name: /record sales/i }));
+    const cancelButton = await screen.findByRole("button", {
+      name: /^cancel$/i,
+    });
+    fireEvent.click(cancelButton);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("does not post when the preview fails", async () => {
+    previewMutateAsync.mockRejectedValue(new Error("preview failed"));
+    render(<SalesEntryPage />, { wrapper });
+    fillOneRow();
+    fireEvent.click(screen.getByRole("button", { name: /record sales/i }));
+
+    await waitFor(() => {
+      expect(previewMutateAsync).toHaveBeenCalled();
+    });
+    expect(mutate).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 });

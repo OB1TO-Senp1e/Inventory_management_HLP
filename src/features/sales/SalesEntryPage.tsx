@@ -1,10 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageHeader } from "@/components/PageHeader";
 import { formatINR, formatNumber } from "@/lib/format";
+import type { SalesPreviewItem } from "@/api/sales";
 import {
   aggregateSalesLines,
   saleDateSchema,
@@ -13,7 +15,7 @@ import {
   type SalesLine,
 } from "@/schemas/sales";
 import { useMenuItems } from "@/features/recipes/hooks";
-import { useRecordSales } from "./hooks";
+import { usePreviewSalesDeductions, useRecordSales } from "./hooks";
 
 const inputClass =
   "h-11 w-full rounded-md border border-input bg-background px-3 text-sm " +
@@ -61,12 +63,24 @@ function emptyLine(): SalesLine {
  *
  * Deducting more than current stock is permitted — stock goes negative and
  * the next count reconciles it (the same "warn + allow" precedent as
- * usage/wastage; P4-04 adds the explicit confirmation, negative flag and
- * audit entry).
+ * usage/wastage). P4-04: the submit path first previews the deductions via
+ * `preview_sales_deductions`; any ingredient that would go below zero is
+ * listed in an explicit confirmation dialog, and the posted movement is
+ * flagged `over_sale` in the ledger with an `audit_log` entry.
  */
+
+interface PendingOverSale {
+  saleDate: string;
+  lines: SalesLine[];
+  flagged: SalesPreviewItem[];
+}
+
 export function SalesEntryPage() {
   const dishes = useMenuItems({ active: true });
   const recordSales = useRecordSales();
+  const previewDeductions = usePreviewSalesDeductions();
+  const [pendingOverSale, setPendingOverSale] =
+    useState<PendingOverSale | null>(null);
 
   const {
     register,
@@ -109,18 +123,43 @@ export function SalesEntryPage() {
     (line) => itemById.get(line.menuItemId)?.sellingPrice == null,
   ).length;
 
-  const onSubmit = (input: FormInput) => {
-    recordSales.mutate(
-      {
+  const onSubmit = async (input: FormInput) => {
+    const lines = aggregateSalesLines(input.lines);
+    // P4-04: pre-submit check — the RPC still computes the authoritative
+    // over_sale flag at post time (stock can move between the two calls).
+    let preview: SalesPreviewItem[];
+    try {
+      preview = await previewDeductions.mutateAsync({
         saleDate: input.saleDate,
-        lines: aggregateSalesLines(input.lines),
-      },
+        lines,
+      });
+    } catch {
+      return; // error already toasted by the hook
+    }
+    const flagged = preview.filter((row) => row.wouldGoNegative);
+    if (flagged.length > 0) {
+      setPendingOverSale({ saleDate: input.saleDate, lines, flagged });
+      return;
+    }
+    submitEntry(input.saleDate, lines);
+  };
+
+  const submitEntry = (saleDate: string, lines: SalesLine[]) => {
+    recordSales.mutate(
+      { saleDate, lines },
       {
         onSuccess: () => {
-          reset({ saleDate: input.saleDate, lines: [emptyLine()] });
+          setPendingOverSale(null);
+          reset({ saleDate, lines: [emptyLine()] });
         },
       },
     );
+  };
+
+  const confirmOverSale = () => {
+    if (pendingOverSale) {
+      submitEntry(pendingOverSale.saleDate, pendingOverSale.lines);
+    }
   };
 
   return (
@@ -284,19 +323,52 @@ export function SalesEntryPage() {
           )}
 
           <p className="text-sm text-muted-foreground">
-            Selling more than current stock is allowed but takes stock
-            negative — the next count reconciles it.
+            If any ingredient would go below zero, you&apos;ll be asked to
+            confirm before the entry posts — confirmed over-sales are flagged
+            in the ledger and written to the audit log. The next count
+            reconciles negative stock.
           </p>
 
           <Button
             type="submit"
             className="min-h-[44px] w-full sm:w-auto"
-            disabled={isSubmitting || recordSales.isPending}
+            disabled={
+              isSubmitting || recordSales.isPending || previewDeductions.isPending
+            }
           >
-            {isSubmitting ? "Recording…" : "Record sales"}
+            {isSubmitting || previewDeductions.isPending
+              ? "Checking…"
+              : recordSales.isPending
+                ? "Recording…"
+                : "Record sales"}
           </Button>
         </form>
       )}
+
+      <ConfirmDialog
+        open={pendingOverSale !== null}
+        title="Insufficient stock"
+        description="This entry would take the following ingredients below zero. Confirm to record the sale anyway — the flagged movements and an audit entry are written to the ledger."
+        confirmLabel="Record sale anyway"
+        destructive
+        onConfirm={confirmOverSale}
+        onCancel={() => setPendingOverSale(null)}
+      >
+        <ul className="mt-3 space-y-1.5 text-sm" aria-label="Ingredients that would go below zero">
+          {pendingOverSale?.flagged.map((row) => (
+            <li key={row.itemId} className="flex items-baseline justify-between gap-2 rounded-md bg-muted/60 px-3 py-2">
+              <span className="font-medium">{row.itemName}</span>
+              <span className="text-muted-foreground">
+                {formatNumber(row.currentQuantity)} {row.unitSymbol} −{" "}
+                {formatNumber(row.deductionQuantity)} {row.unitSymbol} ={" "}
+                <span className="font-semibold text-destructive">
+                  {formatNumber(row.projectedQuantity)} {row.unitSymbol}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </ConfirmDialog>
     </div>
   );
 }

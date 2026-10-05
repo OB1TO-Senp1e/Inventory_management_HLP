@@ -108,6 +108,79 @@ test.describe("sales entry", () => {
         page.getByText(/dishes sold must be greater than zero/i),
       ).toBeVisible();
     });
+
+    test("over-sale shows the warning dialog with flagged items", async ({
+      page,
+    }) => {
+      await stubBackend(page);
+      await page.goto("/sales");
+      await page.getByLabel(/dish 1/i).selectOption({ label: "Butter Chicken" });
+      // Stubbed stock: Tomato 4 kg, Milk 2 L. 12 dishes deduct 6 kg + 3 L —
+      // both go negative (Tomato projects to -2 kg).
+      await page.getByLabel(/dishes sold \(butter chicken\)/i).fill("12");
+      await page.getByRole("button", { name: /record sales/i }).click();
+      const dialog = page.getByRole("alertdialog");
+      await expect(dialog).toContainText(/insufficient stock/i);
+      await expect(dialog).toContainText(/tomato/i);
+      await expect(dialog).toContainText(/-1/);
+      await expect(dialog).toContainText(/milk/i);
+      // Not posted yet: no summary toast.
+      await expect(
+        page.getByText(new RegExp(`Sales recorded for ${todayISO()}`)),
+      ).not.toBeVisible();
+    });
+
+    test("canceling the over-sale dialog aborts the entry", async ({
+      page,
+    }) => {
+      await stubBackend(page);
+      await page.goto("/sales");
+      await page.getByLabel(/dish 1/i).selectOption({ label: "Butter Chicken" });
+      await page.getByLabel(/dishes sold \(butter chicken\)/i).fill("12");
+      await page.getByRole("button", { name: /record sales/i }).click();
+      const dialog = page.getByRole("alertdialog");
+      await expect(dialog).toBeVisible();
+      await dialog.getByRole("button", { name: /^cancel$/i }).click();
+      await expect(dialog).not.toBeVisible();
+      // The form keeps its rows and nothing posted.
+      await expect(page.getByLabel(/dish \d/i)).toHaveCount(1);
+      await expect(
+        page.getByText(new RegExp(`Sales recorded for ${todayISO()}`)),
+      ).not.toBeVisible();
+    });
+
+    test("confirming the over-sale posts the entry", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/sales");
+      await page.getByLabel(/dish 1/i).selectOption({ label: "Butter Chicken" });
+      await page.getByLabel(/dishes sold \(butter chicken\)/i).fill("12");
+      await page.getByRole("button", { name: /record sales/i }).click();
+      const dialog = page.getByRole("alertdialog");
+      await expect(dialog).toBeVisible();
+      await dialog
+        .getByRole("button", { name: /record sale anyway/i })
+        .click();
+      await expect(
+        page.getByText(
+          new RegExp(`Sales recorded for ${todayISO()}: 12 dishes`),
+        ),
+      ).toBeVisible({ timeout: 10000 });
+    });
+
+    test("sufficient stock posts without any dialog", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/sales");
+      await page.getByLabel(/dish 1/i).selectOption({ label: "Butter Chicken" });
+      // 2 dishes deduct 1 kg Tomato + 0.5 L Milk — within stock, no warning.
+      await page.getByLabel(/dishes sold \(butter chicken\)/i).fill("2");
+      await page.getByRole("button", { name: /record sales/i }).click();
+      await expect(page.getByRole("alertdialog")).not.toBeVisible();
+      await expect(
+        page.getByText(
+          new RegExp(`Sales recorded for ${todayISO()}: 2 dishes`),
+        ),
+      ).toBeVisible({ timeout: 10000 });
+    });
   });
 
   test.describe("as manager", () => {

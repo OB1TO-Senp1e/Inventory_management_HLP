@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
 export interface ConfirmDialogProps {
@@ -8,6 +8,12 @@ export interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
+  /**
+   * Optional rich content rendered between the description and the action
+   * buttons (P4-04: the over-sale item list). Keeps the description prop a
+   * plain string for the simple cases.
+   */
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -24,6 +30,7 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   destructive = false,
+  children,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -73,6 +80,7 @@ export function ConfirmDialog({
         >
           {description}
         </p>
+        {children}
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button
             ref={cancelRef}

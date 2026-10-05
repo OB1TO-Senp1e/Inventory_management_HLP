@@ -3,6 +3,47 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string;
+          created_at: string;
+          created_by: string | null;
+          details: Json | null;
+          entity_id: string | null;
+          entity_type: string | null;
+          id: string;
+          restaurant_id: string;
+        };
+        Insert: {
+          action: string;
+          created_at?: string;
+          created_by?: string | null;
+          details?: Json | null;
+          entity_id?: string | null;
+          entity_type?: string | null;
+          id?: string;
+          restaurant_id: string;
+        };
+        Update: {
+          action?: string;
+          created_at?: string;
+          created_by?: string | null;
+          details?: Json | null;
+          entity_id?: string | null;
+          entity_type?: string | null;
+          id?: string;
+          restaurant_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       item_categories: {
         Row: {
           active: boolean;
@@ -427,6 +468,7 @@ export type Database = {
           item_id: string;
           movement_type: string;
           notes: string | null;
+          over_sale: boolean;
           quantity: number;
           reason_code: string | null;
           reference_id: string | null;
@@ -443,6 +485,7 @@ export type Database = {
           item_id: string;
           movement_type: string;
           notes?: string | null;
+          over_sale?: boolean;
           quantity: number;
           reason_code?: string | null;
           reference_id?: string | null;
@@ -459,6 +502,7 @@ export type Database = {
           item_id?: string;
           movement_type?: string;
           notes?: string | null;
+          over_sale?: boolean;
           quantity?: number;
           reason_code?: string | null;
           reference_id?: string | null;
@@ -814,6 +858,18 @@ export type Database = {
     };
     Functions: {
       cancel_purchase_order: { Args: { p_po_id: string }; Returns: undefined };
+      compute_sales_deductions: {
+        Args: { p_lines: Json };
+        Returns: {
+          deduction_base_qty: number;
+          dishes: number;
+          item_id: string;
+          item_name: string;
+          menu_item_id: string;
+          menu_name: string;
+          unit_symbol: string;
+        }[];
+      };
       create_opening_balance: {
         Args: { p_item_id: string; p_quantity: number; p_unit_cost: number };
         Returns: string;
@@ -851,6 +907,18 @@ export type Database = {
         Returns: string;
       };
       pgp_armor_headers: { Args: { "": string }; Returns: Record<string, unknown>[] };
+      preview_sales_deductions: {
+        Args: { p_lines: Json };
+        Returns: {
+          current_quantity: number;
+          deduction_quantity: number;
+          item_id: string;
+          item_name: string;
+          projected_quantity: number;
+          unit_symbol: string;
+          would_go_negative: boolean;
+        }[];
+      };
       receive_goods: {
         Args: { p_lines: Json; p_reference_id?: string; p_reference_type?: string };
         Returns: Json;
