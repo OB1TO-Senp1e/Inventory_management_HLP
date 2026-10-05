@@ -7,7 +7,13 @@ import {
   type AuthSession,
   type UserProfile,
 } from "@/api/auth";
+import { ensureCurrentOutlet } from "@/api/outlets";
 import { AuthContext, type AuthStatus } from "./AuthContext";
+
+/** Mock profiles (ri.mockRole) never hit the network — skip provisioning. */
+function isMockProfile(profile: UserProfile): boolean {
+  return profile.id.startsWith("mock-");
+}
 
 /**
  * Owns the session lifecycle: restores the persisted session on mount,
@@ -29,7 +35,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const nextProfile = await getCurrentProfile();
+      let nextProfile = await getCurrentProfile();
+      // V2-07: first sign-in after the multi-outlet migration (or any
+      // profile without a pinned outlet) provisions "Main outlet" and pins
+      // it, so every stock view has an outlet context from the start.
+      if (nextProfile && !nextProfile.currentOutletId && !isMockProfile(nextProfile)) {
+        try {
+          await ensureCurrentOutlet();
+          nextProfile = await getCurrentProfile();
+        } catch {
+          // Provisioning is best-effort here; stock views surface the
+          // missing outlet with a retry action if it failed.
+        }
+      }
       setProfile(nextProfile);
       setStatus(nextProfile ? "signed-in" : "signed-out");
     } catch (err) {
@@ -76,9 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus("signed-out");
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    const nextProfile = await getCurrentProfile();
+    setProfile(nextProfile);
+  }, []);
+
   const value = useMemo(
-    () => ({ status, session, profile, error, signOut }),
-    [status, session, profile, error, signOut],
+    () => ({ status, session, profile, error, signOut, refreshProfile }),
+    [status, session, profile, error, signOut, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

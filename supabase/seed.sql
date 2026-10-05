@@ -39,6 +39,21 @@ values
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
+-- V2-07: default "Main outlet" + pin all seed profiles to it, so a seeded
+-- dev DB has a working outlet context out of the box.
+-- ---------------------------------------------------------------------------
+
+insert into public.outlets (id, restaurant_id, name, is_default)
+values
+  ('b1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d6', 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5', 'Main outlet', true)
+on conflict (id) do nothing;
+
+update public.profiles
+   set current_outlet_id = 'b1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d6'
+ where restaurant_id = 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5'
+   and current_outlet_id is null;
+
+-- ---------------------------------------------------------------------------
 -- Sample item categories (India kitchen defaults)
 -- ---------------------------------------------------------------------------
 

@@ -59,6 +59,7 @@ const NOTIF_ROW = {
   body: "3 L left (reorder at 10 L)",
   item_id: "b0000000-0000-0000-0000-000000000002",
   batch_no: null,
+  outlet_id: "c0000000-0000-0000-0000-000000000011",
   read_at: null,
   created_at: "2026-10-05T08:00:00.000Z",
 };

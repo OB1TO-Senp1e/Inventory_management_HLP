@@ -34,6 +34,10 @@ const syncEntryBaseSchema = z.object({
    * the currently signed-in restaurant, so a restaurant switch can never
    * post another tenant's entries. */
   restaurantId: z.string().min(1),
+  /** V2-07: outlet the entry was queued under. The drain only replays
+   * entries for the current outlet — an outlet switch while offline turns
+   * the entry into a visible conflict instead of a silent mispost. */
+  outletId: z.string().min(1).nullable().default(null),
   createdAt: z.string(),
   attempts: z.number().int().min(0),
   /** ISO timestamp before which this entry is not retried (backoff). */
@@ -69,16 +73,19 @@ export const newSyncEntrySchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("wastage"),
     restaurantId: z.string().min(1),
+    outletId: z.string().min(1).nullable().optional(),
     payload: logWastageSchema,
   }),
   z.object({
     type: z.literal("usage"),
     restaurantId: z.string().min(1),
+    outletId: z.string().min(1).nullable().optional(),
     payload: logUsageSchema,
   }),
   z.object({
     type: z.literal("receiving"),
     restaurantId: z.string().min(1),
+    outletId: z.string().min(1).nullable().optional(),
     payload: receiveGoodsSchema,
   }),
 ]);
@@ -92,6 +99,8 @@ export type NewSyncEntry = z.infer<typeof newSyncEntrySchema>;
 export interface EnqueueInput {
   type: SyncEntryType;
   restaurantId: string;
+  /** V2-07: outlet the entry was queued under (null = pre-V2-07 entry). */
+  outletId?: string | null;
   payload: unknown;
 }
 

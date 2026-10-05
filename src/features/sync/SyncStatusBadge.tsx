@@ -28,6 +28,7 @@ export function SyncStatusBadge() {
   const { profile } = useAuth();
   const { isOnline, pending, failed, syncing } = useSyncStatus();
   const restaurantId = profile?.restaurantId ?? null;
+  const outletId = profile?.currentOutletId ?? null;
 
   const retryNow = () => {
     if (!isOnline) {
@@ -36,6 +37,7 @@ export function SyncStatusBadge() {
     void drainSyncQueue({
       queryClient,
       restaurantId,
+      outletId,
       onSynced: (count) => {
         success(
           count === 1

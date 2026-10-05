@@ -18,6 +18,9 @@ import type { UserRole } from "../src/schemas/role";
  */
 
 export const MOCK_ROLE_STORAGE_KEY = "ri.mockRole";
+export const MOCK_OUTLET_STORAGE_KEY = "ri.mockOutlet";
+/** The stub backend's default outlet (first entry of OUTLETS). */
+export const MOCK_OUTLET_ID = "c0000000-0000-0000-0000-000000000011";
 
 type RoleFixtures = {
   role: UserRole | null;
@@ -32,6 +35,14 @@ export const test = base.extend<RoleFixtures>({
           window.localStorage.setItem(key, value);
         },
         { key: MOCK_ROLE_STORAGE_KEY, value: role },
+      );
+      // V2-07: pin the mocked profile to the stub backend's default outlet
+      // so outlet-scoped UI (switcher, transfers) renders with zero backend.
+      await page.addInitScript(
+        ({ key, value }: { key: string; value: string }) => {
+          window.localStorage.setItem(key, value);
+        },
+        { key: MOCK_OUTLET_STORAGE_KEY, value: MOCK_OUTLET_ID },
       );
     }
     await use(page);

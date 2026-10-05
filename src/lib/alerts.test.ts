@@ -44,7 +44,7 @@ function notification(
     title: "Tomato is running low",
     body: "2 kg left",
     itemId: BASE_ROW.itemId,
-    batchNo: null,
+    batchNo: null, outletId: null,
     readAt: null,
     createdAt: new Date().toISOString(),
     ...overrides,
@@ -126,7 +126,7 @@ describe("diffAlerts", () => {
     {
       type: "low_stock" as const,
       itemId: "b0000000-0000-0000-0000-000000000001",
-      batchNo: null,
+      batchNo: null, outletId: null,
       title: "Tomato is running low",
       body: "2 kg left",
     },

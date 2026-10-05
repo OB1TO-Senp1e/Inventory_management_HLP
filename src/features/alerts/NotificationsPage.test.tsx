@@ -32,7 +32,7 @@ function notif(overrides: Partial<Notification> = {}): Notification {
     title: "Milk is running low",
     body: "3 L left (reorder at 10 L)",
     itemId: "b0000000-0000-0000-0000-000000000002",
-    batchNo: null,
+    batchNo: null, outletId: null,
     readAt: null,
     createdAt: "2026-10-05T08:00:00.000Z",
     ...overrides,
@@ -64,7 +64,7 @@ describe("NotificationsPage", () => {
         id: "c0000000-0000-0000-0000-000000000002",
         type: "expiring_soon",
         title: "Tomato batch B-101 expiring soon",
-        batchNo: "B-101",
+        batchNo: "B-101", outletId: null,
         readAt: "2026-10-05T09:00:00.000Z",
       }),
     ]);

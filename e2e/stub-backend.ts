@@ -306,11 +306,37 @@ const PURCHASE_ORDER_LINES = [
  * dish names from MENU_ITEMS) and the posted sale date, so date-sensitive
  * assertions stay correct without a backend.
  */
+/**
+ * Outlets (V2-07). Two active outlets so the switcher renders; the profile
+ * mock pins the first as current (see e2e/fixtures.ts `ri.mockOutlet`).
+ */
+const OUTLETS = [
+  {
+    id: "c0000000-0000-0000-0000-000000000011",
+    restaurant_id: R,
+    name: "Main outlet",
+    address: null,
+    is_active: true,
+    is_default: true,
+    created_at: NOW,
+  },
+  {
+    id: "c0000000-0000-0000-0000-000000000012",
+    restaurant_id: R,
+    name: "Downtown",
+    address: "42 Spice Rd",
+    is_active: true,
+    is_default: false,
+    created_at: NOW,
+  },
+];
+
 const RPC_STUBS: Record<string, unknown> = {
   "rpc:create_purchase_order": "c0000000-0000-0000-0000-000000000001",
   "rpc:send_purchase_order": null,
   "rpc:log_po_resend": null,
   "rpc:cancel_purchase_order": null,
+  "rpc:ensure_current_outlet": OUTLETS[0].id,
   "rpc:receive_purchase_order": {
     po_id: PURCHASE_ORDERS[1].id,
     status: "partially_received",
@@ -655,6 +681,7 @@ const TABLES: Record<string, Record<string, unknown>[]> = {
   storage_locations: LOCATIONS,
   units: UNITS,
   items: ITEMS,
+  outlets: OUTLETS,
   suppliers: SUPPLIERS,
   supplier_prices: SUPPLIER_PRICES,
   supplier_price_history: PRICE_HISTORY,
@@ -726,6 +753,56 @@ async function handle(route: Route): Promise<void> {
       status: 200,
       headers: { "content-type": "application/json" },
       body: JSON.stringify(lines),
+    });
+    return;
+  }
+
+  // V2-07: switch_outlet echoes the chosen outlet row so the switcher spec
+  // can assert the UI updates with zero backend.
+  if (key === "rpc:switch_outlet") {
+    const body = (await route.request().postDataJSON()) as {
+      p_outlet_id: string;
+    };
+    const outlet =
+      OUTLETS.find((o) => o.id === body.p_outlet_id) ?? OUTLETS[0];
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(outlet),
+    });
+    return;
+  }
+
+  // V2-07: transfer_stock echoes a canned transfer result shaped to the
+  // TransferResult schema, resolving names from the stub tables.
+  if (key === "rpc:transfer_stock") {
+    const body = (await route.request().postDataJSON()) as {
+      p_to_outlet_id: string;
+      p_item_id: string;
+      p_quantity: number;
+      p_batch_no: string | null;
+      p_notes: string | null;
+    };
+    const toOutlet =
+      OUTLETS.find((o) => o.id === body.p_to_outlet_id) ?? OUTLETS[1];
+    const item = ITEMS.find((i) => i.id === body.p_item_id) ?? ITEMS[0];
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        transfer_id: "d0000000-0000-0000-0000-000000000001",
+        from_outlet_id: OUTLETS[0].id,
+        from_outlet_name: OUTLETS[0].name,
+        to_outlet_id: toOutlet.id,
+        to_outlet_name: toOutlet.name,
+        item_id: item.id,
+        item_name: item.name,
+        quantity: body.p_quantity,
+        unit_symbol: "kg",
+        batch_no: body.p_batch_no,
+        transfer_out_movement_id: "d0000000-0000-0000-0000-000000000002",
+        transfer_in_movement_id: "d0000000-0000-0000-0000-000000000003",
+      }),
     });
     return;
   }
@@ -1069,6 +1146,60 @@ async function handle(route: Route): Promise<void> {
     }
     const idMatch = /^eq\.(.*)$/.exec(url.searchParams.get("id") ?? "");
     for (const row of NOTIFICATIONS) {
+      if (idMatch && String(row["id"]) !== idMatch[1]) {
+        continue;
+      }
+      Object.assign(row, patchBody);
+    }
+  }
+
+  // V2-07: outlets POST creates a canned row (echoing the posted name /
+  // address) and PATCH merges into the canned rows in place, so the
+  // management specs see the state they posted after the UI refetches.
+  if (key === "outlets" && route.request().method() === "POST") {
+    let postBody: Record<string, unknown> = {};
+    try {
+      postBody =
+        ((await route.request().postDataJSON()) as Record<string, unknown>) ??
+        {};
+    } catch {
+      // No JSON body — fall through to the canned rows.
+    }
+    if (typeof postBody["name"] === "string" && postBody["name"]) {
+      const created = {
+        id: "c0000000-0000-0000-0000-000000000013",
+        restaurant_id: R,
+        name: postBody["name"] as string,
+        address:
+          typeof postBody["address"] === "string"
+            ? (postBody["address"] as string)
+            : null,
+        is_active: true,
+        is_default: false,
+        created_at: NOW,
+      };
+      OUTLETS.push(created);
+      await route.fulfill({
+        status: 201,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(created),
+      });
+      return;
+    }
+  }
+  if (key === "outlets" && route.request().method() === "PATCH") {
+    let patchBody: Record<string, unknown> = {};
+    try {
+      patchBody =
+        ((await route.request().postDataJSON()) as Record<
+          string,
+          unknown
+        >) ?? {};
+    } catch {
+      // No JSON body — return the rows unchanged.
+    }
+    const idMatch = /^eq\.(.*)$/.exec(url.searchParams.get("id") ?? "");
+    for (const row of OUTLETS) {
       if (idMatch && String(row["id"]) !== idMatch[1]) {
         continue;
       }

@@ -80,6 +80,7 @@ export function QueuedEntriesCard({ entries, itemName }: QueuedEntriesCardProps)
   const { success } = useToast();
   const { profile } = useAuth();
   const restaurantId = profile?.restaurantId ?? null;
+  const outletId = profile?.currentOutletId ?? null;
 
   if (entries.length === 0) {
     return null;
@@ -91,12 +92,12 @@ export function QueuedEntriesCard({ entries, itemName }: QueuedEntriesCardProps)
         resetSyncEntryForRetry(entry.id);
       }
     }
-    void drainSyncQueue({ queryClient, restaurantId });
+    void drainSyncQueue({ queryClient, restaurantId, outletId });
   };
 
   const retryOne = (id: string) => {
     resetSyncEntryForRetry(id);
-    void drainSyncQueue({ queryClient, restaurantId });
+    void drainSyncQueue({ queryClient, restaurantId, outletId });
   };
 
   const discardOne = (id: string) => {

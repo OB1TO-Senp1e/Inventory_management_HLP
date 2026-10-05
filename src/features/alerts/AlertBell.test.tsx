@@ -42,7 +42,7 @@ function notif(overrides: Partial<Notification> = {}): Notification {
     title: "Milk is running low",
     body: "3 L left",
     itemId: "b0000000-0000-0000-0000-000000000002",
-    batchNo: null,
+    batchNo: null, outletId: null,
     readAt: null,
     createdAt: "2026-10-05T08:00:00.000Z",
     ...overrides,

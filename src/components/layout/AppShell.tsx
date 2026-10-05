@@ -9,6 +9,7 @@ import { AppNav } from "./AppNav";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { InstallAppButton } from "@/features/pwa/InstallAppButton";
 import { SyncStatusBadge } from "@/features/sync/SyncStatusBadge";
+import { OutletSwitcher } from "@/features/outlets/OutletSwitcher";
 import { useSyncEngine } from "@/features/sync/engine";
 import { AlertBell } from "@/features/alerts/AlertBell";
 import { useAlertEngine } from "@/features/alerts/useAlertEngine";
@@ -176,6 +177,7 @@ export function AppShell() {
           <Brand />
           <div className="ml-auto flex items-center gap-1">
             <AlertBell />
+            <OutletSwitcher />
             <SyncStatusBadge />
             <InstallAppButton />
           </div>
@@ -186,6 +188,7 @@ export function AppShell() {
           <Breadcrumbs />
           <div className="flex shrink-0 items-center gap-3">
             <AlertBell />
+            <OutletSwitcher />
             <SyncStatusBadge />
             <InstallAppButton />
             <RoleBadge role={profile.role} />

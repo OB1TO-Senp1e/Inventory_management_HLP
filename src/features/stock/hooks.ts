@@ -40,6 +40,11 @@ function useRestaurantId(): string | null {
   return profile?.restaurantId ?? null;
 }
 
+function useOutletId(): string | null {
+  const { profile } = useAuth();
+  return profile?.currentOutletId ?? null;
+}
+
 /**
  * Offline queue wrapper (P6-02). When the device is offline the submission
  * is stored locally and a `QueuedSubmission` sentinel is returned instead
@@ -51,6 +56,7 @@ async function submitWithOfflineQueue<TInput, TResult>(
   type: SyncEntryType,
   input: TInput,
   restaurantId: string | null,
+  outletId: string | null,
   apiCall: (input: TInput) => Promise<TResult>,
 ): Promise<TResult | QueuedSubmission> {
   if (restaurantId === null) {
@@ -59,14 +65,14 @@ async function submitWithOfflineQueue<TInput, TResult>(
     );
   }
   if (!isOnline()) {
-    const entry = enqueueSyncEntry({ type, restaurantId, payload: input });
+    const entry = enqueueSyncEntry({ type, restaurantId, outletId, payload: input });
     return { queued: true, entryId: entry.id };
   }
   try {
     return await apiCall(input);
   } catch (err) {
     if (isNetworkError(err)) {
-      const entry = enqueueSyncEntry({ type, restaurantId, payload: input });
+      const entry = enqueueSyncEntry({ type, restaurantId, outletId, payload: input });
       return { queued: true, entryId: entry.id };
     }
     throw err;
@@ -110,13 +116,14 @@ export function useReceiveGoods() {
   const queryClient = useQueryClient();
   const { success, error: toastError } = useToast();
   const restaurantId = useRestaurantId();
+  const outletId = useOutletId();
   return useMutation<ReceiveGoodsResult | QueuedSubmission, Error, ReceiveGoodsInput>({
     // `networkMode: "always"`: TanStack Query pauses mutations while offline
     // by default, which would leave the form stuck in "pending" — the queue
     // wrapper above owns the offline decision instead.
     networkMode: "always",
     mutationFn: (input) =>
-      submitWithOfflineQueue("receiving", input, restaurantId, receiveGoods),
+      submitWithOfflineQueue("receiving", input, restaurantId, outletId, receiveGoods),
     onSuccess: (result) => {
       if (isQueuedSubmission(result)) {
         success(
@@ -151,12 +158,13 @@ export function useLogWastage() {
   const queryClient = useQueryClient();
   const { success, error: toastError } = useToast();
   const restaurantId = useRestaurantId();
+  const outletId = useOutletId();
   return useMutation<LogMovementResult | QueuedSubmission, Error, LogWastageInput>({
     // `networkMode: "always"`: see useReceiveGoods — the queue owns the
     // offline decision, so the mutation must run even when offline.
     networkMode: "always",
     mutationFn: (input) =>
-      submitWithOfflineQueue("wastage", input, restaurantId, logWastage),
+      submitWithOfflineQueue("wastage", input, restaurantId, outletId, logWastage),
     onSuccess: (result) => {
       if (isQueuedSubmission(result)) {
         success(
@@ -182,12 +190,13 @@ export function useLogUsage() {
   const queryClient = useQueryClient();
   const { success, error: toastError } = useToast();
   const restaurantId = useRestaurantId();
+  const outletId = useOutletId();
   return useMutation<LogMovementResult | QueuedSubmission, Error, LogUsageInput>({
     // `networkMode: "always"`: see useReceiveGoods — the queue owns the
     // offline decision, so the mutation must run even when offline.
     networkMode: "always",
     mutationFn: (input) =>
-      submitWithOfflineQueue("usage", input, restaurantId, logUsage),
+      submitWithOfflineQueue("usage", input, restaurantId, outletId, logUsage),
     onSuccess: (result) => {
       if (isQueuedSubmission(result)) {
         success(

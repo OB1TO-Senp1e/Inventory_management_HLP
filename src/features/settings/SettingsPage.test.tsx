@@ -4,6 +4,22 @@ import { SettingsPage } from "./SettingsPage";
 
 // Hooks are mocked: these tests verify page states (tabs, loading, error,
 // empty, populated) with zero network.
+vi.mock("@/features/auth/useAuth", () => ({
+  useAuth: () => ({
+    profile: {
+      id: "u1",
+      restaurantId: "r1",
+      role: "owner",
+      currentOutletId: "o1",
+    },
+    status: "signed-in",
+    session: null,
+    error: null,
+    signOut: async () => {},
+    refreshProfile: async () => {},
+  }),
+}));
+
 vi.mock("./hooks", () => ({
   useCategories: vi.fn(),
   useLocations: vi.fn(),

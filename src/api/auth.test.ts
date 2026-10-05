@@ -139,11 +139,12 @@ describe("getCurrentProfile", () => {
       data: { session: { user: { id: "u1", email: "u@x.com" } } },
       error: null,
     });
-    mockProfileQuery({ id: "u1", restaurant_id: "r1", role: "manager" }, null);
+    mockProfileQuery({ id: "u1", restaurant_id: "r1", role: "manager", current_outlet_id: "o1" }, null);
     await expect(getCurrentProfile()).resolves.toEqual({
       id: "u1",
       restaurantId: "r1",
       role: "manager",
+      currentOutletId: "o1",
     });
     expect(mockFrom).toHaveBeenCalledWith("profiles");
   });
@@ -180,6 +181,7 @@ describe("mock role (test-only session mock)", () => {
       id: "mock-staff-user",
       restaurantId: "mock-restaurant",
       role: "staff",
+      currentOutletId: null,
     });
     expect(mockFrom).not.toHaveBeenCalled();
   });

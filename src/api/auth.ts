@@ -24,12 +24,16 @@ export interface UserProfile {
   id: string;
   restaurantId: string;
   role: UserRole;
+  /** The user's current outlet (V2-07). Null when never set — callers should
+   *  ensure it via ensureCurrentOutlet() before stock work. */
+  currentOutletId: string | null;
 }
 
 const profileRowSchema = z.object({
   id: z.string(),
   restaurant_id: z.string(),
   role: userRoleSchema,
+  current_outlet_id: z.string().nullable(),
 });
 
 function parseOrThrow<T>(schema: z.ZodSchema<T>, input: unknown, what: string): T {
@@ -128,8 +132,10 @@ export async function getSession(): Promise<AuthSession | null> {
 }
 
 /**
- * The signed-in user's profile row (role + restaurant). Returns null when
- * there is no session. Throws when the row is missing or the role is unknown.
+ * The signed-in user's profile row (role + restaurant + outlet). Returns null
+ * when there is no session. Throws when the row is missing or the role is
+ * unknown. When the profile has no outlet pinned yet, the caller is expected
+ * to call ensureCurrentOutlet() (V2-07 provisioning) and refetch.
  */
 export async function getCurrentProfile(): Promise<UserProfile | null> {
   const mockRole = readMockRole();
@@ -138,6 +144,7 @@ export async function getCurrentProfile(): Promise<UserProfile | null> {
       id: `mock-${mockRole}-user`,
       restaurantId: "mock-restaurant",
       role: mockRole,
+      currentOutletId: readMockOutlet(),
     };
   }
   const session = await getSession();
@@ -147,14 +154,38 @@ export async function getCurrentProfile(): Promise<UserProfile | null> {
   const client = getSupabaseClient();
   const { data, error } = await client
     .from("profiles")
-    .select("id, restaurant_id, role")
+    .select("id, restaurant_id, role, current_outlet_id")
     .eq("id", session.userId)
     .single();
   if (error) {
     throw new Error(error.message);
   }
   const parsed = profileRowSchema.parse(data);
-  return { id: parsed.id, restaurantId: parsed.restaurant_id, role: parsed.role };
+  return {
+    id: parsed.id,
+    restaurantId: parsed.restaurant_id,
+    role: parsed.role,
+    currentOutletId: parsed.current_outlet_id,
+  };
+}
+
+const MOCK_OUTLET_STORAGE_KEY = "ri.mockOutlet";
+
+/**
+ * TEST-ONLY outlet mock (V2-07). When `localStorage` holds `ri.mockOutlet`
+ * with a UUID, the mocked profile reports it as the current outlet. Lets
+ * Playwright fixtures exercise outlet-scoped UI without a live backend.
+ */
+function readMockOutlet(): string | null {
+  try {
+    const raw = window.localStorage.getItem(MOCK_OUTLET_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    return z.string().uuid().safeParse(raw).success ? raw : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

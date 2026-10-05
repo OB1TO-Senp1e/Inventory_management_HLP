@@ -61,6 +61,11 @@ const StockOverviewPage = lazy(() =>
 const WastagePage = lazy(() =>
   import("@/features/stock/WastagePage").then((m) => ({ default: m.WastagePage })),
 );
+const TransfersPage = lazy(() =>
+  import("@/features/transfers/TransfersPage").then((m) => ({
+    default: m.TransfersPage,
+  })),
+);
 const RecipesPage = lazy(() =>
   import("@/features/recipes/RecipesPage").then((m) => ({ default: m.RecipesPage })),
 );
@@ -114,6 +119,7 @@ const builtSections: Record<string, ReactNode> = {
   "/receiving/invoice": lazySection(<InvoiceScanPage />),
   "/stock": lazySection(<StockOverviewPage />),
   "/wastage": lazySection(<WastagePage />),
+  "/transfers": lazySection(<TransfersPage />),
   "/purchase-orders": lazySection(<PurchaseOrdersPage />),
   "/purchase-orders/:id": lazySection(<PurchaseOrderDetailPage />),
   "/purchase-orders/:id/print": lazySection(<PurchaseOrderPrintPage />),

@@ -50,6 +50,9 @@ export interface DrainResult {
 export interface DrainDeps {
   queryClient: QueryClient;
   restaurantId: string | null;
+  /** V2-07: current outlet. Entries queued under a different outlet are
+   *  marked failed (visible conflict) instead of silently misposted. */
+  outletId: string | null;
   onSynced?: (count: number) => void;
   onFailed?: (count: number) => void;
 }
@@ -88,6 +91,20 @@ export async function drainSyncQueue(deps: DrainDeps): Promise<DrainResult> {
   );
   for (const entry of entries) {
     result.attempted++;
+    // V2-07: an outlet switch while offline must not silently mispost.
+    // Entries tagged with a different outlet become visible conflicts.
+    if (
+      entry.outletId !== null &&
+      deps.outletId !== null &&
+      entry.outletId !== deps.outletId
+    ) {
+      markSyncEntryFailed(
+        entry.id,
+        "Queued at a different outlet. Switch back to that outlet to sync, or discard and re-enter.",
+      );
+      result.failed++;
+      continue;
+    }
     markSyncEntrySyncing(entry.id);
     try {
       await replaySyncEntry(entry);
@@ -128,6 +145,7 @@ export function useSyncEngine(): void {
   const { success, error: toastError } = useToast();
   const { profile } = useAuth();
   const restaurantId = profile?.restaurantId ?? null;
+  const outletId = profile?.currentOutletId ?? null;
 
   useEffect(() => {
     if (restaurantId === null) {
@@ -136,6 +154,7 @@ export function useSyncEngine(): void {
     const deps: DrainDeps = {
       queryClient,
       restaurantId,
+      outletId,
       onSynced: (count) => {
         success(
           count === 1
@@ -167,5 +186,5 @@ export function useSyncEngine(): void {
       window.removeEventListener("online", onOnline);
       window.clearInterval(timer);
     };
-  }, [queryClient, success, toastError, restaurantId]);
+  }, [queryClient, success, toastError, restaurantId, outletId]);
 }

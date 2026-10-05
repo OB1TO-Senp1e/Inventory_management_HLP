@@ -10,15 +10,25 @@ import { reportRangeSchema } from "./reports";
  * Machine-readable audit actions the app can write. Kept as an enum so
  * the action filter dropdown and the details renderer stay in sync with
  * the writers (`record_sales` → over_sale, `apply_stock_count` →
- * stock_count_applied).
+ * stock_count_applied, `transfer_stock` → stock_transfer, PO lifecycle →
+ * po_sent / po_resend).
  */
-export const auditActionSchema = z.enum(["over_sale", "stock_count_applied"]);
+export const auditActionSchema = z.enum([
+  "over_sale",
+  "stock_count_applied",
+  "stock_transfer",
+  "po_sent",
+  "po_resend",
+]);
 export type AuditAction = z.infer<typeof auditActionSchema>;
 
 /** Human-readable labels for the known actions. */
 export const auditActionLabels: Record<AuditAction, string> = {
   over_sale: "Over sale",
   stock_count_applied: "Stock count applied",
+  stock_transfer: "Stock transfer",
+  po_sent: "PO sent",
+  po_resend: "PO resent",
 };
 
 export const listAuditLogInputSchema = z.object({

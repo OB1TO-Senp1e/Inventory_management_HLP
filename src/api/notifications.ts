@@ -20,7 +20,7 @@ import { DEFAULT_ALERT_PREFERENCES } from "@/schemas/notifications";
  */
 
 const NOTIFICATION_SELECT =
-  "id, type, title, body, item_id, batch_no, read_at, created_at";
+  "id, type, title, body, item_id, batch_no, outlet_id, read_at, created_at";
 
 const notificationRowSchema = z.object({
   id: z.string(),
@@ -29,6 +29,7 @@ const notificationRowSchema = z.object({
   body: z.string(),
   item_id: z.string(),
   batch_no: z.string().nullable(),
+  outlet_id: z.string().nullable(),
   read_at: z.string().nullable(),
   created_at: z.string(),
 });
@@ -41,6 +42,7 @@ function toNotification(row: z.infer<typeof notificationRowSchema>): Notificatio
     body: row.body,
     itemId: row.item_id,
     batchNo: row.batch_no,
+    outletId: row.outlet_id,
     readAt: row.read_at,
     createdAt: row.created_at,
   });

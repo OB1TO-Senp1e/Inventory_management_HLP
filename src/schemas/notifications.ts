@@ -23,6 +23,8 @@ export const notificationSchema = z.object({
   body: z.string(),
   itemId: z.string().uuid(),
   batchNo: z.string().nullable(),
+  /** V2-07: the outlet the alert belongs to (RLS already scopes the inbox). */
+  outletId: z.string().uuid().nullable().default(null),
   readAt: z.string().nullable(),
   createdAt: z.string(),
 });

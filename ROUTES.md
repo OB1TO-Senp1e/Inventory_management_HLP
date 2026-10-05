@@ -20,6 +20,7 @@
 | `/receiving/invoice`   | `features/invoice/InvoiceScanPage`            | owner, manager, staff | receiving page | DONE | `e2e/invoice.spec.ts`    |
 | `/stock`               | `features/stock/StockOverviewPage`            | owner, manager        | AppShell nav | DONE   | `e2e/stock.spec.ts`      |
 | `/wastage`             | `features/stock/WastagePage`                  | owner, manager, staff | AppShell nav | DONE   | `e2e/stock.spec.ts`      |
+| `/transfers`           | `features/transfers/TransfersPage`            | owner, manager        | AppShell nav | DONE   | `e2e/transfers.spec.ts`  |
 | `/recipes`             | `features/recipes/RecipesPage`                | owner, manager        | AppShell nav | DONE   | `e2e/recipes.spec.ts`    |
 | `/sales`               | `features/sales/SalesEntryPage`               | owner, manager        | AppShell nav | DONE   | `e2e/sales.spec.ts`      |
 | `/stock-counts`        | `features/counts/StockCountsPage`             | owner, manager, staff | AppShell nav | DONE   | `e2e/counts.spec.ts`     |

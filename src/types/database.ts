@@ -251,6 +251,7 @@ export type Database = {
           created_at: string;
           id: string;
           item_id: string;
+          outlet_id: string;
           read_at: string | null;
           restaurant_id: string;
           title: string;
@@ -262,6 +263,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           item_id: string;
+          outlet_id: string;
           read_at?: string | null;
           restaurant_id: string;
           title: string;
@@ -273,6 +275,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           item_id?: string;
+          outlet_id?: string;
           read_at?: string | null;
           restaurant_id?: string;
           title?: string;
@@ -287,7 +290,58 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "notifications_outlet_id_fkey";
+            columns: ["outlet_id"];
+            isOneToOne: false;
+            referencedRelation: "outlets";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "notifications_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      outlets: {
+        Row: {
+          address: string | null;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          is_active: boolean;
+          is_default: boolean;
+          name: string;
+          restaurant_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          address?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          is_active?: boolean;
+          is_default?: boolean;
+          name: string;
+          restaurant_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          address?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          is_active?: boolean;
+          is_default?: boolean;
+          name?: string;
+          restaurant_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "outlets_restaurant_id_fkey";
             columns: ["restaurant_id"];
             isOneToOne: false;
             referencedRelation: "restaurants";
@@ -303,6 +357,7 @@ export type Database = {
           id: string;
           imported_at: string;
           menu_item_id: string;
+          outlet_id: string;
           provider: string;
           restaurant_id: string;
           sale_date: string;
@@ -315,6 +370,7 @@ export type Database = {
           id?: string;
           imported_at?: string;
           menu_item_id: string;
+          outlet_id: string;
           provider: string;
           restaurant_id: string;
           sale_date: string;
@@ -327,6 +383,7 @@ export type Database = {
           id?: string;
           imported_at?: string;
           menu_item_id?: string;
+          outlet_id?: string;
           provider?: string;
           restaurant_id?: string;
           sale_date?: string;
@@ -348,6 +405,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "pos_imports_outlet_id_fkey";
+            columns: ["outlet_id"];
+            isOneToOne: false;
+            referencedRelation: "outlets";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "pos_imports_restaurant_id_fkey";
             columns: ["restaurant_id"];
             isOneToOne: false;
@@ -360,6 +424,7 @@ export type Database = {
         Row: {
           created_at: string;
           created_by: string | null;
+          current_outlet_id: string | null;
           id: string;
           restaurant_id: string;
           role: string;
@@ -368,6 +433,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           created_by?: string | null;
+          current_outlet_id?: string | null;
           id: string;
           restaurant_id: string;
           role: string;
@@ -376,12 +442,20 @@ export type Database = {
         Update: {
           created_at?: string;
           created_by?: string | null;
+          current_outlet_id?: string | null;
           id?: string;
           restaurant_id?: string;
           role?: string;
           updated_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "profiles_current_outlet_id_fkey";
+            columns: ["current_outlet_id"];
+            isOneToOne: false;
+            referencedRelation: "outlets";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "profiles_restaurant_id_fkey";
             columns: ["restaurant_id"];
@@ -672,6 +746,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           id: string;
+          outlet_id: string;
           restaurant_id: string;
           status: string;
           title: string;
@@ -682,6 +757,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           id?: string;
+          outlet_id: string;
           restaurant_id: string;
           status?: string;
           title: string;
@@ -692,6 +768,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           id?: string;
+          outlet_id?: string;
           restaurant_id?: string;
           status?: string;
           title?: string;
@@ -703,6 +780,13 @@ export type Database = {
             columns: ["assigned_to"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_counts_outlet_id_fkey";
+            columns: ["outlet_id"];
+            isOneToOne: false;
+            referencedRelation: "outlets";
             referencedColumns: ["id"];
           },
           {
@@ -724,6 +808,7 @@ export type Database = {
           item_id: string;
           movement_type: string;
           notes: string | null;
+          outlet_id: string;
           over_sale: boolean;
           quantity: number;
           reason_code: string | null;
@@ -741,6 +826,7 @@ export type Database = {
           item_id: string;
           movement_type: string;
           notes?: string | null;
+          outlet_id: string;
           over_sale?: boolean;
           quantity: number;
           reason_code?: string | null;
@@ -758,6 +844,7 @@ export type Database = {
           item_id?: string;
           movement_type?: string;
           notes?: string | null;
+          outlet_id?: string;
           over_sale?: boolean;
           quantity?: number;
           reason_code?: string | null;
@@ -772,6 +859,13 @@ export type Database = {
             columns: ["item_id"];
             isOneToOne: false;
             referencedRelation: "items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_movements_outlet_id_fkey";
+            columns: ["outlet_id"];
+            isOneToOne: false;
+            referencedRelation: "outlets";
             referencedColumns: ["id"];
           },
           {
@@ -1075,6 +1169,7 @@ export type Database = {
         Row: {
           item_id: string | null;
           last_movement_at: string | null;
+          outlet_id: string | null;
           quantity: number | null;
           restaurant_id: string | null;
         };
@@ -1084,6 +1179,13 @@ export type Database = {
             columns: ["item_id"];
             isOneToOne: false;
             referencedRelation: "items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_movements_outlet_id_fkey";
+            columns: ["outlet_id"];
+            isOneToOne: false;
+            referencedRelation: "outlets";
             referencedColumns: ["id"];
           },
           {
@@ -1149,6 +1251,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           id: string;
+          outlet_id: string;
           restaurant_id: string;
           status: string;
           title: string;
@@ -1164,6 +1267,8 @@ export type Database = {
       current_restaurant_id: { Args: Record<PropertyKey, never>; Returns: string };
       current_user_id: { Args: Record<PropertyKey, never>; Returns: string };
       dearmor: { Args: { "": string }; Returns: string };
+      effective_outlet_id: { Args: Record<PropertyKey, never>; Returns: string };
+      ensure_current_outlet: { Args: Record<PropertyKey, never>; Returns: string };
       find_item_by_barcode: {
         Args: { p_barcode: string };
         Returns: {
@@ -1196,6 +1301,7 @@ export type Database = {
         Args: { p_item_id: string; p_notes?: string; p_quantity: number; p_reason: string };
         Returns: string;
       };
+      my_current_outlet: { Args: Record<PropertyKey, never>; Returns: string };
       pgp_armor_headers: { Args: { "": string }; Returns: Record<string, unknown>[] };
       preview_sales_deductions: {
         Args: { p_lines: Json };
@@ -1238,6 +1344,36 @@ export type Database = {
         };
       };
       stock_count_visible: { Args: { p_count_id: string }; Returns: boolean };
+      switch_outlet: {
+        Args: { p_outlet_id: string };
+        Returns: {
+          address: string | null;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          is_active: boolean;
+          is_default: boolean;
+          name: string;
+          restaurant_id: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "outlets";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      transfer_stock: {
+        Args: {
+          p_batch_no?: string;
+          p_item_id: string;
+          p_notes?: string;
+          p_quantity: number;
+          p_to_outlet_id: string;
+        };
+        Returns: Json;
+      };
       upsert_alert_preferences: {
         Args: {
           p_expiry_days_window: number;

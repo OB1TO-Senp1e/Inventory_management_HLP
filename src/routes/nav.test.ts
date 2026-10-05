@@ -7,7 +7,8 @@ describe("getNavItems", () => {
     expect(labels).toContain("Audit Log");
     expect(labels).toContain("Users");
     expect(labels).toContain("Dashboard");
-    expect(labels).toHaveLength(15);
+    expect(labels).toContain("Transfers");
+    expect(labels).toHaveLength(16);
   });
 
   it("manager sees everything except user management", () => {
@@ -16,7 +17,8 @@ describe("getNavItems", () => {
     expect(labels).not.toContain("Audit Log");
     expect(labels).toContain("Reports");
     expect(labels).toContain("Items");
-    expect(labels).toHaveLength(13);
+    expect(labels).toContain("Transfers");
+    expect(labels).toHaveLength(14);
   });
 
   it("staff sees only the operational sections", () => {

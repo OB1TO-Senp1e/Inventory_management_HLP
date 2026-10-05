@@ -48,6 +48,7 @@ function deps(overrides: Partial<Parameters<typeof drainSyncQueue>[0]> = {}) {
   return {
     queryClient,
     restaurantId: RESTAURANT_ID,
+    outletId: "outlet-a",
     ...overrides,
   };
 }

@@ -129,6 +129,7 @@ export function enqueueSyncEntry(input: EnqueueInput): SyncEntry {
   const stamped = {
     id: crypto.randomUUID(),
     restaurantId: parsed.restaurantId,
+    outletId: parsed.outletId ?? null,
     createdAt: new Date().toISOString(),
     attempts: 0,
     nextRetryAt: null as string | null,

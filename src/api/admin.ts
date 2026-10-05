@@ -83,8 +83,23 @@ export interface ListAuditLogResult {
 }
 
 function isAuditAction(action: string): action is AuditAction {
-  return action === "over_sale" || action === "stock_count_applied";
+  return (
+    action === "over_sale" ||
+    action === "stock_count_applied" ||
+    action === "stock_transfer" ||
+    action === "po_sent" ||
+    action === "po_resend"
+  );
 }
+
+const stockTransferDetailsSchema = z.object({
+  from_outlet_name: z.string(),
+  to_outlet_name: z.string(),
+  item_name: z.string(),
+  quantity: z.coerce.number(),
+  unit_symbol: z.string(),
+  batch_no: z.string().nullable().optional(),
+});
 
 /**
  * Human-readable one-line summary of an entry's payload. Unknown actions
@@ -114,6 +129,16 @@ export function summarizeAuditDetails(action: string, details: unknown): string 
     const { title, total_lines, posted_adjustments } = parsed.data;
     const lineWord = total_lines === 1 ? "line" : "lines";
     return `Count "${title}" — ${posted_adjustments} of ${total_lines} ${lineWord} adjusted`;
+  }
+  if (action === "stock_transfer") {
+    const parsed = stockTransferDetailsSchema.safeParse(details);
+    if (!parsed.success) {
+      return JSON.stringify(details);
+    }
+    const { from_outlet_name, to_outlet_name, item_name, quantity, unit_symbol, batch_no } =
+      parsed.data;
+    const batch = batch_no ? ` (batch ${batch_no})` : "";
+    return `${quantity} ${unit_symbol} ${item_name}${batch}: ${from_outlet_name} → ${to_outlet_name}`;
   }
   return JSON.stringify(details);
 }

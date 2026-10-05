@@ -15,6 +15,7 @@ function signedOutValue(): AuthContextValue {
     profile: null,
     error: null,
     signOut: async () => {},
+    refreshProfile: async () => {},
   };
 }
 
@@ -22,9 +23,10 @@ function signedInValue(role: UserRole): AuthContextValue {
   return {
     status: "signed-in",
     session: { userId: "u1", email: "u@example.com" },
-    profile: { id: "u1", restaurantId: "r1", role },
+    profile: { id: "u1", restaurantId: "r1", role, currentOutletId: null },
     error: null,
     signOut: async () => {},
+    refreshProfile: async () => {},
   };
 }
 
@@ -35,6 +37,7 @@ function loadingValue(): AuthContextValue {
     profile: null,
     error: null,
     signOut: async () => {},
+    refreshProfile: async () => {},
   };
 }
 

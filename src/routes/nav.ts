@@ -1,4 +1,5 @@
 import {
+  ArrowRightLeft,
   BarChart3,
   Boxes,
   ChefHat,
@@ -34,6 +35,7 @@ export const allNavItems: NavItem[] = [
   { path: "/receiving", label: "Receiving", icon: PackageCheck },
   { path: "/stock", label: "Stock", icon: Boxes },
   { path: "/wastage", label: "Usage & wastage", icon: Trash2 },
+  { path: "/transfers", label: "Transfers", icon: ArrowRightLeft },
   { path: "/recipes", label: "Recipes", icon: ChefHat },
   { path: "/sales", label: "Sales", icon: ReceiptText },
   { path: "/stock-counts", label: "Stock Counts", icon: ClipboardCheck },

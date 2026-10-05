@@ -10,6 +10,8 @@ export interface AuthContextValue {
   /** Human-readable message when status is "error" (e.g. missing .env config). */
   error: string | null;
   signOut: () => Promise<void>;
+  /** Re-fetch the profile row (V2-07: after switch_outlet() pins a new outlet). */
+  refreshProfile: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
