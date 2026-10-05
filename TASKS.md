@@ -75,3 +75,4 @@
 - [DONE] V2-05 | Send POs via WhatsApp/email | depends: P3-02 | acceptance: PO sent to supplier via pluggable provider; stub provider for tests; live send needs WhatsApp/email account; UI polished; e2e passes
 - [DONE] V2-06 | POS integration: sales auto-import | depends: P4-03 | acceptance: sales import from POS provider into record_sales flow; pluggable provider; live import needs POS credentials; UI polished; e2e passes
 - [DONE] V2-07 | Multi-outlet support | depends: P2-05 | acceptance: outlets under restaurant; outlet-scoped stock; inter-outlet transfers post movements; UI polished; e2e passes
+- [TODO] V2-08 | UI refinement & full-app audit pass | depends: V2-07 | acceptance: full gate suite green (typecheck, lint, unit, db, build, wiring, routes, e2e); visual consistency pass over all routes on mobile + desktop; every bug found fixed; UI polished with before/after evidence
