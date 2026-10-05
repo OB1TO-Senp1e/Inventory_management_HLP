@@ -2,12 +2,13 @@ import { test, expect } from "./fixtures";
 import { stubBackend } from "./stub-backend";
 
 /**
- * Recipes spec (P4-01).
+ * Recipes spec (P4-01, costing in P4-02).
  *
  * Deterministic specs run everywhere with the stubbed backend — they
  * exercise the REAL recipe UI (list, search, builder dialog, unit
- * filtering) with zero backend. The live CRUD flow needs a real Supabase
- * backend + seed data, so it only runs when E2E_LIVE_SUPABASE=1.
+ * filtering, live cost preview, selling price) with zero backend. The live
+ * CRUD flow needs a real Supabase backend + seed data, so it only runs
+ * when E2E_LIVE_SUPABASE=1.
  */
 
 const LIVE = process.env.E2E_LIVE_SUPABASE === "1";
@@ -81,6 +82,89 @@ test.describe("recipes access", () => {
       await expect(
         page.getByText("Add at least one ingredient."),
       ).toBeVisible();
+    });
+
+    test("list shows cost per dish and food-cost %", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/recipes");
+      await expect(
+        page.getByText("Butter Chicken").filter({ visible: true }).first(),
+      ).toBeVisible();
+      // Butter Chicken: ₹123 / 4 servings = ₹30.75 per dish (en-IN ₹).
+      await expect(
+        page.getByText("₹30.75").filter({ visible: true }).first(),
+      ).toBeVisible();
+      // Food cost = 30.75 / 199 × 100 = 15.45%.
+      await expect(
+        page.getByText("15.45%").filter({ visible: true }).first(),
+      ).toBeVisible();
+      // Dal Makhani: ₹48 / 6 = ₹8.00 per dish; 8 / 149 × 100 = 5.37%.
+      await expect(
+        page.getByText("₹8.00").filter({ visible: true }).first(),
+      ).toBeVisible();
+      await expect(
+        page.getByText("5.37%").filter({ visible: true }).first(),
+      ).toBeVisible();
+    });
+
+    test("builder dialog shows a live cost preview", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/recipes");
+      await page.getByRole("button", { name: /new recipe/i }).click();
+      await expect(page.getByLabel("Dish name")).toBeVisible({ timeout: 10000 });
+
+      await page.getByLabel("Dish name").fill("Cost Curry");
+      await page.getByLabel("Yield quantity").fill("4");
+
+      // No ingredients yet → no cost.
+      await expect(
+        page.getByText("Add ingredients to see the live cost."),
+      ).toBeVisible();
+
+      // 2 kg of Tomato at ₹32.50/kg = ₹65.00 for the full yield.
+      await page.getByLabel("Add ingredient").selectOption({ label: "Tomato (kg)" });
+      await page.getByRole("button", { name: /^add$/i }).click();
+      await page.getByLabel("Quantity for Tomato").fill("2");
+
+      // ₹65.00 / 4 servings = ₹16.25 per dish.
+      await expect(page.getByText("₹65.00")).toBeVisible();
+      await expect(page.getByText("₹16.25")).toBeVisible();
+      // No selling price → food cost is "—" with a hint.
+      await expect(
+        page.getByText("Set a selling price to see the food-cost %."),
+      ).toBeVisible();
+
+      // ₹130 selling price → 16.25 / 130 × 100 = 12.5%.
+      await page.getByLabel(/selling price/i).fill("130");
+      await expect(page.getByText("12.5%")).toBeVisible();
+    });
+
+    test("selling price can be edited on an existing recipe", async ({
+      page,
+    }) => {
+      await stubBackend(page);
+      await page.goto("/recipes");
+      await expect(
+        page.getByText("Butter Chicken").filter({ visible: true }).first(),
+      ).toBeVisible();
+      await page
+        .getByRole("button", { name: "Edit Butter Chicken" })
+        .filter({ visible: true })
+        .first()
+        .click();
+      const dialog = page.getByRole("dialog", { name: /edit recipe/i });
+      await expect(dialog).toBeVisible();
+      await expect(page.getByLabel("Dish name")).toBeVisible({ timeout: 10000 });
+
+      // The current price is prefilled; the live preview shows the
+      // stubbed cost (₹123 / 4 = ₹30.75 per dish).
+      await expect(page.getByLabel(/selling price/i)).toHaveValue("199");
+      await expect(dialog.getByText("₹30.75")).toBeVisible();
+
+      await page.getByLabel(/selling price/i).fill("249");
+      await page.getByRole("button", { name: /save changes/i }).click();
+      await expect(page.getByText("Recipe updated.")).toBeVisible();
+      await expect(dialog).not.toBeVisible();
     });
   });
 

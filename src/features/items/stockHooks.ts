@@ -12,6 +12,7 @@ import {
   subscribeToStockMovements,
 } from "@/api/stock";
 import { itemsQueryKey } from "@/features/items/hooks";
+import { recipesQueryKey } from "@/features/recipes/hooks";
 import type { CreateOpeningBalanceInput } from "@/schemas/stock";
 
 /**
@@ -49,6 +50,9 @@ export function useCreateOpeningBalance() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: itemsQueryKey });
       void queryClient.invalidateQueries({ queryKey: stockQueryKey });
+      // Opening balance seeds avg_unit_cost, which feeds recipe costing
+      // (P4-02): refresh the recipes list/detail so costs update at once.
+      void queryClient.invalidateQueries({ queryKey: recipesQueryKey });
       success("Opening balance posted.");
     },
     onError: (err: Error) => {

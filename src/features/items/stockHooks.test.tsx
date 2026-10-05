@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/toast/ToastProvider";
 import { createOpeningBalance, getCurrentStock, listBatches, listMovements, listStockOverview, subscribeToItemMovements, subscribeToStockMovements } from "@/api/stock";
 import { itemsQueryKey } from "@/features/items/hooks";
+import { recipesQueryKey } from "@/features/recipes/hooks";
 import {
   LEDGER_PAGE_SIZE,
   stockQueryKey,
@@ -137,6 +138,10 @@ describe("useCreateOpeningBalance", () => {
     );
     expect(invalidateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: stockQueryKey }),
+    );
+    // Opening balance seeds avg_unit_cost → recipe costs (P4-02) refresh.
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: recipesQueryKey }),
     );
     await screen.findByText("Opening balance posted.");
   });

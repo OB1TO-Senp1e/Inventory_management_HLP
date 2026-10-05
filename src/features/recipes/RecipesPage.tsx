@@ -3,7 +3,9 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { useAuth } from "@/features/auth/useAuth";
-import { useArchiveMenuItem, useMenuItems } from "./hooks";
+import { formatINR, formatNumber } from "@/lib/format";
+import type { MenuItem } from "@/api/recipes";
+import { useArchiveMenuItem, useMenuItems, useRecipeCostRealtime } from "./hooks";
 import { RecipeDialog } from "./RecipeDialog";
 
 const inputClass =
@@ -21,13 +23,32 @@ function LoadingSkeleton() {
 }
 
 /**
- * Recipes list (P4-01). Owner/manager only (route guard + RLS).
- * Each recipe is a menu item with ingredient lines; the builder dialog
- * handles create/edit including yield and per-line units.
+ * Food-cost % cell: "—" when the recipe has no selling price yet.
+ */
+function FoodCostCell({ item }: { item: MenuItem }) {
+  if (item.foodCostPct === null) {
+    return (
+      <span title="Set a selling price to see the food cost">—</span>
+    );
+  }
+  return <span className="tabular-nums">{formatNumber(item.foodCostPct)}%</span>;
+}
+
+/**
+ * Recipes list (P4-01, costing in P4-02). Owner/manager only (route guard +
+ * RLS). Each recipe is a menu item with ingredient lines; the builder
+ * dialog handles create/edit including yield, selling price and per-line
+ * units. Cost per dish and food-cost % are derived live from the
+ * `menu_item_costs` view — they update automatically when ingredient
+ * costs change (receiving recalculates `avg_unit_cost`).
  */
 export function RecipesPage() {
   const { profile } = useAuth();
   const canManage = profile?.role === "owner" || profile?.role === "manager";
+
+  // Any new ledger movement can change an item's avg_unit_cost and hence
+  // every recipe cost: refresh the list without a reload.
+  useRecipeCostRealtime();
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState<string | undefined>(undefined);
@@ -139,6 +160,8 @@ export function RecipesPage() {
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Yield</th>
                   <th className="px-4 py-3 font-medium">Ingredients</th>
+                  <th className="px-4 py-3 font-medium">Cost / dish</th>
+                  <th className="px-4 py-3 font-medium">Food cost</th>
                   {canManage && (
                     <th className="px-4 py-3 font-medium">
                       <span className="sr-only">Actions</span>
@@ -157,6 +180,12 @@ export function RecipesPage() {
                       {item.ingredientCount}{" "}
                       {item.ingredientCount === 1 ? "ingredient" : "ingredients"}
                     </td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {formatINR(item.costPerDish)}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      <FoodCostCell item={item} />
+                    </td>
                     {canManage && (
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
@@ -165,6 +194,7 @@ export function RecipesPage() {
                             size="sm"
                             className="min-h-[44px]"
                             onClick={() => openEdit(item.id)}
+                            aria-label={`Edit ${item.name}`}
                           >
                             Edit
                           </Button>
@@ -174,6 +204,7 @@ export function RecipesPage() {
                             className="min-h-[44px]"
                             onClick={() => archiveMutation.mutate(item.id)}
                             disabled={archiveMutation.isPending}
+                            aria-label={`Archive ${item.name}`}
                           >
                             Archive
                           </Button>
@@ -197,6 +228,14 @@ export function RecipesPage() {
                       {item.ingredientCount}{" "}
                       {item.ingredientCount === 1 ? "ingredient" : "ingredients"}
                     </p>
+                    <p className="mt-1 text-sm">
+                      <span className="tabular-nums font-medium">
+                        {formatINR(item.costPerDish)}
+                      </span>
+                      <span className="text-muted-foreground"> / dish · </span>
+                      <span className="text-muted-foreground">Food cost: </span>
+                      <FoodCostCell item={item} />
+                    </p>
                   </div>
                   {canManage && (
                     <div className="flex gap-2">
@@ -205,6 +244,7 @@ export function RecipesPage() {
                         size="sm"
                         className="min-h-[44px]"
                         onClick={() => openEdit(item.id)}
+                        aria-label={`Edit ${item.name}`}
                       >
                         Edit
                       </Button>
@@ -214,6 +254,7 @@ export function RecipesPage() {
                         className="min-h-[44px]"
                         onClick={() => archiveMutation.mutate(item.id)}
                         disabled={archiveMutation.isPending}
+                        aria-label={`Archive ${item.name}`}
                       >
                         Archive
                       </Button>

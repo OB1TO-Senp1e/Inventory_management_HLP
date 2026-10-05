@@ -12,6 +12,7 @@ import {
 } from "@/api/stock";
 import { itemsQueryKey } from "@/features/items/hooks";
 import { stockQueryKey } from "@/features/items/stockHooks";
+import { recipesQueryKey } from "@/features/recipes/hooks";
 import type {
   LogUsageInput,
   LogWastageInput,
@@ -69,6 +70,9 @@ export function useReceiveGoods() {
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: itemsQueryKey });
       void queryClient.invalidateQueries({ queryKey: stockQueryKey });
+      // Receiving recalculates avg_unit_cost, which feeds recipe costing
+      // (P4-02): refresh the recipes list/detail so costs update at once.
+      void queryClient.invalidateQueries({ queryKey: recipesQueryKey });
       const lineWord = result.lines.length === 1 ? "line" : "lines";
       success(`Receipt posted: ${result.lines.length} ${lineWord}.`);
     },

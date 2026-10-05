@@ -31,12 +31,14 @@ const tomato = {
   name: "Tomato",
   unitId: "unit-kg",
   unitSymbol: "kg",
+  avgUnitCost: 32.5,
 };
 const milk = {
   id: "item-milk",
   name: "Milk",
   unitId: "unit-l",
   unitSymbol: "L",
+  avgUnitCost: 58,
 };
 
 beforeEach(() => {
@@ -134,5 +136,59 @@ describe("RecipeDialog", () => {
     expect(screen.getByText("Tomato")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Remove Tomato" }));
     expect(screen.queryByText("Tomato")).not.toBeInTheDocument();
+  });
+
+  it("shows a live cost preview as ingredients are added", () => {
+    renderDialog();
+    // No ingredients yet → no cost.
+    expect(
+      screen.getByText("Add ingredients to see the live cost."),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Dish name"), {
+      target: { value: "Cost Curry" },
+    });
+    fireEvent.change(screen.getByLabelText("Yield quantity"), {
+      target: { value: "4" },
+    });
+    // 2 kg of Tomato at ₹32.50/kg = ₹65.00 for the full yield.
+    fireEvent.change(screen.getByLabelText("Add ingredient"), {
+      target: { value: "item-tomato" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText("Quantity for Tomato"), {
+      target: { value: "2" },
+    });
+    // ₹65.00 / 4 servings = ₹16.25 per dish.
+    expect(screen.getByText("₹65.00")).toBeInTheDocument();
+    expect(screen.getByText("₹16.25")).toBeInTheDocument();
+    // No selling price → food cost is "—" with a hint.
+    expect(
+      screen.getByText("Set a selling price to see the food-cost %."),
+    ).toBeInTheDocument();
+    // A selling price of ₹130 → 16.25 / 130 × 100 = 12.5%.
+    fireEvent.change(screen.getByLabelText(/selling price/i), {
+      target: { value: "130" },
+    });
+    expect(screen.getByText("12.5%")).toBeInTheDocument();
+  });
+
+  it("rejects a non-positive selling price", async () => {
+    renderDialog();
+    fireEvent.change(screen.getByLabelText("Dish name"), {
+      target: { value: "Priced Dish" },
+    });
+    fireEvent.change(screen.getByLabelText("Add ingredient"), {
+      target: { value: "item-tomato" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText(/selling price/i), {
+      target: { value: "-5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create recipe" }));
+    await waitFor(() => {
+      expect(
+        screen.getByText("Selling price must be greater than zero."),
+      ).toBeInTheDocument();
+    });
   });
 });

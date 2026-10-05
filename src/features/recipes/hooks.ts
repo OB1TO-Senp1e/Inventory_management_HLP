@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/toast/useToast";
 import { useAuth } from "@/features/auth/useAuth";
@@ -13,6 +14,7 @@ import {
   updateMenuItem,
 } from "@/api/recipes";
 import { listUnits } from "@/api/items";
+import { subscribeToStockMovements } from "@/api/stock";
 import type {
   CreateMenuItemInput,
   ListMenuItemsInput,
@@ -195,4 +197,34 @@ export function useRemoveIngredient() {
           : "Could not remove the ingredient.",
       ),
   });
+}
+
+/**
+ * Realtime cost updates (P4-02). Any new ledger movement can change an
+ * item's `avg_unit_cost` (receiving recalculates the weighted average),
+ * which changes recipe costs — the cost is derived live, never stored. On
+ * every INSERT the recipe queries are invalidated so the list refreshes
+ * without a reload. Best-effort like the stock hooks: silent without a
+ * backend or without realtime enabled on the table.
+ */
+export function useRecipeCostRealtime() {
+  const queryClient = useQueryClient();
+  const restaurantId = useRestaurantId();
+  useEffect(() => {
+    if (restaurantId === null) {
+      return;
+    }
+    let unsubscribe: (() => void) | undefined;
+    try {
+      unsubscribe = subscribeToStockMovements(() => {
+        void queryClient.invalidateQueries({ queryKey: recipesQueryKey });
+      });
+    } catch {
+      // No Supabase config (audit crawl / backend-less dev): realtime is
+      // unavailable; the page works without it.
+    }
+    return () => {
+      unsubscribe?.();
+    };
+  }, [restaurantId, queryClient]);
 }

@@ -127,6 +127,7 @@ export type Database = {
           id: string;
           name: string;
           restaurant_id: string;
+          selling_price: number | null;
           updated_at: string;
           yield_quantity: number;
           yield_unit: string;
@@ -139,6 +140,7 @@ export type Database = {
           id?: string;
           name: string;
           restaurant_id: string;
+          selling_price?: number | null;
           updated_at?: string;
           yield_quantity: number;
           yield_unit: string;
@@ -151,6 +153,7 @@ export type Database = {
           id?: string;
           name?: string;
           restaurant_id?: string;
+          selling_price?: number | null;
           updated_at?: string;
           yield_quantity?: number;
           yield_unit?: string;
@@ -359,6 +362,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "items";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recipe_ingredients_menu_item_id_fkey";
+            columns: ["menu_item_id"];
+            isOneToOne: false;
+            referencedRelation: "menu_item_costs";
+            referencedColumns: ["menu_item_id"];
           },
           {
             foreignKeyName: "recipe_ingredients_menu_item_id_fkey";
@@ -778,6 +788,22 @@ export type Database = {
           },
           {
             foreignKeyName: "stock_movements_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      menu_item_costs: {
+        Row: {
+          ingredient_cost: number | null;
+          menu_item_id: string | null;
+          restaurant_id: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "menu_items_restaurant_id_fkey";
             columns: ["restaurant_id"];
             isOneToOne: false;
             referencedRelation: "restaurants";

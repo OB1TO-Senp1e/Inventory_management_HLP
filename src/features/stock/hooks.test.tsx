@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/toast/ToastProvider";
 import { listReceivableItems, logUsage, logWastage, receiveGoods } from "@/api/stock";
 import { itemsQueryKey } from "@/features/items/hooks";
 import { stockQueryKey } from "@/features/items/stockHooks";
+import { recipesQueryKey } from "@/features/recipes/hooks";
 import { useLogUsage, useLogWastage, useReceivableItems, useReceiveGoods } from "./hooks";
 
 // The API modules are mocked: these tests verify hook wiring (delegation,
@@ -113,6 +114,10 @@ describe("useReceiveGoods", () => {
     );
     expect(invalidateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: stockQueryKey }),
+    );
+    // Receiving recalculates avg_unit_cost → recipe costs (P4-02) refresh.
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: recipesQueryKey }),
     );
     await screen.findByText(/receipt posted: 1 line/i);
     invalidateSpy.mockRestore();

@@ -16,6 +16,13 @@ import {
 } from "./hooks";
 import { convertibleUnits } from "@/lib/units";
 import {
+  costPerDish,
+  foodCostPct,
+  totalIngredientCost,
+  type CostedIngredient,
+} from "@/lib/costing";
+import { formatINR, formatNumber } from "@/lib/format";
+import {
   createMenuItemSchema,
   type CreateMenuItemInput,
 } from "@/schemas/recipe";
@@ -27,6 +34,20 @@ const inputClass =
 
 const labelClass = "mb-1 block text-sm font-medium";
 const errorClass = "mt-1 text-sm text-destructive";
+
+/**
+ * Coerce a raw form value (number | numeric string | undefined) to a
+ * positive number, or null when it is empty/invalid. React Hook Form hands
+ * number inputs back as strings until the Zod resolver runs, so the live
+ * cost preview must tolerate the raw shapes.
+ */
+function toPositiveNumber(value: unknown): number | null {
+  const n = typeof value === "string" ? Number(value) : (value as number);
+  if (!Number.isFinite(n) || n <= 0) {
+    return null;
+  }
+  return n;
+}
 
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) {
@@ -96,10 +117,17 @@ export function RecipeDialog({
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<CreateMenuItemInput>({
     resolver: zodResolver(createMenuItemSchema),
-    defaultValues: { name: "", description: "", yieldQuantity: 1, yieldUnit: "servings" },
+    defaultValues: {
+      name: "",
+      description: "",
+      yieldQuantity: 1,
+      yieldUnit: "servings",
+      sellingPrice: undefined,
+    },
   });
 
   const [lines, setLines] = useState<IngredientLine[]>([]);
@@ -116,6 +144,7 @@ export function RecipeDialog({
         description: detail.description ?? "",
         yieldQuantity: detail.yieldQuantity,
         yieldUnit: detail.yieldUnit,
+        sellingPrice: detail.sellingPrice ?? undefined,
       });
       setLines(
         detail.ingredients.map((ing) => ({
@@ -180,6 +209,34 @@ export function RecipeDialog({
 
   const unitOptionsFor = (line: IngredientLine) =>
     convertibleUnits(line.baseUnitId, units, conversions);
+
+  // Live cost preview (P4-02): recomputed on every render from the current
+  // lines, the items' live avg_unit_cost, and the form's yield / selling
+  // price. Nothing is stored — receiving stock updates these numbers
+  // automatically on the next render.
+  const previewYield = toPositiveNumber(watch("yieldQuantity"));
+  const previewSellingPrice = toPositiveNumber(watch("sellingPrice"));
+  const previewLines: CostedIngredient[] = lines.map((line) => ({
+    quantity: Number(line.quantity),
+    unitId: line.unitId,
+    itemBaseUnitId: line.baseUnitId,
+    avgUnitCost: itemById.get(line.itemId)?.avgUnitCost ?? 0,
+  }));
+  const previewLinesValid =
+    lines.length > 0 &&
+    previewLines.every(
+      (l) => Number.isFinite(l.quantity) && l.quantity > 0 && l.unitId !== "",
+    );
+  const previewTotal =
+    previewLinesValid ? totalIngredientCost(previewLines, conversions) : null;
+  const previewCostPerDish =
+    previewTotal !== null && previewYield !== null
+      ? costPerDish(previewTotal, previewYield)
+      : null;
+  const previewFoodCostPct =
+    previewCostPerDish === null
+      ? null
+      : foodCostPct(previewCostPerDish, previewSellingPrice);
 
   const onSubmit = async (input: CreateMenuItemInput) => {
     if (lines.length === 0) {
@@ -369,6 +426,28 @@ export function RecipeDialog({
                   message={errors.yieldUnit?.message}
                 />
               </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="recipe-selling-price" className={labelClass}>
+                  Selling price{" "}
+                  <span className="font-normal text-muted-foreground">
+                    (₹, optional)
+                  </span>
+                </label>
+                <input
+                  id="recipe-selling-price"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="e.g. 199"
+                  className={inputClass}
+                  {...register("sellingPrice")}
+                  aria-invalid={!!errors.sellingPrice}
+                />
+                <FieldError
+                  id="recipe-selling-price-error"
+                  message={errors.sellingPrice?.message}
+                />
+              </div>
             </div>
 
             <h3 className="mb-2 mt-6 font-medium">
@@ -482,6 +561,62 @@ export function RecipeDialog({
                 <Plus className="mr-1 size-4" aria-hidden="true" />
                 Add
               </Button>
+            </div>
+
+            <div
+              className="mt-4 rounded-lg border bg-muted/40 p-4"
+              aria-live="polite"
+              aria-label="Live recipe cost"
+            >
+              <h3 className="text-sm font-medium">
+                Recipe cost{" "}
+                <span className="font-normal text-muted-foreground">
+                  (live)
+                </span>
+              </h3>
+              {previewTotal === null ? (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Add ingredients to see the live cost.
+                </p>
+              ) : (
+                <>
+                  <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-3">
+                    <div>
+                      <dt className="text-muted-foreground">
+                        Ingredients, full yield
+                      </dt>
+                      <dd className="font-medium tabular-nums">
+                        {formatINR(previewTotal)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Cost per dish</dt>
+                      <dd className="font-medium tabular-nums">
+                        {previewCostPerDish === null
+                          ? "—"
+                          : formatINR(previewCostPerDish)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Food cost</dt>
+                      <dd className="font-medium tabular-nums">
+                        {previewFoodCostPct === null ? (
+                          <span title="Set a selling price to see the food cost">
+                            —
+                          </span>
+                        ) : (
+                          `${formatNumber(previewFoodCostPct)}%`
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
+                  {previewSellingPrice === null && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Set a selling price to see the food-cost %.
+                    </p>
+                  )}
+                </>
+              )}
             </div>
 
             <div className="mt-6 flex justify-end gap-2">

@@ -9,6 +9,7 @@ import { RecipesPage } from "./RecipesPage";
 vi.mock("./hooks", () => ({
   useMenuItems: vi.fn(),
   useArchiveMenuItem: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useRecipeCostRealtime: vi.fn(),
 }));
 
 const { mockUseAuth } = vi.hoisted(() => ({
@@ -35,10 +36,22 @@ const sampleItem: MenuItem = {
   description: "Creamy tomato curry",
   yieldQuantity: 4,
   yieldUnit: "servings",
+  sellingPrice: 199,
   active: true,
   ingredientCount: 3,
+  ingredientCost: 123,
+  costPerDish: 30.75,
+  foodCostPct: 15.4523,
   createdAt: "2026-10-05T00:00:00Z",
   updatedAt: "2026-10-05T00:00:00Z",
+};
+
+const sampleItemNoPrice: MenuItem = {
+  ...sampleItem,
+  id: "menu-2",
+  name: "Dal Makhani",
+  sellingPrice: null,
+  foodCostPct: null,
 };
 
 beforeEach(() => {
@@ -103,9 +116,9 @@ describe("RecipesPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders recipe rows with yield and ingredient counts", () => {
+  it("renders recipe rows with cost per dish and food-cost %", () => {
     mockedUseMenuItems.mockReturnValue({
-      data: [sampleItem],
+      data: [sampleItem, sampleItemNoPrice],
       isLoading: false,
       isError: false,
       refetch: vi.fn(),
@@ -115,6 +128,15 @@ describe("RecipesPage", () => {
     expect(screen.getAllByText("Butter Chicken").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/4 servings/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/3 ingredients/).length).toBeGreaterThan(0);
+    // ₹30.75 per dish (₹123 / 4 servings), rendered in the desktop table
+    // and the mobile card (one hidden).
+    expect(screen.getAllByText("₹30.75").length).toBeGreaterThan(0);
+    // 30.75 / 199 × 100 = 15.45% in en-IN formatting.
+    expect(screen.getAllByText("15.45%").length).toBeGreaterThan(0);
+    // No selling price → food cost shows "—" (desktop table + mobile card).
+    expect(
+      screen.getAllByTitle("Set a selling price to see the food cost").length,
+    ).toBeGreaterThan(0);
   });
 
   it("hides the New recipe button for staff", () => {

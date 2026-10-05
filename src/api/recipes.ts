@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getSupabaseClient } from "@/lib/supabase";
+import { costPerDish, foodCostPct } from "@/lib/costing";
 import type { UnitConversion } from "@/lib/units";
 import {
   createMenuItemSchema,
@@ -29,6 +30,13 @@ import {
  *
  * Staff have no RLS policies on these tables (recipes carry costs from
  * P4-02) — every staff query is denied by the database.
+ *
+ * Costing (P4-02): cost per dish is DERIVED, never stored. `listMenuItems`
+ * and `getMenuItem` read the `menu_item_costs` view (total ingredient cost
+ * for the full yield, computed live from `items.avg_unit_cost` and the
+ * direct unit conversions) and divide by the yield; food-cost % divides by
+ * `menu_items.selling_price`. Nothing is snapshotted, so costs update
+ * automatically when ingredient costs change (e.g. after receiving).
  */
 
 export interface RecipeIngredient {
@@ -37,6 +45,10 @@ export interface RecipeIngredient {
   itemName: string;
   /** The item's base unit symbol (for display next to the chosen unit). */
   baseUnitSymbol: string;
+  /** The item's base unit id (costing converts the line into this unit). */
+  itemBaseUnitId: string;
+  /** The item's current weighted-average cost per base unit (INR). */
+  itemAvgUnitCost: number;
   quantity: number;
   unitId: string;
   unitSymbol: string;
@@ -49,8 +61,21 @@ export interface MenuItem {
   description: string | null;
   yieldQuantity: number;
   yieldUnit: string;
+  /** Selling price in INR; null when not set. */
+  sellingPrice: number | null;
   active: boolean;
   ingredientCount: number;
+  /**
+   * Total ingredient cost for the FULL recipe yield (INR), read live from
+   * the `menu_item_costs` view (ingredient qty × base-unit factor × the
+   * item's current `avg_unit_cost`). Never snapshotted: it updates whenever
+   * ingredient costs change.
+   */
+  ingredientCost: number;
+  /** `ingredientCost / yieldQuantity`. */
+  costPerDish: number;
+  /** `costPerDish / sellingPrice × 100`; null when no selling price is set. */
+  foodCostPct: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,6 +98,8 @@ const menuItemRowSchema = z.object({
   description: z.string().nullable(),
   yield_quantity: z.coerce.number(),
   yield_unit: z.string(),
+  // Added in P4-02; defaulted so older mocked rows in tests still parse.
+  selling_price: z.coerce.number().nullable().optional().default(null),
   active: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -86,9 +113,17 @@ const ingredientRowSchema = z.object({
   notes: z.string().nullable(),
   items: z.object({
     name: z.string(),
+    unit_id: z.string(),
+    // Added in P4-02; defaulted so older mocked rows in tests still parse.
+    avg_unit_cost: z.coerce.number().optional().default(0),
     units: z.object({ symbol: z.string() }),
   }),
   units: z.object({ symbol: z.string() }),
+});
+
+const menuItemCostRowSchema = z.object({
+  menu_item_id: z.string().nullable(),
+  ingredient_cost: z.coerce.number().nullable(),
 });
 
 const conversionRowSchema = z.object({
@@ -100,15 +135,21 @@ const conversionRowSchema = z.object({
 function toMenuItem(
   row: z.infer<typeof menuItemRowSchema>,
   ingredientCount: number,
+  ingredientCost: number,
 ): MenuItem {
+  const dishCost = costPerDish(ingredientCost, row.yield_quantity);
   return {
     id: row.id,
     name: row.name,
     description: row.description,
     yieldQuantity: row.yield_quantity,
     yieldUnit: row.yield_unit,
+    sellingPrice: row.selling_price,
     active: row.active,
     ingredientCount,
+    ingredientCost,
+    costPerDish: dishCost,
+    foodCostPct: foodCostPct(dishCost, row.selling_price),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -122,11 +163,41 @@ function toIngredient(
     itemId: row.item_id,
     itemName: row.items.name,
     baseUnitSymbol: row.items.units.symbol,
+    itemBaseUnitId: row.items.unit_id,
+    itemAvgUnitCost: row.items.avg_unit_cost,
     quantity: row.quantity,
     unitId: row.unit_id,
     unitSymbol: row.units.symbol,
     notes: row.notes,
   };
+}
+
+/**
+ * Total ingredient cost (full yield) per menu item, from the
+ * `menu_item_costs` view. The view computes it live from the current
+ * `avg_unit_cost` values — no client cost pipeline involved.
+ */
+async function fetchIngredientCosts(
+  menuItemIds: string[],
+): Promise<Map<string, number>> {
+  const costs = new Map<string, number>();
+  if (menuItemIds.length === 0) {
+    return costs;
+  }
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .from("menu_item_costs")
+    .select("menu_item_id, ingredient_cost")
+    .in("menu_item_id", menuItemIds);
+  if (error) {
+    throw friendlyError(error);
+  }
+  for (const row of z.array(menuItemCostRowSchema).parse(data)) {
+    if (row.menu_item_id !== null) {
+      costs.set(row.menu_item_id, row.ingredient_cost ?? 0);
+    }
+  }
+  return costs;
 }
 
 /** List menu items with ingredient counts. */
@@ -156,8 +227,13 @@ export async function listMenuItems(
       }),
     )
     .parse(data);
+  const costs = await fetchIngredientCosts(rows.map((row) => row.id));
   return rows.map((row) =>
-    toMenuItem(row, row.recipe_ingredients[0]?.count ?? 0),
+    toMenuItem(
+      row,
+      row.recipe_ingredients[0]?.count ?? 0,
+      costs.get(row.id) ?? 0,
+    ),
   );
 }
 
@@ -168,7 +244,7 @@ export async function getMenuItem(id: string): Promise<MenuItemDetail> {
   const { data, error } = await client
     .from("menu_items")
     .select(
-      "*, recipe_ingredients(id, item_id, quantity, unit_id, notes, items(name, units(symbol)), units(symbol))",
+      "*, recipe_ingredients(id, item_id, quantity, unit_id, notes, items(name, unit_id, avg_unit_cost, units(symbol)), units(symbol))",
     )
     .eq("id", parsedId)
     .single();
@@ -178,9 +254,13 @@ export async function getMenuItem(id: string): Promise<MenuItemDetail> {
   const row = menuItemRowSchema
     .extend({ recipe_ingredients: z.array(ingredientRowSchema) })
     .parse(data);
+  const ingredients = row.recipe_ingredients.map(toIngredient);
+  const ingredientCost = (
+    await fetchIngredientCosts([row.id])
+  ).get(row.id) ?? 0;
   return {
-    ...toMenuItem(row, row.recipe_ingredients.length),
-    ingredients: row.recipe_ingredients.map(toIngredient),
+    ...toMenuItem(row, row.recipe_ingredients.length, ingredientCost),
+    ingredients,
   };
 }
 
@@ -199,13 +279,15 @@ export async function createMenuItem(
       description: input.description ?? null,
       yield_quantity: input.yieldQuantity,
       yield_unit: input.yieldUnit,
+      selling_price: input.sellingPrice ?? null,
     })
     .select()
     .single();
   if (error) {
     throw friendlyError(error);
   }
-  return toMenuItem(menuItemRowSchema.parse(data), 0);
+  // A new menu item has no ingredients yet, so its cost is zero.
+  return toMenuItem(menuItemRowSchema.parse(data), 0, 0);
 }
 
 /** Edit a menu item's header fields. */
@@ -227,6 +309,11 @@ export async function updateMenuItem(
         yield_quantity: input.yieldQuantity,
       }),
       ...(input.yieldUnit !== undefined && { yield_unit: input.yieldUnit }),
+      // null clears the selling price (the update schema maps a blank
+      // field to null); undefined leaves it untouched.
+      ...(input.sellingPrice !== undefined && {
+        selling_price: input.sellingPrice,
+      }),
     })
     .eq("id", parsedId)
     .select("*, recipe_ingredients(count)")
@@ -239,7 +326,14 @@ export async function updateMenuItem(
       recipe_ingredients: z.array(z.object({ count: z.coerce.number() })),
     })
     .parse(data);
-  return toMenuItem(row, row.recipe_ingredients[0]?.count ?? 0);
+  const ingredientCost = (
+    await fetchIngredientCosts([row.id])
+  ).get(row.id) ?? 0;
+  return toMenuItem(
+    row,
+    row.recipe_ingredients[0]?.count ?? 0,
+    ingredientCost,
+  );
 }
 
 /** Archive a menu item (soft delete; recipes are history). */

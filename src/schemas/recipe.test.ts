@@ -57,6 +57,45 @@ describe("createMenuItemSchema", () => {
       expect(result.data.yieldQuantity).toBe(4);
     }
   });
+
+  it("accepts an optional selling price", () => {
+    const result = createMenuItemSchema.safeParse({
+      name: "Dal",
+      yieldQuantity: 4,
+      yieldUnit: "servings",
+      sellingPrice: "199",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sellingPrice).toBe(199);
+    }
+  });
+
+  it("treats a blank selling price as unset", () => {
+    const result = createMenuItemSchema.safeParse({
+      name: "Dal",
+      yieldQuantity: 4,
+      yieldUnit: "servings",
+      sellingPrice: "",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sellingPrice).toBeUndefined();
+    }
+  });
+
+  it("rejects a non-positive selling price", () => {
+    for (const sellingPrice of [0, -5]) {
+      expect(
+        createMenuItemSchema.safeParse({
+          name: "Dal",
+          yieldQuantity: 4,
+          yieldUnit: "servings",
+          sellingPrice,
+        }).success,
+      ).toBe(false);
+    }
+  });
 });
 
 describe("updateMenuItemSchema", () => {
@@ -67,6 +106,30 @@ describe("updateMenuItemSchema", () => {
 
   it("accepts an empty object", () => {
     expect(updateMenuItemSchema.safeParse({}).success).toBe(true);
+  });
+
+  it("accepts a selling price", () => {
+    const result = updateMenuItemSchema.safeParse({ sellingPrice: 199 });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sellingPrice).toBe(199);
+    }
+  });
+
+  it("maps a blank selling price to null (clears it)", () => {
+    const result = updateMenuItemSchema.safeParse({ sellingPrice: "" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sellingPrice).toBeNull();
+    }
+  });
+
+  it("rejects a non-positive selling price", () => {
+    for (const sellingPrice of [0, -5]) {
+      expect(
+        updateMenuItemSchema.safeParse({ sellingPrice }).success,
+      ).toBe(false);
+    }
   });
 });
 

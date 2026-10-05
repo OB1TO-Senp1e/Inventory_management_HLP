@@ -258,6 +258,7 @@ const MENU_ITEMS = [
     description: "Creamy tomato curry",
     yield_quantity: 4,
     yield_unit: "servings",
+    selling_price: 199,
     active: true,
     created_at: NOW,
     updated_at: NOW,
@@ -270,10 +271,30 @@ const MENU_ITEMS = [
     description: null,
     yield_quantity: 6,
     yield_unit: "servings",
+    selling_price: 149,
     active: true,
     created_at: NOW,
     updated_at: NOW,
     recipe_ingredients: [{ count: 1 }],
+  },
+];
+
+/**
+ * P4-02: live total ingredient cost (full yield) per menu item.
+ * Butter Chicken: 2 kg Tomato @ 32.5 = 65 + 1 L Milk @ 58 = 123
+ * (yield 4 → ₹30.75/dish; food cost 30.75/199 = 15.45%).
+ * Dal Makhani: 48 (yield 6 → ₹8.00/dish; food cost 8/149 = 5.37%).
+ */
+const MENU_ITEM_COSTS = [
+  {
+    restaurant_id: R,
+    menu_item_id: MENU_ITEMS[0].id,
+    ingredient_cost: 123,
+  },
+  {
+    restaurant_id: R,
+    menu_item_id: MENU_ITEMS[1].id,
+    ingredient_cost: 48,
   },
 ];
 
@@ -286,7 +307,12 @@ const RECIPE_INGREDIENTS = [
     quantity: 2,
     unit_id: UNITS[0].id,
     notes: null,
-    items: { name: ITEMS[0].name, units: { symbol: "kg" } },
+    items: {
+      name: ITEMS[0].name,
+      unit_id: UNITS[0].id,
+      avg_unit_cost: 32.5,
+      units: { symbol: "kg" },
+    },
     units: { symbol: "kg" },
   },
   {
@@ -297,7 +323,12 @@ const RECIPE_INGREDIENTS = [
     quantity: 1,
     unit_id: UNITS[1].id,
     notes: null,
-    items: { name: ITEMS[1].name, units: { symbol: "L" } },
+    items: {
+      name: ITEMS[1].name,
+      unit_id: UNITS[1].id,
+      avg_unit_cost: 58,
+      units: { symbol: "L" },
+    },
     units: { symbol: "L" },
   },
 ];
@@ -326,6 +357,7 @@ const TABLES: Record<string, Record<string, unknown>[]> = {
   purchase_orders: PURCHASE_ORDERS,
   purchase_order_lines: PURCHASE_ORDER_LINES,
   menu_items: MENU_ITEMS,
+  menu_item_costs: MENU_ITEM_COSTS,
   recipe_ingredients: RECIPE_INGREDIENTS,
   unit_conversions: UNIT_CONVERSIONS,
   restaurants: [{ id: R, name: "Testaurant", created_at: NOW, updated_at: NOW }],
@@ -348,6 +380,25 @@ async function handle(route: Route): Promise<void> {
   }
 
   let rows = [...(TABLES[key] ?? [])];
+
+  // P4-02: the recipe detail select asks for full ingredient rows while the
+  // list select asks for `recipe_ingredients(count)`. The canned menu_items
+  // rows carry the count shape, so expand the nested rows for detail-shaped
+  // selects — otherwise the detail Zod schema rejects the response.
+  if (key === "menu_items") {
+    const select = url.searchParams.get("select") ?? "";
+    if (
+      select.includes("recipe_ingredients(") &&
+      !select.includes("recipe_ingredients(count)")
+    ) {
+      rows = rows.map((row) => ({
+        ...row,
+        recipe_ingredients: RECIPE_INGREDIENTS.filter(
+          (ing) => ing.menu_item_id === row["id"],
+        ),
+      }));
+    }
+  }
 
   for (const [param, value] of url.searchParams) {
     if (["select", "order", "limit", "offset"].includes(param)) continue;
