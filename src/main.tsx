@@ -21,3 +21,13 @@ createRoot(rootElement).render(
     </QueryClientProvider>
   </StrictMode>,
 );
+
+// PWA shell (P6-01): register the service worker in production builds only.
+// Offline-first is best-effort — the app works fine without the worker.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js").catch(() => {
+      /* no-op: app remains usable without offline support */
+    });
+  });
+}

@@ -1,10 +1,11 @@
 import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { pwaServiceWorkerPlugin } from "./scripts/vite-pwa-plugin.js";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), pwaServiceWorkerPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

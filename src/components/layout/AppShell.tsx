@@ -7,6 +7,7 @@ import { AuthLoading } from "@/routes/AuthLoading";
 import { getNavItems } from "@/routes/nav";
 import { AppNav } from "./AppNav";
 import { Breadcrumbs } from "./Breadcrumbs";
+import { InstallAppButton } from "@/features/pwa/InstallAppButton";
 import { cn } from "@/lib/utils";
 
 function Brand() {
@@ -165,12 +166,16 @@ export function AppShell() {
             <Menu aria-hidden="true" className="h-6 w-6" />
           </button>
           <Brand />
+          <div className="ml-auto">
+            <InstallAppButton />
+          </div>
         </div>
 
         {/* Desktop header */}
         <header className="sticky top-0 z-30 hidden h-16 shrink-0 items-center justify-between gap-4 border-b bg-background px-6 print:hidden lg:flex">
           <Breadcrumbs />
           <div className="flex shrink-0 items-center gap-3">
+            <InstallAppButton />
             <RoleBadge role={profile.role} />
             <SignOutButton />
           </div>
