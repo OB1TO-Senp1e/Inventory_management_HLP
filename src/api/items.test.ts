@@ -61,6 +61,7 @@ const dbRow = {
   par_level: 10,
   reorder_point: 4,
   active: true,
+  barcode: "8901234567890",
   created_at: "2026-10-04T00:00:00Z",
   updated_at: "2026-10-04T00:00:00Z",
   item_categories: { name: "Vegetables" },
@@ -202,8 +203,18 @@ describe("createItem", () => {
       storage_location_id: null,
       par_level: 10,
       reorder_point: 4,
+      barcode: null,
     });
     expect(item.id).toBe(ITEM_ID);
+    expect(item.barcode).toBe("8901234567890");
+  });
+
+  it("sends a trimmed barcode on create", async () => {
+    const builder = mockQuery({ data: dbRow, error: null });
+    await createItem({ ...valid, barcode: "  8901234567890  " });
+    expect(builder["insert"]).toHaveBeenCalledWith(
+      expect.objectContaining({ barcode: "8901234567890" }),
+    );
   });
 
   it("maps a duplicate-name violation to a friendly message", async () => {
@@ -214,6 +225,20 @@ describe("createItem", () => {
     await expect(createItem(valid)).rejects.toThrow(
       "An item with this name already exists.",
     );
+  });
+
+  it("maps a duplicate-barcode violation to a friendly message", async () => {
+    mockQuery({
+      data: null,
+      error: {
+        code: "23505",
+        message:
+          'duplicate key value violates unique constraint "items_barcode_restaurant_unique"',
+      },
+    });
+    await expect(
+      createItem({ ...valid, barcode: "8901234567890" }),
+    ).rejects.toThrow("This barcode is already used by another item.");
   });
 });
 
@@ -226,6 +251,12 @@ describe("updateItem", () => {
       par_level: 12,
     });
     expect(builder["eq"]).toHaveBeenCalledWith("id", ITEM_ID);
+  });
+
+  it("sends barcode null when cleared", async () => {
+    const builder = mockQuery({ data: dbRow, error: null });
+    await updateItem(ITEM_ID, { barcode: null });
+    expect(builder["update"]).toHaveBeenCalledWith({ barcode: null });
   });
 
   it("rejects an invalid id without calling the client", async () => {

@@ -86,6 +86,7 @@ export type Database = {
         Row: {
           active: boolean;
           avg_unit_cost: number;
+          barcode: string | null;
           category_id: string | null;
           created_at: string;
           created_by: string | null;
@@ -101,6 +102,7 @@ export type Database = {
         Insert: {
           active?: boolean;
           avg_unit_cost?: number;
+          barcode?: string | null;
           category_id?: string | null;
           created_at?: string;
           created_by?: string | null;
@@ -116,6 +118,7 @@ export type Database = {
         Update: {
           active?: boolean;
           avg_unit_cost?: number;
+          barcode?: string | null;
           category_id?: string | null;
           created_at?: string;
           created_by?: string | null;
@@ -1011,6 +1014,14 @@ export type Database = {
       current_restaurant_id: { Args: Record<PropertyKey, never>; Returns: string };
       current_user_id: { Args: Record<PropertyKey, never>; Returns: string };
       dearmor: { Args: { "": string }; Returns: string };
+      find_item_by_barcode: {
+        Args: { p_barcode: string };
+        Returns: {
+          item_id: string;
+          item_name: string;
+          unit_symbol: string;
+        }[];
+      };
       gen_random_uuid: { Args: Record<PropertyKey, never>; Returns: string };
       gen_salt: { Args: { "": string }; Returns: string };
       has_role: { Args: { p_required: string }; Returns: boolean };

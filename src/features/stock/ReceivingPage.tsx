@@ -9,9 +9,10 @@ import {
   receiveGoodsSchema,
   type ReceiveGoodsInput,
 } from "@/schemas/stock";
-import type { ReceiveGoodsResult } from "@/api/stock";
+import type { ReceiveGoodsResult, ReceivableItem } from "@/api/stock";
 import { useReceivableItems, useReceiveGoods } from "./hooks";
 import { useAuth } from "@/features/auth/useAuth";
+import { BarcodeEntry } from "@/features/barcode/BarcodeEntry";
 import { isQueuedSubmission } from "@/features/sync/types";
 import { useSyncStatus } from "@/features/sync/useSyncStatus";
 import { QueuedEntriesCard } from "@/features/sync/QueuedEntriesCard";
@@ -76,6 +77,7 @@ export function ReceivingPage() {
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<ReceiveGoodsInput>({
     resolver: zodResolver(receiveGoodsSchema),
@@ -125,6 +127,36 @@ export function ReceivingPage() {
     setResult(null);
     setQueuedNotice(false);
     reset({ lines: [emptyLine()] });
+  };
+
+  /**
+   * Barcode quick-add (V2-01): a scanned/typed barcode resolves to an item
+   * and fills the first empty line — or appends a new line when every line
+   * already has an item. Focus moves to the new line's quantity field so
+   * the flow stays on the keyboard / scanner.
+   */
+  const focusLineQuantity = (index: number) => {
+    window.setTimeout(() => {
+      const input = document.getElementById(`lines.${index}.quantity`);
+      // scrollIntoView is a no-op in jsdom — the guard keeps unit tests green.
+      input?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      input?.focus({ preventScroll: true });
+    }, 60);
+  };
+
+  const handleBarcodeResolved = (item: ReceivableItem) => {
+    const lines = watch("lines");
+    const emptyIndex = lines.findIndex((line) => !line.itemId);
+    if (emptyIndex >= 0) {
+      setValue(`lines.${emptyIndex}.itemId`, item.id, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      focusLineQuantity(emptyIndex);
+    } else {
+      append({ ...emptyLine(), itemId: item.id });
+      focusLineQuantity(lines.length);
+    }
   };
 
   // The queued notice is about the live queue — clear it once everything
@@ -264,7 +296,15 @@ export function ReceivingPage() {
       {!receivable.isLoading &&
         !receivable.isError &&
         receivable.items.length > 0 && (
-          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+          <>
+            <div className="mb-6 rounded-md border bg-muted/30 p-4">
+              <BarcodeEntry
+                idPrefix="receiving"
+                onResolved={handleBarcodeResolved}
+                hint="Scanning a barcode fills the first empty line — or adds a new one."
+              />
+            </div>
+            <form onSubmit={handleSubmit(onSubmit)} noValidate>
             <div className="space-y-4">
               {fields.map((field, index) => {
                 const selectedItem = itemById.get(
@@ -461,6 +501,7 @@ export function ReceivingPage() {
               </Button>
             </div>
           </form>
+          </>
         )}
     </div>
   );

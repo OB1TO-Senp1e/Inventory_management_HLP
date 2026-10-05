@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseClient } from "@/lib/supabase";
-import { createOpeningBalance, getCurrentStock, listBatches, listMovements, listReceivableItems, listStockOverview, logUsage, logWastage, receiveGoods, subscribeToItemMovements, subscribeToStockMovements } from "./stock";
+import { createOpeningBalance, findItemByBarcode, getCurrentStock, listBatches, listMovements, listReceivableItems, listStockOverview, logUsage, logWastage, receiveGoods, subscribeToItemMovements, subscribeToStockMovements } from "./stock";
 
 // No network in these tests: the client factory is mocked outright.
 vi.mock("@/lib/supabase", () => ({ getSupabaseClient: vi.fn() }));
@@ -309,6 +309,57 @@ describe("listReceivableItems", () => {
   it("rejects malformed rows before they reach components", async () => {
     mockRpc.mockResolvedValue({ data: [{ item_id: "not-a-uuid" }], error: null });
     await expect(listReceivableItems()).rejects.toThrow();
+  });
+});
+
+describe("findItemByBarcode", () => {
+  const rpcRow = {
+    item_id: ITEM_ID,
+    item_name: "Rice",
+    unit_symbol: "kg",
+  };
+
+  it("calls the find_item_by_barcode RPC and maps the row", async () => {
+    mockRpc.mockReturnValue(chainable({ data: rpcRow, error: null }));
+    const result = await findItemByBarcode({ barcode: "8901234567890" });
+    expect(mockRpc).toHaveBeenCalledWith("find_item_by_barcode", {
+      p_barcode: "8901234567890",
+    });
+    expect(result).toEqual({ id: ITEM_ID, name: "Rice", unitSymbol: "kg" });
+  });
+
+  it("returns null when the barcode is unknown (not an error)", async () => {
+    mockRpc.mockReturnValue(chainable({ data: null, error: null }));
+    await expect(
+      findItemByBarcode({ barcode: "0000000000000" }),
+    ).resolves.toBeNull();
+  });
+
+  it("trims the code before the RPC call", async () => {
+    mockRpc.mockReturnValue(chainable({ data: rpcRow, error: null }));
+    await findItemByBarcode({ barcode: "  8901234567890  " });
+    expect(mockRpc).toHaveBeenCalledWith("find_item_by_barcode", {
+      p_barcode: "8901234567890",
+    });
+  });
+
+  it("rejects blank codes client-side (never reaches the RPC)", async () => {
+    await expect(findItemByBarcode({ barcode: "   " })).rejects.toThrow(
+      "Enter or scan a barcode.",
+    );
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces RPC errors (e.g. role-less session rejected)", async () => {
+    mockRpc.mockReturnValue(
+      chainable({
+        data: null,
+        error: { message: "Only signed-in restaurant users can look up barcodes." },
+      }),
+    );
+    await expect(
+      findItemByBarcode({ barcode: "8901234567890" }),
+    ).rejects.toThrow("Only signed-in restaurant users");
   });
 });
 

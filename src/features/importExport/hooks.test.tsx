@@ -76,6 +76,7 @@ function makeItem(name: string): Item {
     reorderPoint: 0,
     active: true,
     avgUnitCost: 0,
+    barcode: null,
     createdAt: "",
     updatedAt: "",
   };

@@ -264,6 +264,8 @@ export function ItemDetailPage() {
           item.categoryName ?? "No category",
           `${item.unitName} (${item.unitSymbol})`,
           item.storageLocationName ?? "No storage location",
+          // V2-01: surface the barcode so staff can verify printed labels.
+          ...(item.barcode ? [`Barcode ${item.barcode}`] : []),
         ].join(" · ")}
         actions={
           <div className="flex flex-wrap gap-2">

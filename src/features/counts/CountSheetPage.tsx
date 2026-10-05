@@ -6,6 +6,8 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageHeader } from "@/components/PageHeader";
 import { useAuth } from "@/features/auth/useAuth";
 import { formatNumber } from "@/lib/format";
+import type { ReceivableItem } from "@/api/stock";
+import { BarcodeEntry } from "@/features/barcode/BarcodeEntry";
 import {
   countProgressPercent,
   isLargeVariance,
@@ -53,6 +55,7 @@ function CountLineRow({
   line,
   disabled,
   showVariance,
+  highlighted,
   onSaved,
 }: {
   countId: string;
@@ -60,6 +63,8 @@ function CountLineRow({
   disabled: boolean;
   /** Variance review (submitted/applied sheets): show the per-line variance. */
   showVariance: boolean;
+  /** Briefly true after a barcode scan resolved to this row. */
+  highlighted: boolean;
   onSaved: () => void;
 }) {
   const [text, setText] = useState(
@@ -149,8 +154,13 @@ function CountLineRow({
 
   return (
     <div
+      id={`count-line-${line.id}`}
       className={`flex items-center gap-3 border-b py-3 last:border-0 ${
-        large ? "rounded-md bg-amber-50 px-2 dark:bg-amber-950/40" : ""
+        highlighted
+          ? "rounded-md bg-primary/10 px-2 ring-2 ring-primary"
+          : large
+            ? "rounded-md bg-amber-50 px-2 dark:bg-amber-950/40"
+            : ""
       }`}
     >
       <div className="min-w-0 flex-1">
@@ -253,6 +263,10 @@ export function CountSheetPage() {
   const [searchInput, setSearchInput] = useState("");
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [confirmApply, setConfirmApply] = useState(false);
+  // Barcode scan state (V2-01): briefly highlight + focus the resolved row.
+  const [highlightedLineId, setHighlightedLineId] = useState<string | null>(null);
+  const [scanNotice, setScanNotice] = useState<string | null>(null);
+  const highlightTimerRef = useRef<number | null>(null);
 
   const canApprove = profile?.role === "owner" || profile?.role === "manager";
 
@@ -304,6 +318,47 @@ export function CountSheetPage() {
     }
     setConfirmApply(false);
     applyCount.mutate(id);
+  };
+
+  // Clear the scan highlight on unmount.
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current !== null) {
+        window.clearTimeout(highlightTimerRef.current);
+      }
+    };
+  }, []);
+
+  /**
+   * Barcode scan (V2-01): jump to the item's row — scroll it into view,
+   * flash a highlight, and focus its counted-quantity input. A barcode
+   * that resolves to an item outside this count's frozen line set gets a
+   * clear notice instead (lines are snapshotted at session creation).
+   */
+  const handleBarcodeResolved = (item: ReceivableItem) => {
+    const line = lines.find((l) => l.itemId === item.id);
+    if (!line) {
+      setHighlightedLineId(null);
+      setScanNotice(
+        `“${item.name}” isn't part of this count — its lines were frozen when the session was created.`,
+      );
+      return;
+    }
+    setScanNotice(null);
+    setHighlightedLineId(line.id);
+    if (highlightTimerRef.current !== null) {
+      window.clearTimeout(highlightTimerRef.current);
+    }
+    highlightTimerRef.current = window.setTimeout(
+      () => setHighlightedLineId(null),
+      3000,
+    );
+    window.setTimeout(() => {
+      const row = document.getElementById(`count-line-${line.id}`);
+      // scrollIntoView is a no-op in jsdom — the guard keeps unit tests green.
+      row?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      row?.querySelector("input")?.focus({ preventScroll: true });
+    }, 60);
   };
 
   return (
@@ -401,6 +456,21 @@ export function CountSheetPage() {
         </div>
       )}
 
+      {detail && (
+        <div className="mb-4 rounded-md border bg-muted/30 p-4">
+          <BarcodeEntry
+            idPrefix="count-sheet"
+            onResolved={handleBarcodeResolved}
+            hint="Scan a barcode to jump straight to that item's row."
+          />
+          {scanNotice && (
+            <p role="status" className="mt-2 text-sm text-muted-foreground">
+              {scanNotice}
+            </p>
+          )}
+        </div>
+      )}
+
       {detail && !isSubmitted && (
         <>
           <div className="sticky top-0 z-10 -mx-1 bg-background/95 px-1 py-2 backdrop-blur">
@@ -447,6 +517,7 @@ export function CountSheetPage() {
                 line={line}
                 disabled={readOnly}
                 showVariance={inReview}
+                highlighted={highlightedLineId === line.id}
                 onSaved={handleSaved}
               />
             ))}

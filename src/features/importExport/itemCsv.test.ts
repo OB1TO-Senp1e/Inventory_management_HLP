@@ -137,6 +137,7 @@ describe("itemToCsvRow", () => {
       reorderPoint: 4,
       active: true,
       avgUnitCost: 0,
+      barcode: null,
       createdAt: "",
       updatedAt: "",
     } satisfies Item;
@@ -167,6 +168,7 @@ describe("itemToCsvRow", () => {
       reorderPoint: 0,
       active: true,
       avgUnitCost: 0,
+      barcode: null,
       createdAt: "",
       updatedAt: "",
     } satisfies Item;

@@ -20,6 +20,18 @@ const quantitySchema = z.coerce
   .min(0, "Cannot be negative.")
   .max(1_000_000_000, "That number is too large.");
 
+/**
+ * Optional product barcode (V2-01). Any supplier label code — EAN-13, UPC,
+ * Code 128, or a keyboard-wedge typed code. Blank becomes null (no
+ * barcode); the DB enforces uniqueness per restaurant.
+ */
+const barcodeSchema = z
+  .string()
+  .trim()
+  .max(64, "Barcode must be 64 characters or fewer.")
+  .nullable()
+  .optional();
+
 export const itemSortColumnSchema = z.enum([
   "name",
   "par_level",
@@ -42,6 +54,7 @@ export const createItemSchema = z.object({
   storageLocationId: uuidSchema.nullable().optional(),
   parLevel: quantitySchema,
   reorderPoint: quantitySchema,
+  barcode: barcodeSchema,
 });
 export type CreateItemInput = z.infer<typeof createItemSchema>;
 
@@ -62,3 +75,17 @@ export const listItemsInputSchema = z.object({
 export type ListItemsInput = z.infer<typeof listItemsInputSchema>;
 /** Pre-defaults input shape, for hook/component props. */
 export type ListItemsQuery = z.input<typeof listItemsInputSchema>;
+
+/**
+ * Barcode lookup input (V2-01). The same code can arrive from the camera
+ * scanner, a keyboard wedge (typed + Enter), or paste — all of them go
+ * through this schema before the RPC call.
+ */
+export const findItemByBarcodeSchema = z.object({
+  barcode: z
+    .string()
+    .trim()
+    .min(1, "Enter or scan a barcode.")
+    .max(64, "Barcode must be 64 characters or fewer."),
+});
+export type FindItemByBarcodeInput = z.infer<typeof findItemByBarcodeSchema>;

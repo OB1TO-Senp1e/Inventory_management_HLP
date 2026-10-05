@@ -75,6 +75,7 @@ export function ItemDialog({ itemId, onClose }: ItemDialogProps) {
       storageLocationId: null,
       parLevel: 0,
       reorderPoint: 0,
+      barcode: null,
     },
   });
 
@@ -88,6 +89,7 @@ export function ItemDialog({ itemId, onClose }: ItemDialogProps) {
         storageLocationId: editingItem.storageLocationId,
         parLevel: editingItem.parLevel,
         reorderPoint: editingItem.reorderPoint,
+        barcode: editingItem.barcode,
       });
     }
   }, [isEdit, editingItem, reset]);
@@ -291,6 +293,43 @@ export function ItemDialog({ itemId, onClose }: ItemDialogProps) {
                   id="item-location-error"
                   message={errors.storageLocationId?.message}
                 />
+              </div>
+
+              <div>
+                <label htmlFor="item-barcode" className={labelClass}>
+                  Barcode{" "}
+                  <span className="font-normal text-muted-foreground">
+                    (optional)
+                  </span>
+                </label>
+                <input
+                  id="item-barcode"
+                  type="text"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  placeholder="Scan or type a product code…"
+                  aria-invalid={errors.barcode ? "true" : undefined}
+                  aria-describedby={
+                    errors.barcode ? "item-barcode-error" : "item-barcode-hint"
+                  }
+                  className={`${inputClass} font-mono`}
+                  {...register("barcode", { setValueAs: toNullable })}
+                />
+                <FieldError
+                  id="item-barcode-error"
+                  message={errors.barcode?.message}
+                />
+                {!errors.barcode && (
+                  <p
+                    id="item-barcode-hint"
+                    className="mt-1 text-xs text-muted-foreground"
+                  >
+                    EAN-13, UPC or supplier label code. Must be unique —
+                    leave empty for no barcode.
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">

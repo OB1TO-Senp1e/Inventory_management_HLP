@@ -45,6 +45,7 @@ const ITEMS = [
     id: "b0000000-0000-0000-0000-000000000001", restaurant_id: R, name: "Tomato",
     category_id: CATEGORIES[0].id, unit_id: UNITS[0].id, storage_location_id: LOCATIONS[1].id,
     par_level: 50, reorder_point: 10, active: true, avg_unit_cost: 32.5,
+    barcode: "8901234567890",
     created_at: NOW, updated_at: NOW,
     item_categories: { name: "Vegetables" },
     units: { name: "kilogram", symbol: "kg" },
@@ -54,6 +55,7 @@ const ITEMS = [
     id: "b0000000-0000-0000-0000-000000000002", restaurant_id: R, name: "Milk",
     category_id: CATEGORIES[1].id, unit_id: UNITS[1].id, storage_location_id: LOCATIONS[1].id,
     par_level: 40, reorder_point: 10, active: true, avg_unit_cost: 58,
+    barcode: "8901234567891",
     created_at: NOW, updated_at: NOW,
     item_categories: { name: "Dairy" },
     units: { name: "litre", symbol: "L" },
@@ -63,6 +65,7 @@ const ITEMS = [
     id: "b0000000-0000-0000-0000-000000000003", restaurant_id: R, name: "Flour",
     category_id: CATEGORIES[0].id, unit_id: UNITS[0].id, storage_location_id: LOCATIONS[0].id,
     par_level: 100, reorder_point: 20, active: true, avg_unit_cost: 45,
+    barcode: null,
     created_at: NOW, updated_at: NOW,
     item_categories: { name: "Vegetables" },
     units: { name: "kilogram", symbol: "kg" },
@@ -176,6 +179,12 @@ const RECEIVABLE_ITEMS = ITEMS.map((item) => ({
   item_name: item.name,
   unit_symbol: item.units.symbol,
 }));
+
+// V2-01: canned barcode index for the find_item_by_barcode stub.
+const BARCODE_INDEX: Record<string, (typeof RECEIVABLE_ITEMS)[number]> = {
+  "8901234567890": RECEIVABLE_ITEMS[0],
+  "8901234567891": RECEIVABLE_ITEMS[1],
+};
 
 // P5-04: supplier price history for the reports spec — one change today
 // (dynamic timestamp) and one on the fixed NOW date, both inside the
@@ -762,6 +771,36 @@ async function handle(route: Route): Promise<void> {
         adjustments,
       }),
     });
+    return;
+  }
+
+  // V2-01: find_item_by_barcode resolves canned barcodes to receivable
+  // rows; unknown codes return [] so the client maps them to null
+  // ("not found", not an error). Mirrors the generic object-accept branch
+  // below because the client calls .maybeSingle().
+  if (key === "rpc:find_item_by_barcode") {
+    const body = (await route.request().postDataJSON()) as {
+      p_barcode: string;
+    };
+    const match = BARCODE_INDEX[(body.p_barcode ?? "").trim()];
+    const found = match ? [match] : [];
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+    };
+    const accept = route.request().headers()["accept"] ?? "";
+    if (accept.includes("vnd.pgrst.object")) {
+      if (found.length === 0) {
+        await route.fulfill({ status: 406, headers, body: "{}" });
+      } else {
+        await route.fulfill({
+          status: 200,
+          headers,
+          body: JSON.stringify(found[0]),
+        });
+      }
+      return;
+    }
+    await route.fulfill({ status: 200, headers, body: JSON.stringify(found) });
     return;
   }
 

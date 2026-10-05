@@ -11,6 +11,18 @@ vi.mock("./hooks", () => ({
   useReceiveGoods: vi.fn(),
 }));
 
+// The barcode lookup is mocked: these tests verify the quick-add wiring
+// (resolved item fills/appends a line) with zero network. The scanner and
+// entry widgets have their own specs.
+vi.mock("@/features/barcode/hooks", () => ({
+  useBarcodeLookup: vi.fn(),
+}));
+
+import { useBarcodeLookup } from "@/features/barcode/hooks";
+
+const mockedUseBarcodeLookup = vi.mocked(useBarcodeLookup);
+const barcodeMutate = vi.fn();
+
 const { authState } = vi.hoisted(() => ({
   authState: {
     profile: { role: "owner" } as { role: "owner" | "manager" | "staff" },
@@ -63,6 +75,11 @@ beforeEach(() => {
     mutate,
     isPending: false,
   } as unknown as ReturnType<typeof useReceiveGoods>);
+  mockedUseBarcodeLookup.mockReturnValue({
+    mutate: barcodeMutate,
+    isPending: false,
+    isError: false,
+  } as unknown as ReturnType<typeof useBarcodeLookup>);
 });
 
 describe("ReceivingPage", () => {
@@ -230,5 +247,48 @@ describe("ReceivingPage", () => {
     expect(screen.queryByText(/₹50\.00/)).not.toBeInTheDocument();
     expect(screen.queryByText(/₹40\.00/)).not.toBeInTheDocument();
     expect(screen.getByText("Rice (kg)")).toBeInTheDocument();
+  });
+
+  it("barcode quick-add fills the first empty line", async () => {
+    barcodeMutate.mockImplementation((_code, options) => {
+      options?.onSuccess?.({ id: ITEM_ID, name: "Rice", unitSymbol: "kg" });
+    });
+    render(<ReceivingPage />, { wrapper });
+
+    fireEvent.change(screen.getByLabelText("Barcode"), {
+      target: { value: "8901234567890" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find" }));
+
+    await waitFor(() => {
+      expect(
+        (screen.getByLabelText("Item") as HTMLSelectElement).value,
+      ).toBe(ITEM_ID);
+    });
+    expect(screen.getByText("Found: Rice (kg)")).toBeInTheDocument();
+  });
+
+  it("barcode quick-add appends a new line when every line has an item", async () => {
+    barcodeMutate.mockImplementation((_code, options) => {
+      options?.onSuccess?.({ id: ITEM_ID, name: "Rice", unitSymbol: "kg" });
+    });
+    render(<ReceivingPage />, { wrapper });
+
+    // Fill line 1 via the picker first.
+    fireEvent.change(screen.getByLabelText("Item"), {
+      target: { value: ITEM_ID },
+    });
+    // Resolve the barcode: no empty line remains, so a second line appears.
+    fireEvent.change(screen.getByLabelText("Barcode"), {
+      target: { value: "8901234567890" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Line 2", { exact: false })).toBeInTheDocument();
+    });
+    const selects = screen.getAllByLabelText("Item") as HTMLSelectElement[];
+    expect(selects).toHaveLength(2);
+    expect(selects[1].value).toBe(ITEM_ID);
   });
 });

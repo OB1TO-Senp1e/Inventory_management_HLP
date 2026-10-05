@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getSupabaseClient } from "@/lib/supabase";
+import { findItemByBarcodeSchema } from "@/schemas/item";
 import {
   createOpeningBalanceSchema,
   getCurrentStockSchema,
@@ -113,6 +114,37 @@ export async function listReceivableItems(): Promise<ReceivableItem[]> {
   }
   const rows = z.array(receivableItemRowSchema).parse(data);
   return rows.map(toReceivableItem);
+}
+
+const findItemByBarcodeRowSchema = z.object({
+  item_id: z.string().uuid(),
+  item_name: z.string(),
+  unit_symbol: z.string(),
+});
+
+/**
+ * Resolve one item by barcode (V2-01) via the `find_item_by_barcode` RPC.
+ * Tenant-scoped and cost-free — same contract as `listReceivableItems`:
+ * staff can call it (receiving and the count sheet need it), the RPC
+ * enforces tenant + owner/manager/staff role from the JWT claims, and it
+ * returns null (not an error) when the code is unknown. Blank codes never
+ * reach the RPC (the schema rejects them).
+ */
+export async function findItemByBarcode(
+  rawInput: unknown,
+): Promise<ReceivableItem | null> {
+  const input = findItemByBarcodeSchema.parse(rawInput);
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .rpc("find_item_by_barcode", { p_barcode: input.barcode })
+    .maybeSingle();
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (data === null) {
+    return null;
+  }
+  return toReceivableItem(findItemByBarcodeRowSchema.parse(data));
 }
 
 export interface OpeningBalanceResult {

@@ -34,6 +34,8 @@ export interface Item {
   parLevel: number;
   reorderPoint: number;
   active: boolean;
+  /** Optional product barcode (V2-01); null = no barcode. Unique per restaurant. */
+  barcode: string | null;
   /** Weighted-average unit cost in the base unit (INR). Maintained by ledger RPCs. */
   avgUnitCost: number;
   createdAt: string;
@@ -64,6 +66,8 @@ const itemRowSchema = z.object({
   par_level: z.coerce.number(),
   reorder_point: z.coerce.number(),
   active: z.boolean(),
+  // Added in V2-01; defaulted so older mocked rows in tests still parse.
+  barcode: z.string().nullable().optional().default(null),
   // Added in P2-01; defaulted so older mocked rows in tests still parse.
   avg_unit_cost: z.coerce.number().optional().default(0),
   created_at: z.string(),
@@ -89,6 +93,7 @@ function toItem(row: ItemRow): Item {
     parLevel: row.par_level,
     reorderPoint: row.reorder_point,
     active: row.active,
+    barcode: row.barcode,
     avgUnitCost: row.avg_unit_cost,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -102,6 +107,10 @@ function escapeLike(term: string): string {
 
 function friendlyError(error: { code?: string; message: string }): Error {
   if (error.code === "23505") {
+    // V2-01: the partial unique index on (restaurant_id, barcode).
+    if (error.message.includes("items_barcode_restaurant_unique")) {
+      return new Error("This barcode is already used by another item.");
+    }
     return new Error("An item with this name already exists.");
   }
   return new Error(error.message);
@@ -169,6 +178,7 @@ export async function createItem(rawInput: unknown): Promise<Item> {
       storage_location_id: parsed.storageLocationId ?? null,
       par_level: parsed.parLevel,
       reorder_point: parsed.reorderPoint,
+      barcode: parsed.barcode?.trim() ? parsed.barcode.trim() : null,
     })
     .select(ITEM_SELECT)
     .single();
@@ -191,6 +201,8 @@ export async function updateItem(id: string, rawInput: unknown): Promise<Item> {
   if (parsed.parLevel !== undefined) patch["par_level"] = parsed.parLevel;
   if (parsed.reorderPoint !== undefined)
     patch["reorder_point"] = parsed.reorderPoint;
+  if (parsed.barcode !== undefined)
+    patch["barcode"] = parsed.barcode?.trim() ? parsed.barcode.trim() : null;
 
   const client = getSupabaseClient();
   const { data, error } = await client

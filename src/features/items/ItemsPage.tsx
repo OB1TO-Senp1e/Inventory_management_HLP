@@ -527,6 +527,7 @@ export function ItemsPage() {
                       size="lg"
                       className="flex-1"
                       onClick={() => setOpeningBalanceTarget(item)}
+                      aria-label={`Set opening balance for ${item.name}`}
                     >
                       <Wallet aria-hidden="true" />
                       Opening balance
@@ -537,6 +538,7 @@ export function ItemsPage() {
                       size="lg"
                       className="flex-1"
                       onClick={() => setDialog({ mode: "edit", id: item.id })}
+                      aria-label={`Edit ${item.name}`}
                     >
                       <Pencil aria-hidden="true" />
                       Edit
@@ -548,6 +550,7 @@ export function ItemsPage() {
                         size="lg"
                         className="flex-1 text-destructive"
                         onClick={() => setArchiveTarget(item)}
+                        aria-label={`Archive ${item.name}`}
                       >
                         <Trash2 aria-hidden="true" />
                         Archive

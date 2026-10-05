@@ -39,6 +39,13 @@ vi.mock("@/features/auth/useAuth", () => ({
   })),
 }));
 
+// The barcode lookup is mocked: these tests verify the scan-to-row wiring
+// (highlight + focus + not-in-count notice) with zero network. The scanner
+// and entry widgets have their own specs.
+vi.mock("@/features/barcode/hooks", () => ({
+  useBarcodeLookup: vi.fn(),
+}));
+
 import {
   useApplyStockCount,
   useSaveCountLine,
@@ -47,6 +54,7 @@ import {
   useUpdateStockCountStatus,
 } from "./hooks";
 import { useAuth } from "@/features/auth/useAuth";
+import { useBarcodeLookup } from "@/features/barcode/hooks";
 
 const mockedUseStockCount = vi.mocked(useStockCount);
 const mockedUseSaveCountLine = vi.mocked(useSaveCountLine);
@@ -54,6 +62,8 @@ const mockedUseSubmitStockCount = vi.mocked(useSubmitStockCount);
 const mockedUseUpdateStockCountStatus = vi.mocked(useUpdateStockCountStatus);
 const mockedUseApplyStockCount = vi.mocked(useApplyStockCount);
 const mockedUseAuth = vi.mocked(useAuth);
+const mockedUseBarcodeLookup = vi.mocked(useBarcodeLookup);
+const barcodeMutate = vi.fn();
 
 const COUNT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const ITEM_A = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -124,6 +134,11 @@ beforeEach(() => {
   mockedUseApplyStockCount.mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
+  } as never);
+  mockedUseBarcodeLookup.mockReturnValue({
+    mutate: barcodeMutate,
+    isPending: false,
+    isError: false,
   } as never);
 });
 
@@ -618,5 +633,61 @@ describe("CountSheetPage", () => {
       expect(screen.queryByText("Tomatoes")).not.toBeInTheDocument();
     });
     expect(screen.getByText("Milk")).toBeInTheDocument();
+  });
+
+  it("barcode scan highlights the resolved row and focuses its input", async () => {
+    mockedUseStockCount.mockReturnValue(
+      successState(makeDetail()) as never,
+    );
+    barcodeMutate.mockImplementation((_code, options) => {
+      options?.onSuccess?.({ id: ITEM_B, name: "Milk", unitSymbol: "L" });
+    });
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Barcode"), {
+      target: { value: "8901234567890" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find" }));
+
+    await waitFor(() => {
+      const row = document.getElementById(
+        "count-line-d0000000-0000-0000-0000-000000000002",
+      );
+      expect(row?.className).toMatch(/ring-primary/);
+    });
+    // The row's counted-quantity input receives focus.
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Counted quantity for Milk"),
+      ).toHaveFocus();
+    });
+  });
+
+  it("barcode resolving outside the count shows a notice, not a highlight", async () => {
+    mockedUseStockCount.mockReturnValue(
+      successState(makeDetail()) as never,
+    );
+    barcodeMutate.mockImplementation((_code, options) => {
+      options?.onSuccess?.({
+        id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+        name: "Sugar",
+        unitSymbol: "kg",
+      });
+    });
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Barcode"), {
+      target: { value: "8901234567899" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/isn't part of this count/),
+      ).toBeInTheDocument();
+    });
+    expect(
+      document.querySelector(".ring-primary"),
+    ).not.toBeInTheDocument();
   });
 });

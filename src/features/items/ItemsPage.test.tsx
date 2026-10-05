@@ -56,6 +56,7 @@ const sampleItem: Item = {
   reorderPoint: 4,
   active: true,
   avgUnitCost: 0,
+  barcode: null,
   createdAt: "",
   updatedAt: "",
 };
