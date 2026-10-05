@@ -53,6 +53,7 @@ function UserFooter({
         <RoleBadge role={role} />
       </div>
       <SignOutButton />
+      <p className="text-xs text-muted-foreground">© 2026 Biswajit Dey</p>
     </div>
   );
 }

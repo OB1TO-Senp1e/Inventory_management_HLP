@@ -214,3 +214,7 @@ State files are the source of truth between build runs: `ARCHITECTURE.md`
 (stack, data model, decisions), `TASKS.md` (ordered task list), `PROGRESS.md`
 (append-only run log), `BLOCKERS.md` (human-only inputs), `ROUTES.md` (every
 route), `FEATURE_MATRIX.md` (screen → component → api → DB → test).
+
+---
+
+© 2026 Biswajit Dey. All rights reserved.
