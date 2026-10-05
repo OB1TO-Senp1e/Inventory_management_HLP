@@ -184,6 +184,11 @@ begin
                and item_id = '61000000-0000-0000-0000-000000000002'));
 
   -- The audit entry: one row per over-sale call, with the payload shape.
+  -- Written by the RPC (SECURITY DEFINER); read back as the owner, the
+  -- only role that can see audit entries (P5-05).
+  perform set_config('request.jwt.claims',
+    '{"sub":"dddddddd-dddd-dddd-dddd-dddddddddddd","restaurant_id":"11111111-1111-1111-1111-111111111111","role":"owner"}',
+    true);
   select * into v_audit from public.audit_log
    where restaurant_id = '11111111-1111-1111-1111-111111111111'
      and action = 'over_sale';
@@ -242,6 +247,10 @@ begin
      and notes like '%2026-10-06%';
   perform pg_temp.assert_true('sufficient sale: no movement flagged', v_flagged_count = 0);
 
+  -- Read the audit log back as the owner (only owners can read entries).
+  perform set_config('request.jwt.claims',
+    '{"sub":"dddddddd-dddd-dddd-dddd-dddddddddddd","restaurant_id":"11111111-1111-1111-1111-111111111111","role":"owner"}',
+    true);
   select count(*) into v_audit_count from public.audit_log
    where restaurant_id = '11111111-1111-1111-1111-111111111111'
      and details ->> 'sale_date' = '2026-10-06';

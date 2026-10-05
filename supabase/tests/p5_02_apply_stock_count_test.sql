@@ -189,8 +189,9 @@ declare
   v_count_id uuid;
   v_details jsonb;
 begin
-  perform pg_temp.claims('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    '11111111-1111-1111-1111-111111111111', 'manager');
+  -- Audit read-back as the owner (only owners can read audit_log, P5-05).
+  perform pg_temp.claims('dddddddd-dddd-dddd-dddd-dddddddddddd',
+    '11111111-1111-1111-1111-111111111111', 'owner');
   select id into v_count_id from public.stock_counts
    where title = 'October full count';
 

@@ -515,6 +515,48 @@ const PROFILES = [
   },
 ];
 
+// P5-05: canned audit entries for the owner-only audit log page.
+const AUDIT_LOG = [
+  {
+    id: "e0000000-0000-0000-0000-000000000001",
+    restaurant_id: R,
+    action: "over_sale",
+    entity_type: "stock_movement",
+    entity_id: null,
+    details: {
+      sale_date: "2026-10-05",
+      lines: [{ menu_item_id: "m1", name: "Butter Chicken", dishes: 8 }],
+      flagged_items: [
+        {
+          item_id: "i1",
+          name: "Tomatoes",
+          unit_symbol: "kg",
+          current_quantity: 2,
+          deduction_quantity: 4,
+          projected_quantity: -2,
+        },
+      ],
+    },
+    created_by: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+    created_at: "2026-10-05T10:00:00+05:30",
+  },
+  {
+    id: "e0000000-0000-0000-0000-000000000002",
+    restaurant_id: R,
+    action: "stock_count_applied",
+    entity_type: "stock_count",
+    entity_id: "c0000000-0000-0000-0000-000000000001",
+    details: {
+      title: "Weekly count",
+      total_lines: 3,
+      posted_adjustments: 2,
+      adjustments: [],
+    },
+    created_by: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+    created_at: "2026-10-03T09:00:00+05:30",
+  },
+];
+
 const TABLES: Record<string, Record<string, unknown>[]> = {
   item_categories: CATEGORIES,
   storage_locations: LOCATIONS,
@@ -536,6 +578,7 @@ const TABLES: Record<string, Record<string, unknown>[]> = {
   stock_counts: STOCK_COUNTS,
   stock_count_lines: STOCK_COUNT_LINES,
   profiles: PROFILES,
+  audit_log: AUDIT_LOG,
 };
 
 /** Tiny PostgREST subset: eq/neq/ilike filters, limit/offset, content-range. */

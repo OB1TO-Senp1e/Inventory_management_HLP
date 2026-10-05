@@ -26,6 +26,7 @@ import { StockCountsPage } from "@/features/counts/StockCountsPage";
 import { CountSheetPage } from "@/features/counts/CountSheetPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ReportsPage } from "@/features/reports/ReportsPage";
+import { AuditLogPage } from "@/features/admin/AuditLogPage";
 import { routeAccess } from "./access";
 import type { UserRole } from "@/schemas/role";
 
@@ -57,6 +58,7 @@ const builtSections: Record<string, ReactNode> = {
   "/stock-counts/:id": <CountSheetPage />,
   "/dashboard": <DashboardPage />,
   "/reports": <ReportsPage />,
+  "/audit-log": <AuditLogPage />,
 };
 
 /**
