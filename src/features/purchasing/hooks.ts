@@ -11,6 +11,7 @@ import {
   getRestaurantName,
   listPurchaseOrders,
   listReorderSuggestions,
+  logPoResend,
   receivePurchaseOrder,
   removePurchaseOrderLine,
   sendPurchaseOrder,
@@ -20,6 +21,7 @@ import {
 } from "@/api/purchasing";
 import type {
   CreatePurchaseOrderInput,
+  PoSendChannel,
   PurchaseOrderStatus,
   UpdatePurchaseOrderInput,
 } from "@/schemas/purchaseOrder";
@@ -176,13 +178,41 @@ export function useSendPurchaseOrder() {
   const { success, error } = useToast();
   const invalidate = useInvalidatePOs();
   return useMutation({
-    mutationFn: (id: string) => sendPurchaseOrder(id),
-    onSuccess: (_, id) => {
-      invalidate(id);
-      success("Purchase order sent to the supplier.");
+    mutationFn: (input: { id: string; channel?: PoSendChannel }) =>
+      sendPurchaseOrder(input.id, input.channel),
+    onSuccess: (_, input) => {
+      invalidate(input.id);
+      success(
+        input.channel === "whatsapp"
+          ? "Purchase order sent via WhatsApp."
+          : input.channel === "email"
+            ? "Purchase order sent via email."
+            : "Purchase order sent to the supplier.",
+      );
     },
     onError: (err: unknown) => {
       error(err instanceof Error ? err.message : "Could not send the purchase order.");
+    },
+  });
+}
+
+/** Record a re-send of an already-sent PO (audit-only, V2-05). */
+export function useResendPurchaseOrder() {
+  const { success, error } = useToast();
+  const invalidate = useInvalidatePOs();
+  return useMutation({
+    mutationFn: (input: { id: string; channel: PoSendChannel }) =>
+      logPoResend(input.id, input.channel),
+    onSuccess: (_, input) => {
+      invalidate(input.id);
+      success(
+        input.channel === "whatsapp"
+          ? "Re-send via WhatsApp recorded."
+          : "Re-send via email recorded.",
+      );
+    },
+    onError: (err: unknown) => {
+      error(err instanceof Error ? err.message : "Could not record the re-send.");
     },
   });
 }

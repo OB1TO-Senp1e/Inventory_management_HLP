@@ -401,6 +401,8 @@ export type Database = {
           notes: string | null;
           order_date: string;
           restaurant_id: string;
+          sent_at: string | null;
+          sent_via: string | null;
           status: string;
           supplier_id: string;
           updated_at: string;
@@ -414,6 +416,8 @@ export type Database = {
           notes?: string | null;
           order_date?: string;
           restaurant_id: string;
+          sent_at?: string | null;
+          sent_via?: string | null;
           status?: string;
           supplier_id: string;
           updated_at?: string;
@@ -427,6 +431,8 @@ export type Database = {
           notes?: string | null;
           order_date?: string;
           restaurant_id?: string;
+          sent_at?: string | null;
+          sent_via?: string | null;
           status?: string;
           supplier_id?: string;
           updated_at?: string;
@@ -1116,6 +1122,7 @@ export type Database = {
           unit_symbol: string;
         }[];
       };
+      log_po_resend: { Args: { p_channel: string; p_po_id: string }; Returns: undefined };
       log_usage: {
         Args: { p_item_id: string; p_notes?: string; p_quantity: number; p_reason: string };
         Returns: string;
@@ -1143,7 +1150,7 @@ export type Database = {
       };
       receive_purchase_order: { Args: { p_lines: Json; p_po_id: string }; Returns: Json };
       record_sales: { Args: { p_lines: Json; p_sale_date?: string }; Returns: Json };
-      send_purchase_order: { Args: { p_po_id: string }; Returns: undefined };
+      send_purchase_order: { Args: { p_channel?: string; p_po_id: string }; Returns: undefined };
       set_preferred_supplier: {
         Args: { p_item_id: string; p_supplier_id: string };
         Returns: {

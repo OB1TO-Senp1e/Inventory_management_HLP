@@ -8,12 +8,15 @@ import { PurchaseOrderDetailPage } from "./PurchaseOrderDetailPage";
 // Hooks are mocked: these tests verify the lifecycle UI (send/cancel/
 // receive actions per status) with zero network.
 const mockMutate = vi.fn();
+const mockResendMutate = vi.fn();
 vi.mock("./hooks", () => ({
   usePurchaseOrder: vi.fn(),
   useUpdatePurchaseOrder: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useAddPurchaseOrderLine: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useRemovePurchaseOrderLine: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useSendPurchaseOrder: vi.fn(() => ({ mutate: mockMutate, isPending: false })),
+  useResendPurchaseOrder: vi.fn(() => ({ mutate: mockResendMutate, isPending: false })),
+  useRestaurantName: vi.fn(() => ({ data: "Test Restaurant", isLoading: false })),
   useCancelPurchaseOrder: vi.fn(() => ({ mutate: mockMutate, isPending: false })),
   useReceivePurchaseOrder: vi.fn(() => ({ mutate: mockMutate, isPending: false })),
   useSupplierPricesForPrefill: vi.fn(() => ({ data: [] })),
@@ -53,6 +56,8 @@ function samplePO(status: PurchaseOrderDetail["status"]): PurchaseOrderDetail {
     grandTotal: 713.9,
     createdAt: "2026-10-05T00:00:00Z",
     updatedAt: "2026-10-05T00:00:00Z",
+    sentAt: null,
+    sentVia: null,
     lines: [
       {
         id: "line-1",
@@ -175,15 +180,75 @@ describe("PurchaseOrderDetailPage lifecycle actions", () => {
     expect(screen.getAllByLabelText(/^expiry/i)).toHaveLength(2);
   });
 
-  it("send confirmation calls the send mutation", () => {
+  it("send opens the channel dialog and marking sent calls the send mutation", () => {
     mockedUsePurchaseOrder.mockReturnValue({
       data: samplePO("draft"),
       isLoading: false,
       isError: false,
     } as unknown as ReturnType<typeof usePurchaseOrder>);
+    const openSpy = vi.fn().mockReturnValue(null);
+    window.open = openSpy as typeof window.open;
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Send order" }));
-    expect(mockMutate).toHaveBeenCalledWith("po-1", expect.anything());
+    expect(screen.getByRole("dialog", { name: /send purchase order/i })).toBeVisible();
+    // WhatsApp is available (supplier has a phone): open the deep link.
+    fireEvent.click(screen.getByRole("button", { name: /send via whatsapp/i }));
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^https:\/\/wa\.me\/919820012345\?text=/),
+      "_blank",
+      "noopener,noreferrer",
+    );
+    // Confirm step: the app cannot observe the external app.
+    fireEvent.click(screen.getByRole("button", { name: /mark as sent/i }));
+    expect(mockMutate).toHaveBeenCalledWith(
+      { id: "po-1", channel: "whatsapp" },
+      expect.anything(),
+    );
+  });
+
+  it("disables channels the supplier cannot receive on", () => {
+    const po = samplePO("draft");
+    mockedUsePurchaseOrder.mockReturnValue({
+      data: { ...po, supplierPhone: null, supplierEmail: "  " },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof usePurchaseOrder>);
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    expect(
+      screen.getByRole("button", { name: /whatsapp unavailable/i }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/add a phone number to the supplier/i),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: /email unavailable/i })).toBeDisabled();
+  });
+
+  it("sent PO shows a re-send button that records an audit-only re-send", () => {
+    mockedUsePurchaseOrder.mockReturnValue({
+      data: {
+        ...samplePO("sent"),
+        sentAt: "2026-10-05T10:00:00Z",
+        sentVia: "whatsapp",
+      },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof usePurchaseOrder>);
+    const openSpy = vi.fn().mockReturnValue(null);
+    window.open = openSpy as typeof window.open;
+    renderPage();
+    expect(screen.getByText(/sent via whatsapp/i)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /^re-send$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /send via email/i }));
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^mailto:ramesh@freshfarms\.example\?/),
+      "_blank",
+      "noopener,noreferrer",
+    );
+    fireEvent.click(screen.getByRole("button", { name: /record re-send/i }));
+    expect(mockResendMutate).toHaveBeenCalledWith(
+      { id: "po-1", channel: "email" },
+      expect.anything(),
+    );
   });
 });

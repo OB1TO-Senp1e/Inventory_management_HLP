@@ -35,6 +35,14 @@ export const purchaseOrderStatusSchema = z.enum([
 
 export type PurchaseOrderStatus = z.infer<typeof purchaseOrderStatusSchema>;
 
+/**
+ * V2-05: channel a PO was sent through. Mirrors the
+ * `purchase_orders.sent_via` CHECK constraint.
+ */
+export const poSendChannelSchema = z.enum(["whatsapp", "email"]);
+
+export type PoSendChannel = z.infer<typeof poSendChannelSchema>;
+
 /** One line on a purchase order: item + ordered quantity + price snapshot. */
 export const purchaseOrderLineInputSchema = z.object({
   itemId: uuidSchema,

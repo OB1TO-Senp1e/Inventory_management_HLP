@@ -125,14 +125,118 @@ test.describe("PO lifecycle (P3-02)", () => {
       await expect(page.getByRole("button", { name: /^receive$/i })).toHaveCount(0);
     });
 
-    test("send flow confirms and toasts", async ({ page }) => {
+    test("send flow opens the WhatsApp deep link, confirms and toasts", async ({ page }) => {
       await stubBackend(page);
+      // Record deep-link URLs instead of opening the real WhatsApp app.
+      await page.addInitScript(() => {
+        (window as unknown as { __openedUrls: string[] }).__openedUrls = [];
+        window.open = ((url?: string | URL | null) => {
+          (window as unknown as { __openedUrls: string[] }).__openedUrls.push(
+            String(url),
+          );
+          return null;
+        }) as typeof window.open;
+      });
       await page.goto("/purchase-orders/d0000000-0000-0000-0000-000000000001");
       await page.getByRole("button", { name: /^send$/i }).click();
-      await expect(page.getByRole("alertdialog")).toBeVisible();
-      await page.getByRole("button", { name: "Send order" }).click();
-      // The send RPC stub returns void → success toast.
+      await expect(page.getByRole("dialog")).toBeVisible();
+      // Supplier phone "+91 98200 12345" → wa.me/919820012345 with the PO text.
+      await page.getByRole("button", { name: /whatsapp/i }).click();
+      const urls = await page.evaluate(
+        () => (window as unknown as { __openedUrls: string[] }).__openedUrls,
+      );
+      expect(urls).toHaveLength(1);
+      expect(urls[0]).toMatch(/^https:\/\/wa\.me\/919820012345\?text=/);
+      expect(decodeURIComponent(urls[0])).toContain("Purchase order");
+      // The app cannot observe the external app — the user confirms.
+      await page.getByRole("button", { name: /mark as sent/i }).click();
+      // The send RPC stub returns void → success toast, dialog closes.
       await expect(page.getByText(/purchase order sent/i)).toBeVisible();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    });
+
+    test("email channel opens a mailto link with subject and body", async ({ page }) => {
+      await stubBackend(page);
+      await page.addInitScript(() => {
+        (window as unknown as { __openedUrls: string[] }).__openedUrls = [];
+        window.open = ((url?: string | URL | null) => {
+          (window as unknown as { __openedUrls: string[] }).__openedUrls.push(
+            String(url),
+          );
+          return null;
+        }) as typeof window.open;
+      });
+      await page.goto("/purchase-orders/d0000000-0000-0000-0000-000000000001");
+      await page.getByRole("button", { name: /^send$/i }).click();
+      await page.getByRole("button", { name: /email/i }).click();
+      const urls = await page.evaluate(
+        () => (window as unknown as { __openedUrls: string[] }).__openedUrls,
+      );
+      expect(urls).toHaveLength(1);
+      expect(urls[0]).toMatch(/^mailto:ramesh@freshfarms\.example\?/);
+      const decoded = decodeURIComponent(urls[0]);
+      expect(decoded).toContain("subject=");
+      expect(decoded).toContain("Purchase order");
+      await page.getByRole("button", { name: /mark as sent/i }).click();
+      await expect(page.getByText(/purchase order sent/i)).toBeVisible();
+    });
+
+    test("channels are disabled when the supplier has no contact info", async ({ page }) => {
+      await stubBackend(page);
+      // Override the PO row (registered after the stub, so it wins) with a
+      // supplier that has neither phone nor email; lines fall through to
+      // the stub handler.
+      await page.route("**/rest/v1/purchase_orders**", async (route) => {
+        const url = new URL(route.request().url());
+        const isDetail =
+          route.request().method() === "GET" &&
+          url.searchParams.get("id") ===
+            "eq.d0000000-0000-0000-0000-000000000001";
+        if (!isDetail) {
+          await route.fallback();
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          headers: { "content-type": "application/json" },
+          // Mirrors the stub's .single() handling: a bare object, not an array.
+          body: JSON.stringify({
+            id: "d0000000-0000-0000-0000-000000000001",
+            supplier_id: "e0000000-0000-0000-0000-000000000001",
+            status: "draft",
+            order_date: "2026-10-05",
+            expected_date: "2026-10-12",
+            notes: "Weekly order",
+            gst_rate: 18,
+            created_at: "2026-10-05T00:00:00Z",
+            updated_at: "2026-10-05T00:00:00Z",
+            sent_at: null,
+            sent_via: null,
+            suppliers: {
+              name: "No Contact Supplier",
+              address: null,
+              phone: null,
+              email: null,
+              gstin: null,
+            },
+          }),
+        });
+      });
+      await page.goto("/purchase-orders/d0000000-0000-0000-0000-000000000001");
+      await page.getByRole("button", { name: /^send$/i }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      const whatsapp = page.getByRole("button", { name: /whatsapp/i });
+      const email = page.getByRole("button", { name: /email/i });
+      await expect(whatsapp).toBeDisabled();
+      await expect(email).toBeDisabled();
+      await expect(
+        page.getByText(/add a phone number to the supplier/i),
+      ).toBeVisible();
+      await expect(
+        page.getByText(/add an email address to the supplier/i),
+      ).toBeVisible();
+      // No channel button may be chosen.
+      await expect(page.getByRole("button", { name: /mark as sent/i }).first()).toHaveCount(0);
     });
 
     test("sent PO shows Receive and Cancel with received/pending line quantities", async ({ page }) => {
@@ -143,6 +247,34 @@ test.describe("PO lifecycle (P3-02)", () => {
       await expect(page.getByRole("button", { name: /^send$/i })).toHaveCount(0);
       // 20 ordered, 8 received → "(12 pending)".
       await expect(page.getByText("(12 pending)")).toBeVisible();
+    });
+
+    test("sent PO shows the sent indicator and a re-send flow that audits", async ({ page }) => {
+      await stubBackend(page);
+      await page.addInitScript(() => {
+        (window as unknown as { __openedUrls: string[] }).__openedUrls = [];
+        window.open = ((url?: string | URL | null) => {
+          (window as unknown as { __openedUrls: string[] }).__openedUrls.push(
+            String(url),
+          );
+          return null;
+        }) as typeof window.open;
+      });
+      await page.goto("/purchase-orders/d0000000-0000-0000-0000-000000000002");
+      // Sent indicator rendered from sent_at/sent_via.
+      await expect(page.getByText(/sent via whatsapp/i)).toBeVisible();
+      await page.getByRole("button", { name: /re-send/i }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.getByRole("button", { name: /email/i }).click();
+      const urls = await page.evaluate(
+        () => (window as unknown as { __openedUrls: string[] }).__openedUrls,
+      );
+      expect(urls).toHaveLength(1);
+      expect(urls[0]).toMatch(/^mailto:/);
+      await page.getByRole("button", { name: /record re-send/i }).click();
+      // The log_po_resend RPC stub returns void → success toast.
+      await expect(page.getByText(/re-send via email recorded/i)).toBeVisible();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
     });
 
     test("receive form prefills remaining and validates before posting", async ({ page }) => {

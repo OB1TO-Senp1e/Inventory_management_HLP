@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/toast/ToastProvider";
 import {
   cancelPurchaseOrder,
   listReorderSuggestions,
+  logPoResend,
   receivePurchaseOrder,
   sendPurchaseOrder,
 } from "@/api/purchasing";
@@ -16,6 +17,7 @@ import {
   useCancelPurchaseOrder,
   useReceivePurchaseOrder,
   useReorderSuggestions,
+  useResendPurchaseOrder,
   useSendPurchaseOrder,
 } from "./hooks";
 
@@ -28,6 +30,7 @@ vi.mock("@/api/purchasing", () => ({
   getPurchaseOrder: vi.fn(),
   listPurchaseOrders: vi.fn(),
   listReorderSuggestions: vi.fn(),
+  logPoResend: vi.fn(),
   receivePurchaseOrder: vi.fn(),
   removePurchaseOrderLine: vi.fn(),
   sendPurchaseOrder: vi.fn(),
@@ -41,6 +44,7 @@ vi.mock("@/features/auth/useAuth", () => ({
 }));
 
 const mockedSend = vi.mocked(sendPurchaseOrder);
+const mockedResend = vi.mocked(logPoResend);
 const mockedCancel = vi.mocked(cancelPurchaseOrder);
 const mockedReceive = vi.mocked(receivePurchaseOrder);
 
@@ -74,14 +78,32 @@ beforeEach(() => {
 });
 
 describe("useSendPurchaseOrder", () => {
-  it("delegates to sendPurchaseOrder and invalidates PO queries", async () => {
+  it("delegates to sendPurchaseOrder with channel and invalidates PO queries", async () => {
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(() => useSendPurchaseOrder(), { wrapper });
-    result.current.mutate(PO_ID);
-    await waitFor(() => expect(mockedSend).toHaveBeenCalledWith(PO_ID));
+    result.current.mutate({ id: PO_ID, channel: "whatsapp" });
+    await waitFor(() =>
+      expect(mockedSend).toHaveBeenCalledWith(PO_ID, "whatsapp"),
+    );
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: [...purchaseOrdersQueryKey, "list"],
+      }),
+    );
+  });
+});
+
+describe("useResendPurchaseOrder", () => {
+  it("delegates to logPoResend and invalidates PO queries", async () => {
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(() => useResendPurchaseOrder(), { wrapper });
+    result.current.mutate({ id: PO_ID, channel: "email" });
+    await waitFor(() =>
+      expect(mockedResend).toHaveBeenCalledWith(PO_ID, "email"),
+    );
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: [...purchaseOrdersQueryKey, "detail", PO_ID],
       }),
     );
   });

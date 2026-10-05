@@ -11,13 +11,14 @@ import {
   usePurchaseOrder,
   useReceivePurchaseOrder,
   useRemovePurchaseOrderLine,
-  useSendPurchaseOrder,
+  useRestaurantName,
   useUpdatePurchaseOrder,
 } from "./hooks";
+import { PoSendDialog } from "./PoSendDialog";
 import { useReceivableItems } from "@/features/stock/hooks";
 import { useSupplierPricesForPrefill } from "./hooks";
 import { StatusBadge } from "./PurchaseOrdersPage";
-import { formatDate, formatINR } from "@/lib/format";
+import { formatDate, formatDateTime, formatINR } from "@/lib/format";
 
 const inputClass =
   "h-11 w-full rounded-md border border-input bg-background px-3 text-sm " +
@@ -50,6 +51,7 @@ export function PurchaseOrderDetailPage() {
   const [qtyToAdd, setQtyToAdd] = useState("1");
   const [priceToAdd, setPriceToAdd] = useState("");
   const [confirmingSend, setConfirmingSend] = useState(false);
+  const [sendDialogResend, setSendDialogResend] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [receiving, setReceiving] = useState(false);
   const [receiveInputs, setReceiveInputs] = useState<
@@ -59,9 +61,9 @@ export function PurchaseOrderDetailPage() {
   const updateMutation = useUpdatePurchaseOrder();
   const addLineMutation = useAddPurchaseOrderLine();
   const removeLineMutation = useRemovePurchaseOrderLine();
-  const sendMutation = useSendPurchaseOrder();
   const cancelMutation = useCancelPurchaseOrder();
   const receiveMutation = useReceivePurchaseOrder();
+  const restaurantQuery = useRestaurantName();
 
   const receivable = useReceivableItems();
   const prefill = useSupplierPricesForPrefill(po?.supplierId ?? null);
@@ -251,12 +253,27 @@ export function PurchaseOrderDetailPage() {
             )}
             {isDraft && (
               <Button
-                onClick={() => setConfirmingSend(true)}
+                onClick={() => {
+                  setSendDialogResend(false);
+                  setConfirmingSend(true);
+                }}
                 className="min-h-[44px]"
-                disabled={sendMutation.isPending}
               >
                 <Send className="mr-1 size-4" aria-hidden="true" />
-                {sendMutation.isPending ? "Sending…" : "Send"}
+                Send
+              </Button>
+            )}
+            {isReceivable && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSendDialogResend(true);
+                  setConfirmingSend(true);
+                }}
+                className="min-h-[44px]"
+              >
+                <Send className="mr-1 size-4" aria-hidden="true" />
+                Re-send
               </Button>
             )}
             {isReceivable && !receiving && (
@@ -282,6 +299,17 @@ export function PurchaseOrderDetailPage() {
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <StatusBadge status={po.status} />
+        {po.sentAt && (
+          <span className="text-sm text-muted-foreground">
+            Sent via{" "}
+            {po.sentVia === "whatsapp"
+              ? "WhatsApp"
+              : po.sentVia === "email"
+                ? "Email"
+                : "unknown channel"}{" "}
+            · {formatDateTime(po.sentAt)}
+          </span>
+        )}
         <span className="text-sm text-muted-foreground">
           {po.lineCount} {po.lineCount === 1 ? "line" : "lines"} · Total{" "}
           <strong className="text-foreground tabular-nums">{formatINR(po.total)}</strong>
@@ -624,17 +652,12 @@ export function PurchaseOrderDetailPage() {
       )}
 
       {confirmingSend && (
-        <ConfirmDialog
+        <PoSendDialog
           open
-          title="Send this purchase order?"
-          description={`The order will be marked sent to ${po.supplierName}. Sent orders can no longer be edited, but stock can be received against them.`}
-          confirmLabel="Send order"
-          onConfirm={() => {
-            sendMutation.mutate(po.id, {
-              onSuccess: () => setConfirmingSend(false),
-            });
-          }}
-          onCancel={() => setConfirmingSend(false)}
+          po={po}
+          restaurantName={restaurantQuery.data ?? "Restaurant"}
+          resend={sendDialogResend}
+          onClose={() => setConfirmingSend(false)}
         />
       )}
 

@@ -230,6 +230,8 @@ const PURCHASE_ORDERS = [
     gst_rate: 18,
     created_at: NOW,
     updated_at: NOW,
+    sent_at: null,
+    sent_via: null,
     suppliers: {
       name: SUPPLIERS[0].name,
       address: SUPPLIERS[0].address,
@@ -248,6 +250,8 @@ const PURCHASE_ORDERS = [
     gst_rate: 0,
     created_at: NOW,
     updated_at: NOW,
+    sent_at: NOW,
+    sent_via: "whatsapp",
     suppliers: {
       name: SUPPLIERS[0].name,
       address: SUPPLIERS[0].address,
@@ -305,6 +309,7 @@ const PURCHASE_ORDER_LINES = [
 const RPC_STUBS: Record<string, unknown> = {
   "rpc:create_purchase_order": "c0000000-0000-0000-0000-000000000001",
   "rpc:send_purchase_order": null,
+  "rpc:log_po_resend": null,
   "rpc:cancel_purchase_order": null,
   "rpc:receive_purchase_order": {
     po_id: PURCHASE_ORDERS[1].id,

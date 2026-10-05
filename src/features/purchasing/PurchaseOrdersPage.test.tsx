@@ -52,6 +52,8 @@ const samplePO: PurchaseOrder = {
   total: 605,
   createdAt: "2026-10-05T00:00:00Z",
   updatedAt: "2026-10-05T00:00:00Z",
+  sentAt: null,
+  sentVia: null,
 };
 
 function renderPage() {

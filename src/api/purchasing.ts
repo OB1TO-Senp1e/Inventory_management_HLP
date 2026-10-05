@@ -3,10 +3,12 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { listStockOverview } from "./stock";
 import {
   createPurchaseOrderSchema,
+  poSendChannelSchema,
   purchaseOrderLineInputSchema,
   purchaseOrderStatusSchema,
   updatePurchaseOrderSchema,
   type CreatePurchaseOrderInput,
+  type PoSendChannel,
   type PurchaseOrderStatus,
   type UpdatePurchaseOrderInput,
 } from "@/schemas/purchaseOrder";
@@ -63,6 +65,10 @@ export interface PurchaseOrder {
   total: number;
   createdAt: string;
   updatedAt: string;
+  /** V2-05: when the PO left draft (null when unsent / pre-V2-05). */
+  sentAt: string | null;
+  /** V2-05: channel used for the send (null when sent without a channel). */
+  sentVia: PoSendChannel | null;
 }
 
 export interface PurchaseOrderDetail extends PurchaseOrder {
@@ -74,7 +80,7 @@ export interface PurchaseOrderDetail extends PurchaseOrder {
 }
 
 const PO_SELECT =
-  "id, supplier_id, status, order_date, expected_date, notes, gst_rate, created_at, updated_at, suppliers(name, address, phone, email, gstin)";
+  "id, supplier_id, status, order_date, expected_date, notes, gst_rate, created_at, updated_at, sent_at, sent_via, suppliers(name, address, phone, email, gstin)";
 
 const poRowSchema = z.object({
   id: z.string(),
@@ -86,6 +92,8 @@ const poRowSchema = z.object({
   gst_rate: z.coerce.number(),
   created_at: z.string(),
   updated_at: z.string(),
+  sent_at: z.string().nullable(),
+  sent_via: poSendChannelSchema.nullable(),
   suppliers: z.object({
     name: z.string(),
     address: z.string().nullable(),
@@ -115,6 +123,8 @@ function toPurchaseOrder(row: PurchaseOrderRow, lineCount: number, total: number
     total,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    sentAt: row.sent_at,
+    sentVia: row.sent_via,
   };
 }
 
@@ -418,11 +428,40 @@ const receiveResultSchema = z.object({
 
 /**
  * Send a draft PO (draft → sent). The RPC requires at least one line.
+ * V2-05: `channel` records how the PO reached the supplier (whatsapp |
+ * email) in `sent_via`/`sent_at` plus a `po_sent` audit entry; omit it for
+ * a channel-less send (pre-V2-05 behaviour).
  */
-export async function sendPurchaseOrder(rawId: unknown): Promise<void> {
+export async function sendPurchaseOrder(
+  rawId: unknown,
+  rawChannel?: unknown,
+): Promise<void> {
   const id = z.string().uuid().parse(rawId);
+  const channel =
+    rawChannel === undefined ? undefined : poSendChannelSchema.parse(rawChannel);
   const client = getSupabaseClient();
-  const { error } = await client.rpc("send_purchase_order", { p_po_id: id });
+  const { error } = await client.rpc("send_purchase_order", {
+    p_po_id: id,
+    ...(channel === undefined ? {} : { p_channel: channel }),
+  });
+  if (error) {
+    throw friendlyError(error);
+  }
+}
+
+/**
+ * Record a re-send of a PO that already left draft (sent /
+ * partially_received). Audit-only: the status is unchanged; the history
+ * lives in the `po_resent` audit entries.
+ */
+export async function logPoResend(rawId: unknown, rawChannel: unknown): Promise<void> {
+  const id = z.string().uuid().parse(rawId);
+  const channel = poSendChannelSchema.parse(rawChannel);
+  const client = getSupabaseClient();
+  const { error } = await client.rpc("log_po_resend", {
+    p_po_id: id,
+    p_channel: channel,
+  });
   if (error) {
     throw friendlyError(error);
   }

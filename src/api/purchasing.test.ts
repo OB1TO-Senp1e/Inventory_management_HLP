@@ -7,6 +7,7 @@ import {
   createPurchaseOrder,
   getPurchaseOrder,
   listPurchaseOrders,
+  logPoResend,
   receivePurchaseOrder,
   removePurchaseOrderLine,
   sendPurchaseOrder,
@@ -72,6 +73,8 @@ const poRow = {
   gst_rate: 18,
   created_at: "2026-10-05T00:00:00Z",
   updated_at: "2026-10-05T00:00:00Z",
+  sent_at: null,
+  sent_via: null,
   suppliers: {
     name: "Fresh Farms",
     address: "APMC Market",
@@ -296,6 +299,20 @@ describe("sendPurchaseOrder / cancelPurchaseOrder", () => {
     expect(mockRpc).toHaveBeenCalledWith("send_purchase_order", { p_po_id: PO_ID });
   });
 
+  it("passes the channel through to the send RPC", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    await sendPurchaseOrder(PO_ID, "whatsapp");
+    expect(mockRpc).toHaveBeenCalledWith("send_purchase_order", {
+      p_po_id: PO_ID,
+      p_channel: "whatsapp",
+    });
+  });
+
+  it("rejects an invalid channel before any network call", async () => {
+    await expect(sendPurchaseOrder(PO_ID, "pigeon")).rejects.toThrow();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
   it("calls the cancel RPC with the PO id", async () => {
     mockRpc.mockResolvedValue({ data: null, error: null });
     await cancelPurchaseOrder(PO_ID);
@@ -313,6 +330,28 @@ describe("sendPurchaseOrder / cancelPurchaseOrder", () => {
     await expect(sendPurchaseOrder(PO_ID)).rejects.toThrow(/only draft/);
     mockRpc.mockResolvedValue({ data: null, error: { message: "only draft or sent" } });
     await expect(cancelPurchaseOrder(PO_ID)).rejects.toThrow(/draft or sent/);
+  });
+});
+
+describe("logPoResend", () => {
+  it("calls the resend RPC with the PO id and channel", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    await logPoResend(PO_ID, "email");
+    expect(mockRpc).toHaveBeenCalledWith("log_po_resend", {
+      p_po_id: PO_ID,
+      p_channel: "email",
+    });
+  });
+
+  it("rejects invalid input before any network call", async () => {
+    await expect(logPoResend("not-a-uuid", "email")).rejects.toThrow();
+    await expect(logPoResend(PO_ID, "pigeon")).rejects.toThrow();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces RPC errors", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "only sent purchase orders can be re-sent" } });
+    await expect(logPoResend(PO_ID, "email")).rejects.toThrow(/re-sent/);
   });
 });
 
