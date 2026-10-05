@@ -2,12 +2,16 @@ import { test, expect } from "./fixtures";
 import { stubBackend } from "./stub-backend";
 
 /**
- * Reports spec (P5-04).
+ * Reports spec (P5-04, V2-02).
  *
  * Deterministic specs run everywhere with the stubbed backend. Canned
  * data (all inside the default 30-day range):
  * - usage: Tomato −32 kg total (kitchen_use, 3 lines)
- * - sale_deduction: Tomato −4 kg today (food cost 4 × ₹32.50 = ₹130.00)
+ * - sale_deduction: Tomato −4 kg today ("Sale <today>: Butter Chicken x4",
+ *   food cost 4 × ₹32.50 = ₹130.00) and Milk −2 L today
+ *   ("Sale <today>: Dal Makhani x6")
+ * - menu engineering: Butter Chicken (4 sold, ₹168.25 margin) → Puzzle;
+ *   Dal Makhani (6 sold, ₹141.00 margin) → Plowhorse
  * - wastage: Milk −1 L, reason "expired" (₹58.00 lost)
  * - supplier price history: Tomato 28 → 30 (NOW) and 30 → 32.5 (today)
  *   with Fresh Farms Produce
@@ -103,6 +107,44 @@ test.describe("reports", () => {
       await expect(
         page.getByText("No supplier price changes in this date range."),
       ).toBeVisible();
+      await page.getByRole("tab", { name: "Menu engineering" }).click();
+      await expect(
+        page.getByText("No sales recorded in this date range."),
+      ).toBeVisible();
+    });
+
+    test("menu engineering tab classifies dishes into quadrants", async ({
+      page,
+    }) => {
+      await stubBackend(page);
+      await page.goto("/reports");
+      await page.getByRole("tab", { name: "Menu engineering" }).click();
+
+      const panel = page.getByLabel("Menu engineering report", { exact: true });
+      // Quadrant chart renders with the average reference lines.
+      await expect(
+        panel.getByLabel(/Popularity vs profitability/),
+      ).toBeVisible();
+      // Butter Chicken: 4 sold, ₹168.25 margin → below-avg popularity,
+      // above-avg margin → Puzzle. Dal Makhani: 6 sold, ₹141.00 margin →
+      // Plowhorse.
+      const table = panel.getByRole("table");
+      await expect(
+        table.getByText("Butter Chicken", { exact: true }),
+      ).toBeVisible();
+      await expect(table.getByText("Puzzle", { exact: true })).toBeVisible();
+      await expect(
+        table.getByText("Dal Makhani", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        table.getByText("Plowhorse", { exact: true }),
+      ).toBeVisible();
+      await expect(table.getByText("₹168.25", { exact: true })).toBeVisible();
+      await expect(table.getByText("₹141.00", { exact: true })).toBeVisible();
+      // The live-costing caveat is stated on the page.
+      await expect(
+        panel.getByText(/evaluated at today's cost and price/),
+      ).toBeVisible();
     });
 
     test("export CSV downloads the usage report", async ({ page }) => {
@@ -150,6 +192,7 @@ test.describe("reports live flow", () => {
       "Wastage by reason",
       "Food cost trend",
       "Supplier price changes",
+      "Menu engineering",
     ]) {
       await expect(page.getByRole("tab", { name: label })).toBeVisible({
         timeout: 20000,

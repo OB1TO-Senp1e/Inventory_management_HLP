@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/useAuth";
 import {
   getFoodCostTrend,
+  getMenuEngineeringReport,
   getPriceChangeReport,
   getUsageReport,
   getWastageReport,
@@ -63,6 +64,25 @@ export function usePriceChangeReport(range: ReportRange) {
   return useQuery({
     queryKey: [...reportsQueryKey, "price-changes", rangeKey(range), restaurantId],
     queryFn: () => getPriceChangeReport(range),
+    enabled: restaurantId !== null,
+  });
+}
+
+/**
+ * Menu engineering (V2-02): dish popularity vs profitability quadrants in
+ * the range. Shares the reports query key family so stock-changing
+ * mutations refresh it alongside the other reports.
+ */
+export function useMenuEngineeringReport(range: ReportRange) {
+  const restaurantId = useRestaurantId();
+  return useQuery({
+    queryKey: [
+      ...reportsQueryKey,
+      "menu-engineering",
+      rangeKey(range),
+      restaurantId,
+    ],
+    queryFn: () => getMenuEngineeringReport(range),
     enabled: restaurantId !== null,
   });
 }

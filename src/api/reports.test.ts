@@ -3,19 +3,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseClient } from "@/lib/supabase";
 import {
   getFoodCostTrend,
+  getMenuEngineeringReport,
   getPriceChangeReport,
   getUsageReport,
   getWastageReport,
 } from "./reports";
 import { listPriceHistory } from "./prices";
+import { listMenuItems } from "./recipes";
 
 // No network in these tests: the client factory and the prices API are
 // mocked outright.
 vi.mock("@/lib/supabase", () => ({ getSupabaseClient: vi.fn() }));
 vi.mock("./prices", () => ({ listPriceHistory: vi.fn() }));
+vi.mock("./recipes", () => ({ listMenuItems: vi.fn() }));
 
 const mockedGetSupabaseClient = vi.mocked(getSupabaseClient);
 const mockedListPriceHistory = vi.mocked(listPriceHistory);
+const mockedListMenuItems = vi.mocked(listMenuItems);
 
 interface QueryResult {
   data: unknown;
@@ -194,5 +198,124 @@ describe("getPriceChangeReport", () => {
     const report = await getPriceChangeReport(RANGE);
     expect(report.events).toEqual([]);
     expect(report.summaries).toEqual([]);
+  });
+});
+
+describe("getMenuEngineeringReport", () => {
+  const BUTTER_CHICKEN = {
+    id: "f0000000-0000-0000-0000-000000000001",
+    name: "Butter Chicken",
+    description: null,
+    yieldQuantity: 4,
+    yieldUnit: "servings",
+    sellingPrice: 199,
+    active: true,
+    ingredientCount: 2,
+    ingredientCost: 123,
+    costPerDish: 30.75,
+    foodCostPct: 15.45,
+    createdAt: "2026-10-04T08:30:00.000Z",
+    updatedAt: "2026-10-04T08:30:00.000Z",
+  };
+  const DAL_MAKHANI = {
+    id: "f0000000-0000-0000-0000-000000000002",
+    name: "Dal Makhani",
+    description: null,
+    yieldQuantity: 6,
+    yieldUnit: "servings",
+    sellingPrice: 149,
+    active: true,
+    ingredientCount: 1,
+    ingredientCost: 48,
+    costPerDish: 8,
+    foodCostPct: 5.37,
+    createdAt: "2026-10-04T08:30:00.000Z",
+    updatedAt: "2026-10-04T08:30:00.000Z",
+  };
+
+  function mockSaleNotes(data: unknown[]): void {
+    mockedGetSupabaseClient.mockReturnValue({
+      from: vi.fn(() => chainable({ data, error: null })),
+    } as unknown as SupabaseClient);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("parses dish quantities from sale notes and classifies against live costs", async () => {
+    mockSaleNotes([
+      {
+        notes: "Sale 2026-10-05: Butter Chicken x4",
+        created_at: "2026-10-05T08:30:00.000Z",
+      },
+      {
+        notes: "Sale 2026-10-06: Dal Makhani x6, Butter Chicken x2",
+        created_at: "2026-10-06T08:30:00.000Z",
+      },
+    ]);
+    mockedListMenuItems.mockResolvedValue([BUTTER_CHICKEN, DAL_MAKHANI]);
+
+    const report = await getMenuEngineeringReport(RANGE);
+    expect(report.classifiedCount).toBe(2);
+    const byName = new Map(report.dishes.map((d) => [d.name, d]));
+    // Butter Chicken: sold 6, margin 199 − 30.75 = 168.25.
+    expect(byName.get("Butter Chicken")?.qtySold).toBe(6);
+    expect(byName.get("Butter Chicken")?.contributionMargin).toBeCloseTo(
+      168.25,
+      5,
+    );
+    // Dal Makhani: sold 6, margin 149 − 8 = 141.
+    expect(byName.get("Dal Makhani")?.qtySold).toBe(6);
+    // avg popularity = 6, avg margin = 154.625 → Butter Chicken is a Star
+    // (on both averages), Dal Makhani a Plowhorse (popular, below margin).
+    expect(byName.get("Butter Chicken")?.classification).toBe("star");
+    expect(byName.get("Dal Makhani")?.classification).toBe("plowhorse");
+    expect(mockedListMenuItems).toHaveBeenCalledWith({});
+  });
+
+  it("marks recipe-less dishes as cost-unknown via ingredientCount", async () => {
+    mockSaleNotes([
+      {
+        notes: "Sale 2026-10-05: Mystery Thali x3",
+        created_at: "2026-10-05T08:30:00.000Z",
+      },
+    ]);
+    mockedListMenuItems.mockResolvedValue([
+      {
+        ...BUTTER_CHICKEN,
+        id: "f0000000-0000-0000-0000-000000000003",
+        name: "Mystery Thali",
+        sellingPrice: 299,
+        ingredientCount: 0,
+        ingredientCost: 0,
+        costPerDish: 0,
+      },
+    ]);
+
+    const report = await getMenuEngineeringReport(RANGE);
+    const row = report.dishes[0];
+    expect(row.costPerDish).toBeNull();
+    expect(row.classification).toBeNull();
+    expect(row.unclassifiedReason).toBe("no-recipe");
+    expect(report.classifiedCount).toBe(0);
+  });
+
+  it("returns an empty report when no sales were posted in the range", async () => {
+    mockSaleNotes([]);
+    mockedListMenuItems.mockResolvedValue([BUTTER_CHICKEN]);
+
+    const report = await getMenuEngineeringReport(RANGE);
+    expect(report.dishes).toEqual([]);
+    expect(report.totalDishesSold).toBe(0);
+  });
+
+  it("throws a friendly error when the notes query fails", async () => {
+    mockedGetSupabaseClient.mockReturnValue({
+      from: vi.fn(() =>
+        chainable({ data: null, error: { message: "boom" } }),
+      ),
+    } as unknown as SupabaseClient);
+    await expect(getMenuEngineeringReport(RANGE)).rejects.toThrow("boom");
   });
 });

@@ -471,3 +471,9 @@
 - Bugs caught: jsdom has no `MediaStream` (guarded cleanup); `scrollIntoView` missing in jsdom (optional-call guard); test-id typo in the count-sheet spec; pre-existing test fixtures needed `barcode: null` on `Item` literals (4 files); lint `react-hooks/exhaustive-deps` ref warning in the scanner effect (copied `videoRef.current` to a local).
 - Infra: VM restarted again — pnpm + PostgreSQL wiped. Recovered per TOOLS.md (reinstalled pnpm@9.12.0, PostgreSQL 16 from cached debs — sysstat deb failed, non-critical — restarted cluster, rebuilt DB from interim-db-setup.sql + all migrations in order).
 - Next task: V2-02 (menu engineering report).
+
+## 2026-10-05 — V2-02 menu engineering report (DONE)
+
+Built the menu engineering tab on /reports (owner/manager only): per-dish quantities sold are parsed from `sale_deduction` ledger notes (the `record_sales` format), merged with live recipe costs and selling prices, and classified into Star/Plowhorse/Puzzle/Dog quadrants against the mean popularity and mean margin. Scatter/bubble chart with average reference lines, quadrant guidance cards, sortable table with classification badges, CSV export, empty states. No migration — client-side aggregation per the v1-volumes precedent. Staff lockout verified at the DB level (no staff policies on `menu_items`/`menu_item_costs`; 9 new DB assertions). Honest edge handling: recipe-less dishes = cost unknown (never ₹0), unpriced dishes and renamed dishes shown with reason badges, live-costing caveat stated in the UI. Review catch: classification-desc sort put unclassified rows first — fixed and tested.
+
+Gates: typecheck ✓, lint ✓, unit 803 passed (88 files) ✓, test:db all passed ✓, build ✓, audit:wiring ✓ (83 matrix rows), audit:routes ✓ (23 routes), e2e 278 passed / 32 live-skipped / 0 failed ✓.

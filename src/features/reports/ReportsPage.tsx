@@ -3,16 +3,27 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
+  Scatter,
+  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
+  ZAxis,
 } from "recharts";
 import { Download } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { buildCsvContent, csvFilename, downloadCSV } from "@/lib/csv";
 import { formatDate, formatDateTime, formatINR, formatNumber } from "@/lib/format";
+import {
+  CLASSIFICATION_GUIDANCE,
+  CLASSIFICATION_LABELS,
+  UNCLASSIFIED_LABELS,
+  type DishClassification,
+  type MenuEngineeringDishRow,
+} from "@/lib/menuEngineering";
 import {
   defaultReportRange,
   reportRangeSchema,
@@ -26,6 +37,7 @@ import type {
 import type { PriceChangeReportEvent } from "@/api/reports";
 import {
   useFoodCostTrend,
+  useMenuEngineeringReport,
   usePriceChangeReport,
   useUsageReport,
   useWastageReport,
@@ -40,13 +52,14 @@ import { cn } from "@/lib/utils";
  * range filters server-side on the Asia/Kolkata wall clock.
  */
 
-type TabId = "usage" | "wastage" | "food-cost" | "price-changes";
+type TabId = "usage" | "wastage" | "food-cost" | "price-changes" | "menu-engineering";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "usage", label: "Usage" },
   { id: "wastage", label: "Wastage by reason" },
   { id: "food-cost", label: "Food cost trend" },
   { id: "price-changes", label: "Supplier price changes" },
+  { id: "menu-engineering", label: "Menu engineering" },
 ];
 
 const REASON_LABELS: Record<string, string> = {
@@ -436,6 +449,461 @@ function PriceChangesPanel({ range }: { range: ReportRange }) {
   );
 }
 
+const CLASSIFICATION_STYLES: Record<DishClassification, string> = {
+  star: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
+  plowhorse: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200",
+  puzzle:
+    "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200",
+  dog: "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300",
+};
+
+const CLASSIFICATION_DOT: Record<DishClassification, string> = {
+  star: "#f59e0b",
+  plowhorse: "#3b82f6",
+  puzzle: "#8b5cf6",
+  dog: "#78716c",
+};
+
+const CLASSIFICATION_ORDER: Record<DishClassification, number> = {
+  star: 0,
+  plowhorse: 1,
+  puzzle: 2,
+  dog: 3,
+};
+
+function ClassificationBadge({ row }: { row: MenuEngineeringDishRow }) {
+  if (row.classification !== null) {
+    return (
+      <span
+        className={cn(
+          "inline-block rounded-full px-2.5 py-0.5 text-xs font-medium",
+          CLASSIFICATION_STYLES[row.classification],
+        )}
+      >
+        {CLASSIFICATION_LABELS[row.classification]}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-block rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+      {row.unclassifiedReason !== null
+        ? UNCLASSIFIED_LABELS[row.unclassifiedReason]
+        : "Unclassified"}
+    </span>
+  );
+}
+
+interface ScatterPoint {
+  name: string;
+  x: number;
+  y: number;
+  z: number;
+  classification: DishClassification;
+}
+
+function paddedDomain(values: number[]): [number, number] {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  if (min === max) {
+    const pad = Math.abs(min) * 0.2 || 1;
+    return [min - pad, max + pad];
+  }
+  const span = max - min;
+  return [min - span * 0.12, max + span * 0.12];
+}
+
+function MenuEngineeringTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: { payload: ScatterPoint }[];
+}) {
+  const point = payload?.[0]?.payload;
+  if (!active || !point) {
+    return null;
+  }
+  return (
+    <div className="rounded-md border bg-popover px-3 py-2 text-sm shadow-md">
+      <p className="font-medium">{point.name}</p>
+      <p className="text-muted-foreground">
+        Sold: {formatNumber(point.x)} · Margin: {formatINR(point.y)}/dish
+      </p>
+      <p className="text-muted-foreground">
+        Total contribution: {formatINR(point.z)}
+      </p>
+      <p className="font-medium">{CLASSIFICATION_LABELS[point.classification]}</p>
+    </div>
+  );
+}
+
+type MenuEngineeringSortKey =
+  | "name"
+  | "classification"
+  | "qtySold"
+  | "sellingPrice"
+  | "costPerDish"
+  | "contributionMargin"
+  | "totalContribution"
+  | "foodCostPct";
+
+const SORT_LABELS: Record<MenuEngineeringSortKey, string> = {
+  name: "Dish",
+  classification: "Class",
+  qtySold: "Sold",
+  sellingPrice: "Price",
+  costPerDish: "Cost/dish",
+  contributionMargin: "Margin/dish",
+  totalContribution: "Total margin",
+  foodCostPct: "Food cost %",
+};
+
+function sortMenuEngineeringRows(
+  rows: MenuEngineeringDishRow[],
+  key: MenuEngineeringSortKey,
+  dir: "asc" | "desc",
+): MenuEngineeringDishRow[] {
+  const factor = dir === "asc" ? 1 : -1;
+  const value = (row: MenuEngineeringDishRow): number | string => {
+    switch (key) {
+      case "name":
+        return row.name.toLowerCase();
+      case "classification":
+        // Classified rows first (Star → Dog), unclassified last.
+        return row.classification === null
+          ? 99
+          : CLASSIFICATION_ORDER[row.classification];
+      case "qtySold":
+        return row.qtySold;
+      case "sellingPrice":
+        return row.sellingPrice ?? Number.NaN;
+      case "costPerDish":
+        return row.costPerDish ?? Number.NaN;
+      case "contributionMargin":
+        return row.contributionMargin ?? Number.NaN;
+      case "totalContribution":
+        return row.totalContribution ?? Number.NaN;
+      case "foodCostPct":
+        return row.foodCostPct ?? Number.NaN;
+    }
+  };
+  return [...rows].sort((a, b) => {
+    const va = value(a);
+    const vb = value(b);
+    // Unknown (null) values always sort last, regardless of direction.
+    const aNaN = typeof va === "number" && Number.isNaN(va);
+    const bNaN = typeof vb === "number" && Number.isNaN(vb);
+    if (aNaN && bNaN) {
+      return a.name.localeCompare(b.name);
+    }
+    if (aNaN) {
+      return 1;
+    }
+    if (bNaN) {
+      return -1;
+    }
+    // Unclassified dishes (classification rank 99) always sort last too.
+    if (key === "classification") {
+      const aUn = va === 99;
+      const bUn = vb === 99;
+      if (aUn && bUn) {
+        return a.name.localeCompare(b.name);
+      }
+      if (aUn) {
+        return 1;
+      }
+      if (bUn) {
+        return -1;
+      }
+    }
+    if (typeof va === "string" || typeof vb === "string") {
+      return factor * String(va).localeCompare(String(vb));
+    }
+    return factor * (va - vb) || a.name.localeCompare(b.name);
+  });
+}
+
+function MenuEngineeringPanel({ range }: { range: ReportRange }) {
+  const query = useMenuEngineeringReport(range);
+  const report = query.data;
+  const rows = report?.dishes ?? [];
+  const [sortKey, setSortKey] =
+    useState<MenuEngineeringSortKey>("totalContribution");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const sorted = sortMenuEngineeringRows(rows, sortKey, sortDir);
+
+  const toggleSort = (key: MenuEngineeringSortKey) => {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "name" || key === "classification" ? "asc" : "desc");
+    }
+  };
+
+  const classified = rows.filter((row) => row.classification !== null);
+  const points: ScatterPoint[] = classified.map((row) => ({
+    name: row.name,
+    x: row.qtySold,
+    y: row.contributionMargin ?? 0,
+    z: Math.max(row.totalContribution ?? 0, 0),
+    classification: row.classification as DishClassification,
+  }));
+  const xDomain = paddedDomain([0, ...points.map((p) => p.x)]);
+  const yDomain = paddedDomain(points.map((p) => p.y));
+
+  const onExport = () =>
+    exportCsv(
+      "menu-engineering",
+      [
+        "Dish",
+        "Classification",
+        "Dishes sold",
+        "Selling price (INR)",
+        "Cost per dish (INR)",
+        "Contribution margin (INR)",
+        "Total contribution (INR)",
+        "Food cost %",
+      ],
+      rows.map((row) => [
+        row.name,
+        row.classification !== null
+          ? CLASSIFICATION_LABELS[row.classification]
+          : row.unclassifiedReason !== null
+            ? UNCLASSIFIED_LABELS[row.unclassifiedReason]
+            : "",
+        String(row.qtySold),
+        row.sellingPrice === null ? "" : row.sellingPrice.toFixed(2),
+        row.costPerDish === null ? "" : row.costPerDish.toFixed(2),
+        row.contributionMargin === null
+          ? ""
+          : row.contributionMargin.toFixed(2),
+        row.totalContribution === null ? "" : row.totalContribution.toFixed(2),
+        row.foodCostPct === null ? "" : row.foodCostPct.toFixed(1),
+      ]),
+    );
+
+  return (
+    <section aria-label="Menu engineering report" className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Each dish sold in the range is plotted by popularity (dishes sold)
+        against profitability (selling price minus live recipe cost). The
+        axes cross at the average of each — Stars are above average on
+        both. Costs and prices are the <em>current</em> values: a dish sold
+        before a price change is evaluated at today&apos;s cost and price.
+      </p>
+      {query.isLoading ? (
+        <div
+          className="h-48 animate-pulse rounded-lg border bg-muted/40"
+          aria-label="Loading menu engineering report"
+        />
+      ) : query.isError ? (
+        <EmptyState message="Could not load the menu engineering report. Try again." />
+      ) : rows.length === 0 ? (
+        <EmptyState message="No sales recorded in this date range." />
+      ) : (
+        <>
+          {classified.length > 0 && report !== undefined ? (
+            <>
+              <ChartShell title="Popularity vs profitability (bubble = total contribution ₹)">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart margin={{ left: 8, right: 16, top: 12 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      type="number"
+                      dataKey="x"
+                      name="Dishes sold"
+                      domain={xDomain}
+                      tick={{ fontSize: 12 }}
+                      label={{
+                        value: "Dishes sold",
+                        position: "insideBottomRight",
+                        offset: -4,
+                        fontSize: 12,
+                      }}
+                    />
+                    <YAxis
+                      type="number"
+                      dataKey="y"
+                      name="Margin/dish"
+                      domain={yDomain}
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value: number) => `₹${value}`}
+                    />
+                    <ZAxis type="number" dataKey="z" range={[80, 500]} />
+                    <Tooltip
+                      content={<MenuEngineeringTooltip />}
+                      cursor={{ strokeDasharray: "3 3" }}
+                    />
+                    <ReferenceLine
+                      x={report.avgPopularity}
+                      stroke="hsl(var(--muted-foreground))"
+                      strokeDasharray="4 4"
+                      label={{
+                        value: "avg sold",
+                        position: "insideTopRight",
+                        fontSize: 11,
+                      }}
+                    />
+                    <ReferenceLine
+                      y={report.avgMargin}
+                      stroke="hsl(var(--muted-foreground))"
+                      strokeDasharray="4 4"
+                      label={{
+                        value: "avg margin",
+                        position: "insideTopRight",
+                        fontSize: 11,
+                      }}
+                    />
+                    {(
+                      Object.keys(CLASSIFICATION_LABELS) as DishClassification[]
+                    ).map((c) => (
+                      <Scatter
+                        key={c}
+                        name={CLASSIFICATION_LABELS[c]}
+                        data={points.filter((p) => p.classification === c)}
+                        fill={CLASSIFICATION_DOT[c]}
+                        fillOpacity={0.75}
+                      />
+                    ))}
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </ChartShell>
+              <ul
+                aria-label="Quadrant guide"
+                className="grid gap-2 sm:grid-cols-2"
+              >
+                {(
+                  Object.keys(CLASSIFICATION_LABELS) as DishClassification[]
+                ).map((c) => (
+                  <li
+                    key={c}
+                    className="flex items-start gap-2 rounded-lg border p-3 text-sm"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="mt-1.5 h-3 w-3 shrink-0 rounded-full"
+                      style={{ backgroundColor: CLASSIFICATION_DOT[c] }}
+                    />
+                    <span>
+                      <strong>{CLASSIFICATION_LABELS[c]}.</strong>{" "}
+                      {CLASSIFICATION_GUIDANCE[c]}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <EmptyState message="Sales exist in this range, but no dish could be classified — set selling prices and recipes to see the quadrants." />
+          )}
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full text-sm">
+              <caption className="sr-only">
+                Menu engineering: dishes sold with profitability classification
+              </caption>
+              <thead>
+                <tr className="border-b bg-muted/50 text-left text-muted-foreground">
+                  {(
+                    Object.keys(SORT_LABELS) as MenuEngineeringSortKey[]
+                  ).map((key) => (
+                    <th
+                      key={key}
+                      scope="col"
+                      aria-sort={
+                        sortKey === key
+                          ? sortDir === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
+                      className={cn(
+                        "whitespace-nowrap px-4 py-2 font-medium",
+                        key !== "name" &&
+                          key !== "classification" &&
+                          "text-right",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(key)}
+                        aria-label={`Sort by ${SORT_LABELS[key]}`}
+                        className="inline-flex items-center gap-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {SORT_LABELS[key]}
+                        <span aria-hidden="true" className="text-xs">
+                          {sortKey === key ? (sortDir === "asc" ? "▲" : "▼") : "△"}
+                        </span>
+                      </button>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((row) => (
+                  <tr
+                    key={`${row.menuItemId ?? "unknown"}|${row.name}`}
+                    className="border-b last:border-0"
+                  >
+                    <Cell>
+                      <span className="font-medium">{row.name}</span>
+                      {row.active === false && (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          (archived)
+                        </span>
+                      )}
+                    </Cell>
+                    <Cell>
+                      <ClassificationBadge row={row} />
+                    </Cell>
+                    <Cell numeric>{formatNumber(row.qtySold)}</Cell>
+                    <Cell numeric>
+                      {row.sellingPrice === null
+                        ? "—"
+                        : formatINR(row.sellingPrice)}
+                    </Cell>
+                    <Cell numeric>
+                      {row.costPerDish === null ? "—" : formatINR(row.costPerDish)}
+                    </Cell>
+                    <Cell numeric>
+                      {row.contributionMargin === null ? (
+                        "—"
+                      ) : (
+                        <span
+                          className={cn(
+                            row.contributionMargin < 0 && "text-destructive",
+                          )}
+                        >
+                          {formatINR(row.contributionMargin)}
+                        </span>
+                      )}
+                    </Cell>
+                    <Cell numeric>
+                      {row.totalContribution === null
+                        ? "—"
+                        : formatINR(row.totalContribution)}
+                    </Cell>
+                    <Cell numeric>
+                      {row.foodCostPct === null
+                        ? "—"
+                        : `${row.foodCostPct.toFixed(1)}%`}
+                    </Cell>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      <div>
+        <Button variant="outline" onClick={onExport} disabled={rows.length === 0}>
+          <Download aria-hidden="true" className="mr-2 h-4 w-4" />
+          Export CSV
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 export function ReportsPage() {
   const [range, setRange] = useState<ReportRange>(() => defaultReportRange());
   const [draft, setDraft] = useState({ from: range.from, to: range.to });
@@ -458,7 +926,7 @@ export function ReportsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Reports"
-        description="Usage, wastage, food cost and supplier prices over a date range."
+        description="Usage, wastage, food cost, supplier prices and menu engineering over a date range."
       />
 
       <div className="flex flex-wrap items-end gap-3" aria-label="Date range filter">
@@ -520,6 +988,7 @@ export function ReportsPage() {
       {tab === "wastage" && <WastagePanel range={range} />}
       {tab === "food-cost" && <FoodCostPanel range={range} />}
       {tab === "price-changes" && <PriceChangesPanel range={range} />}
+      {tab === "menu-engineering" && <MenuEngineeringPanel range={range} />}
     </div>
   );
 }

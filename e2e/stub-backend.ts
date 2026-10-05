@@ -164,12 +164,15 @@ const STOCK_MOVEMENTS = [
     created_by: null, created_at: new Date().toISOString(),
   },
   // P5-04: today's sale deduction for the food-cost trend — dynamic
-  // "today" timestamp so the IST day-boundary filter keeps it.
+  // "today" timestamp so the IST day-boundary filter keeps it. Notes use
+  // the exact `record_sales` format (V2-02 parses dish quantities from
+  // it); two dishes share this ingredient, so both appear in the notes —
+  // Butter Chicken → Puzzle, Dal Makhani → Plowhorse in menu engineering.
   {
     id: "a0000000-0000-0000-0000-000000000007", restaurant_id: R, item_id: ITEMS[0].id,
     movement_type: "sale_deduction", quantity: -4, batch_no: null, expiry_date: null,
     unit_cost: null, reason_code: null, reference_type: "sale",
-    notes: "Sale today: Butter Chicken x4",
+    notes: `Sale ${isoDate(0)}: Butter Chicken x4, Dal Makhani x6`,
     created_by: null, created_at: new Date().toISOString(),
   },
 ];
