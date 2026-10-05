@@ -62,3 +62,16 @@
 - [TODO] P6-05 | Full regression: every route, every role, every flow, on mobile and desktop | depends: P6-04 | acceptance: all route + wiring audits green; e2e suite passes on 390px and 1280px for all roles
 - [TODO] P6-06 | Deployment: Vercel project, Supabase production project, env config, migration runbook, backup policy, README | depends: P6-05 | acceptance: production URL live; migrations runbook executed once cleanly; README covers setup+deploy+rollback
 - [TODO] P6-07 | Handover: user guide per role (short, with screenshots), admin guide, known limitations | depends: P6-06 | acceptance: guides exist in docs/ per role; screenshots current; limitations listed honestly
+
+## Phase 7 — V2 features (no cloud credentials required)
+
+- [TODO] V2-01 | Barcode scanning on receiving & stock counts | depends: P2-02, P5-01 | acceptance: items have optional unique-per-restaurant barcode; camera scan resolves item on /receiving and count sheet; manual entry fallback; UI polished; e2e passes
+- [TODO] V2-02 | Menu engineering report | depends: P4-02, P5-04 | acceptance: dish profitability stars/dogs from recipe cost + sales; report tab with chart + empty state; UI polished; e2e passes
+- [TODO] V2-03 | Smart alerts: low-stock & expiry notifications | depends: P2-05 | acceptance: manager/owner get low-stock and expiring-soon alerts (in-app + local push when app open); alert preferences; UI polished; e2e passes
+- [TODO] V2-04 | Invoice photo capture → draft receipt | depends: P2-02 | acceptance: photo of supplier bill OCRs into draft receipt lines; review/edit before posting; UI polished; e2e passes
+
+## Phase 8 — V2 features (need external accounts)
+
+- [TODO] V2-05 | Send POs via WhatsApp/email | depends: P3-02 | acceptance: PO sent to supplier via pluggable provider; stub provider for tests; live send needs WhatsApp/email account; UI polished; e2e passes
+- [TODO] V2-06 | POS integration: sales auto-import | depends: P4-03 | acceptance: sales import from POS provider into record_sales flow; pluggable provider; live import needs POS credentials; UI polished; e2e passes
+- [TODO] V2-07 | Multi-outlet support | depends: P2-05 | acceptance: outlets under restaurant; outlet-scoped stock; inter-outlet transfers post movements; UI polished; e2e passes
