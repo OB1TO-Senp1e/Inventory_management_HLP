@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { stubBackend } from "./stub-backend";
 
 /**
  * Smoke spec (P0-06) — proves the Playwright harness works: the app boots,
@@ -49,6 +50,31 @@ test.describe("smoke", () => {
       // owner through (no bounce to "/") and the page is non-blank.
       await expect(page).not.toHaveURL("/");
       await expect(page.locator("#root")).not.toBeEmpty();
+    });
+
+    test("app shell never overflows the viewport horizontally", async ({
+      page,
+    }) => {
+      // V2-07 regression: the OutletSwitcher made the 390px mobile header
+      // overflow, expanding the layout viewport and breaking hit-testing
+      // app-wide. Guard the invariant directly.
+      await stubBackend(page);
+      for (const path of ["/", "/recipes", "/transfers"]) {
+        await page.goto(path);
+        await expect(page.locator("#root")).not.toBeEmpty();
+        // Wait for the header (and the outlet switcher) to settle.
+        await expect(
+          page.getByRole("button", { name: /current outlet/i }),
+        ).toBeVisible({ timeout: 10000 });
+        const overflow = await page.evaluate(() => ({
+          scrollWidth: document.documentElement.scrollWidth,
+          innerWidth: window.innerWidth,
+        }));
+        expect(
+          overflow.scrollWidth,
+          `horizontal overflow on ${path}`,
+        ).toBeLessThanOrEqual(overflow.innerWidth);
+      }
     });
   });
 

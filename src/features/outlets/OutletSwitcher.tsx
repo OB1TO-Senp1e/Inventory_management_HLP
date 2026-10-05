@@ -70,8 +70,16 @@ export function OutletSwitcher() {
         ) : (
           <Building2 aria-hidden="true" className="h-4 w-4" />
         )}
-        <span className="max-w-28 truncate sm:max-w-36">{current?.name ?? "…"}</span>
-        <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 opacity-70" />
+        {/* V2-07 fix: icon-only on mobile. The full label made the 390px
+            header overflow, expanding the layout viewport and breaking
+            Playwright hit-testing (and real taps) across the app. */}
+        <span className="hidden max-w-28 truncate sm:inline sm:max-w-36">
+          {current?.name ?? "…"}
+        </span>
+        <ChevronDown
+          aria-hidden="true"
+          className="hidden h-3.5 w-3.5 opacity-70 sm:inline"
+        />
       </button>
 
       {open && (

@@ -612,6 +612,9 @@ const NOTIFICATIONS: Record<string, unknown>[] = [
   {
     id: "c0000000-0000-0000-0000-000000000003",
     restaurant_id: R,
+    // V2-07: the client selects outlet_id and the row schema requires the
+    // key — pin the canned rows to the stub's default outlet.
+    outlet_id: OUTLETS[0].id,
     type: "expiring_soon",
     title: "Tomato batch B-101 expiring soon",
     body: "30 kg expire soon",
@@ -623,6 +626,7 @@ const NOTIFICATIONS: Record<string, unknown>[] = [
   {
     id: "c0000000-0000-0000-0000-000000000001",
     restaurant_id: R,
+    outlet_id: OUTLETS[0].id,
     type: "low_stock",
     title: "Milk is running low",
     body: "3 L left (reorder at 10 L)",
@@ -634,6 +638,7 @@ const NOTIFICATIONS: Record<string, unknown>[] = [
   {
     id: "c0000000-0000-0000-0000-000000000002",
     restaurant_id: R,
+    outlet_id: OUTLETS[0].id,
     type: "low_stock",
     title: "Flour is running low",
     body: "0 kg left (reorder at 20 kg)",

@@ -19,7 +19,7 @@ function Brand() {
   return (
     <Link
       to="/"
-      className="flex min-h-[44px] items-center gap-2 rounded-md px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex min-h-[44px] min-w-0 items-center gap-2 rounded-md px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <UtensilsCrossed aria-hidden="true" className="h-6 w-6 shrink-0 text-primary" />
       <span className="truncate text-base font-semibold tracking-tight">
@@ -175,7 +175,10 @@ export function AppShell() {
             <Menu aria-hidden="true" className="h-6 w-6" />
           </button>
           <Brand />
-          <div className="ml-auto flex items-center gap-1">
+          {/* shrink-0: action buttons must never be squeezed by flex — a
+              crushed container breaks hit-testing on mobile. Brand truncates
+              instead (min-w-0 above). */}
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <AlertBell />
             <OutletSwitcher />
             <SyncStatusBadge />
