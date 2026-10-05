@@ -8,6 +8,8 @@ import { getNavItems } from "@/routes/nav";
 import { AppNav } from "./AppNav";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { InstallAppButton } from "@/features/pwa/InstallAppButton";
+import { SyncStatusBadge } from "@/features/sync/SyncStatusBadge";
+import { useSyncEngine } from "@/features/sync/engine";
 import { cn } from "@/lib/utils";
 
 function Brand() {
@@ -67,6 +69,9 @@ export function AppShell() {
   const { profile, session } = useAuth();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // P6-02: the offline sync engine lives as long as the authenticated
+  // shell — drains the queue on mount, on `online`, and on an interval.
+  useSyncEngine();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Close the drawer whenever the route changes.
@@ -166,7 +171,8 @@ export function AppShell() {
             <Menu aria-hidden="true" className="h-6 w-6" />
           </button>
           <Brand />
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            <SyncStatusBadge />
             <InstallAppButton />
           </div>
         </div>
@@ -175,6 +181,7 @@ export function AppShell() {
         <header className="sticky top-0 z-30 hidden h-16 shrink-0 items-center justify-between gap-4 border-b bg-background px-6 print:hidden lg:flex">
           <Breadcrumbs />
           <div className="flex shrink-0 items-center gap-3">
+            <SyncStatusBadge />
             <InstallAppButton />
             <RoleBadge role={profile.role} />
             <SignOutButton />

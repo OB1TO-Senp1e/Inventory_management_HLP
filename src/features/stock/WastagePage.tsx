@@ -13,6 +13,8 @@ import {
   type WastageReason,
 } from "@/schemas/stock";
 import { useLogUsage, useLogWastage, useReceivableItems } from "./hooks";
+import { useSyncStatus } from "@/features/sync/useSyncStatus";
+import { QueuedEntriesCard } from "@/features/sync/QueuedEntriesCard";
 
 const inputClass =
   "h-11 w-full rounded-md border border-input bg-background px-3 text-sm " +
@@ -87,6 +89,10 @@ export function WastagePage() {
   const receivable = useReceivableItems();
   const logUsage = useLogUsage();
   const logWastage = useLogWastage();
+  const { entries } = useSyncStatus();
+  const queuedStockOuts = entries.filter(
+    (entry) => entry.type === "wastage" || entry.type === "usage",
+  );
 
   const {
     register,
@@ -158,6 +164,11 @@ export function WastagePage() {
       <PageHeader
         title="Usage & wastage"
         description="Log stock consumed or thrown away. Every entry posts to the append-only ledger — entries cannot be edited afterwards."
+      />
+
+      <QueuedEntriesCard
+        entries={queuedStockOuts}
+        itemName={(itemId) => itemById.get(itemId)?.name}
       />
 
       <div

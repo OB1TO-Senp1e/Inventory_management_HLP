@@ -7,6 +7,14 @@ import { WastagePage } from "./WastagePage";
 import { useLogUsage, useLogWastage, useReceivableItems } from "./hooks";
 import { useCurrentStock } from "@/features/items/stockHooks";
 
+// QueuedEntriesCard reads the signed-in profile (restaurant scoping);
+// mock auth — these tests verify the page's wiring, not auth.
+vi.mock("@/features/auth/useAuth", () => ({
+  useAuth: () => ({
+    profile: { id: "user-1", restaurantId: "restaurant-1", role: "owner" },
+  }),
+}));
+
 vi.mock("./hooks", () => ({
   useReceivableItems: vi.fn(),
   useLogUsage: vi.fn(),

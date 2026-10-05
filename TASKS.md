@@ -56,7 +56,7 @@
 ## Phase 6 — Production hardening
 
 - [x] P6-01 | PWA: manifest, icons, service worker, install prompt, offline shell | depends: P0-05 | acceptance: Lighthouse PWA checks pass; install prompt works; offline shell loads cached app shell
-- [TODO] P6-02 | Offline queue for wastage/usage/receiving with conflict-safe sync and visible sync status | depends: P6-01, P2-02, P2-03 | acceptance: actions queued offline sync on reconnect; conflicts resolved safely; sync status visible
+- [x] P6-02 | Offline queue for wastage/usage/receiving with conflict-safe sync and visible sync status | depends: P6-01, P2-02, P2-03 | acceptance: actions queued offline sync on reconnect; conflicts resolved safely; sync status visible
 - [TODO] P6-03 | Performance pass: indexes review, query review, bundle splitting, Lighthouse ≥ 90 on mobile | depends: P5-04 | acceptance: Lighthouse mobile ≥ 90; slow queries have indexes; bundle split verified in build output
 - [TODO] P6-04 | Security pass: RLS review for every table and RPC, input validation, rate limiting on edge functions, dependency audit | depends: P5-06 | acceptance: RLS matrix re-tested for all roles; pnpm audit clean or documented; validation fuzz passes
 - [TODO] P6-05 | Full regression: every route, every role, every flow, on mobile and desktop | depends: P6-04 | acceptance: all route + wiring audits green; e2e suite passes on 390px and 1280px for all roles

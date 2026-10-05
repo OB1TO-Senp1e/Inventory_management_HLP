@@ -12,6 +12,9 @@ import {
 import type { ReceiveGoodsResult } from "@/api/stock";
 import { useReceivableItems, useReceiveGoods } from "./hooks";
 import { useAuth } from "@/features/auth/useAuth";
+import { isQueuedSubmission } from "@/features/sync/types";
+import { useSyncStatus } from "@/features/sync/useSyncStatus";
+import { QueuedEntriesCard } from "@/features/sync/QueuedEntriesCard";
 
 const inputClass =
   "h-11 w-full rounded-md border border-input bg-background px-3 text-sm " +
@@ -57,6 +60,9 @@ export function ReceivingPage() {
   const receivable = useReceivableItems();
   const receiveGoods = useReceiveGoods();
   const [result, setResult] = useState<ReceiveGoodsResult | null>(null);
+  const [queuedNotice, setQueuedNotice] = useState(false);
+  const { entries } = useSyncStatus();
+  const queuedReceipts = entries.filter((entry) => entry.type === "receiving");
   const { profile } = useAuth();
   // Role matrix §7: staff see no costs. The receipt form's unit-cost input
   // is typed by the user (not revealed by the app), but the RPC-returned
@@ -103,6 +109,13 @@ export function ReceivingPage() {
   const onSubmit = (input: ReceiveGoodsInput) => {
     receiveGoods.mutate(input, {
       onSuccess: (res) => {
+        if (isQueuedSubmission(res)) {
+          // The receipt is safely stored in the offline queue — clear the
+          // form and show the queued state instead of the success report.
+          setQueuedNotice(true);
+          reset({ lines: [emptyLine()] });
+          return;
+        }
         setResult(res);
       },
     });
@@ -110,8 +123,17 @@ export function ReceivingPage() {
 
   const startNewReceipt = () => {
     setResult(null);
+    setQueuedNotice(false);
     reset({ lines: [emptyLine()] });
   };
+
+  // The queued notice is about the live queue — clear it once everything
+  // has synced away.
+  useEffect(() => {
+    if (queuedNotice && queuedReceipts.length === 0) {
+      setQueuedNotice(false);
+    }
+  }, [queuedNotice, queuedReceipts.length]);
 
   // -- success report -------------------------------------------------------
   if (result) {
@@ -186,6 +208,24 @@ export function ReceivingPage() {
       <PageHeader
         title="Receiving"
         description="Record an ad hoc delivery. Every line posts a receipt movement to the append-only ledger and recalculates the item's average cost."
+      />
+
+      {queuedNotice && (
+        <div
+          role="status"
+          className="mb-6 rounded-md border border-dashed border-amber-500/50 bg-amber-50 p-4 text-sm dark:bg-amber-950/20"
+        >
+          <p className="font-medium">Receipt queued for sync.</p>
+          <p className="mt-1 text-muted-foreground">
+            You&apos;re offline — the receipt is saved on this device and will
+            post to the ledger when you reconnect.
+          </p>
+        </div>
+      )}
+
+      <QueuedEntriesCard
+        entries={queuedReceipts}
+        itemName={(itemId) => itemById.get(itemId)?.name}
       />
 
       {receivable.isLoading && (

@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthContext, type AuthContextValue } from "@/features/auth/AuthContext";
+import { ToastProvider } from "@/components/toast/ToastProvider";
 import type { UserRole } from "@/schemas/role";
 import { AppShell } from "./AppShell";
 
@@ -28,6 +31,16 @@ function signedInValue(role: UserRole): AuthContextValue {
 }
 
 function renderShell(role: UserRole) {
+  // AppShell now hosts the offline sync engine (needs a query client) and
+  // the sync-status badge (needs the toast provider for queued-count clicks).
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  const providers = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>{children}</ToastProvider>
+    </QueryClientProvider>
+  );
   return render(
     <MemoryRouter initialEntries={["/"]}>
       <AuthContext.Provider value={signedInValue(role)}>
@@ -36,6 +49,7 @@ function renderShell(role: UserRole) {
         </Routes>
       </AuthContext.Provider>
     </MemoryRouter>,
+    { wrapper: providers },
   );
 }
 

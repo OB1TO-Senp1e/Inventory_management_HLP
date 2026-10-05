@@ -8,6 +8,8 @@ import { itemsQueryKey } from "@/features/items/hooks";
 import { stockQueryKey } from "@/features/items/stockHooks";
 import { recipesQueryKey } from "@/features/recipes/hooks";
 import { useLogUsage, useLogWastage, useReceivableItems, useReceiveGoods } from "./hooks";
+import { clearSyncQueue, getSyncEntries } from "@/features/sync/queue";
+import { isQueuedSubmission } from "@/features/sync/types";
 
 // The API modules are mocked: these tests verify hook wiring (delegation,
 // gating, invalidation, toasts) with zero network.
@@ -188,5 +190,73 @@ describe("useLogUsage", () => {
     result.current.mutate(input);
     await waitFor(() => expect(result.current.isError).toBe(true));
     await screen.findByText(/greater than zero/i);
+  });
+});
+
+describe("offline queue (P6-02)", () => {
+  const wastageInput = { itemId: ITEM_ID, quantity: 5, reason: "spoiled" as const };
+  const usageInput = { itemId: ITEM_ID, quantity: 2, reason: "kitchen_use" as const };
+  const receiptInput = {
+    lines: [{ itemId: ITEM_ID, quantity: 10, unitCost: 40 }],
+  };
+
+  beforeEach(() => {
+    clearSyncQueue();
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+  });
+
+  it("queues wastage offline without calling the api", async () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const { result } = renderHook(() => useLogWastage(), { wrapper });
+    result.current.mutate(wastageInput);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedLogWastage).not.toHaveBeenCalled();
+    expect(isQueuedSubmission(result.current.data)).toBe(true);
+    const entries = getSyncEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].type).toBe("wastage");
+    expect(entries[0].payload).toEqual(wastageInput);
+    await screen.findByText(/wastage queued/i);
+  });
+
+  it("queues usage offline without calling the api", async () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const { result } = renderHook(() => useLogUsage(), { wrapper });
+    result.current.mutate(usageInput);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedLogUsage).not.toHaveBeenCalled();
+    expect(isQueuedSubmission(result.current.data)).toBe(true);
+    expect(getSyncEntries()).toHaveLength(1);
+    await screen.findByText(/usage queued/i);
+  });
+
+  it("queues a receipt offline without calling the api", async () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const { result } = renderHook(() => useReceiveGoods(), { wrapper });
+    result.current.mutate(receiptInput);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedReceiveGoods).not.toHaveBeenCalled();
+    expect(isQueuedSubmission(result.current.data)).toBe(true);
+    const entries = getSyncEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].type).toBe("receiving");
+    await screen.findByText(/receipt queued/i);
+  });
+
+  it("queues the submission when the RPC call fails with a network error", async () => {
+    mockedLogWastage.mockRejectedValue(new TypeError("Failed to fetch"));
+    const { result } = renderHook(() => useLogWastage(), { wrapper });
+    result.current.mutate(wastageInput);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(isQueuedSubmission(result.current.data)).toBe(true);
+    expect(getSyncEntries()).toHaveLength(1);
+  });
+
+  it("does NOT queue server rejections (they stay errors)", async () => {
+    mockedLogWastage.mockRejectedValue(new Error("Item is archived"));
+    const { result } = renderHook(() => useLogWastage(), { wrapper });
+    result.current.mutate(wastageInput);
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(getSyncEntries()).toHaveLength(0);
   });
 });

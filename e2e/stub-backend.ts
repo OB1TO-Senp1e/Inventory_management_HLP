@@ -597,6 +597,43 @@ async function handle(route: Route): Promise<void> {
     return;
   }
 
+  // P6-02: the offline queue replays through log_wastage / log_usage /
+  // receive_goods. These stubs return valid payloads so the drain specs can
+  // assert a real sync with zero backend; a spec can override any of them
+  // with a later page.route to simulate a server rejection.
+  if (key === "rpc:log_wastage" || key === "rpc:log_usage") {
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify("d0000000-0000-0000-0000-000000000001"),
+    });
+    return;
+  }
+
+  if (key === "rpc:receive_goods") {
+    const body = (await route.request().postDataJSON()) as {
+      p_lines: {
+        item_id: string;
+        quantity: number;
+        unit_cost: number;
+      }[];
+    };
+    const lines = (body.p_lines ?? []).map((line, index) => ({
+      movement_id: `e0000000-0000-0000-0000-00000000000${index + 1}`,
+      item_id: line.item_id,
+      quantity: line.quantity,
+      unit_cost: line.unit_cost,
+      old_avg_cost: line.unit_cost,
+      new_avg_cost: line.unit_cost,
+    }));
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(lines),
+    });
+    return;
+  }
+
   // P4-03: record_sales echoes the posted entry so the sales specs can
   // assert on the real summary (sale date + dish names) with zero backend.
   if (key === "rpc:record_sales") {
