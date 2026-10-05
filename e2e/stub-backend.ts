@@ -1074,6 +1074,22 @@ async function handle(route: Route): Promise<void> {
 
   let rows = [...(TABLES[key] ?? [])];
 
+  // V2-08: the dashboard/report "today" movements must stay on the current
+  // IST day. They were stamped with `new Date()` at module load, so a suite
+  // running across the IST midnight boundary saw them as "yesterday" and
+  // the dashboard card assertions failed. Refresh per request instead.
+  if (key === "stock_movements") {
+    const nowISO = new Date().toISOString();
+    const todayIds = new Set([
+      "a0000000-0000-0000-0000-000000000005",
+      "a0000000-0000-0000-0000-000000000006",
+      "a0000000-0000-0000-0000-000000000007",
+    ]);
+    rows = rows.map((row) =>
+      todayIds.has(String(row["id"])) ? { ...row, created_at: nowISO } : row,
+    );
+  }
+
   // P5-01: create_stock_count echoes the posted title/assignee as a new
   // draft session row, so the create-dialog specs can assert the real
   // success path (toast + "open the count sheet") with zero backend.
@@ -1277,12 +1293,26 @@ async function handle(route: Route): Promise<void> {
       const s = v === null || v === undefined ? "" : String(v);
       if (op === "eq") return s === raw;
       if (op === "neq") return s !== raw;
-      // Range ops compare as strings — correct for ISO timestamps and
-      // numeric strings PostgREST returns.
-      if (op === "gte") return s >= raw;
-      if (op === "lte") return s <= raw;
-      if (op === "gt") return s > raw;
-      if (op === "lt") return s < raw;
+      // Range ops: compare as instants when both sides look like ISO
+      // timestamps (ISO strings with different offsets, e.g. "Z" vs
+      // "+05:30", do NOT sort lexicographically — V2-08). The explicit
+      // shape check keeps year-like numbers ("2026") on the string path.
+      // Fall back to string comparison for non-date values, which is
+      // correct for the numeric strings PostgREST returns.
+      const looksDateLike = (v: string) => /^\d{4}-\d{2}-\d{2}/.test(v);
+      const bothDates =
+        looksDateLike(s) &&
+        looksDateLike(raw) &&
+        !Number.isNaN(Date.parse(s)) &&
+        !Number.isNaN(Date.parse(raw));
+      if (op === "gte")
+        return bothDates ? Date.parse(s) >= Date.parse(raw) : s >= raw;
+      if (op === "lte")
+        return bothDates ? Date.parse(s) <= Date.parse(raw) : s <= raw;
+      if (op === "gt")
+        return bothDates ? Date.parse(s) > Date.parse(raw) : s > raw;
+      if (op === "lt")
+        return bothDates ? Date.parse(s) < Date.parse(raw) : s < raw;
       // ilike: treat % as wildcard on both sides
       return s.toLowerCase().includes(raw.replace(/%/g, "").toLowerCase());
     });
@@ -1296,6 +1326,9 @@ async function handle(route: Route): Promise<void> {
   const headers: Record<string, string> = {
     "content-type": "application/json",
     "content-range": `${offset}-${offset + page.length - 1}/${total}`,
+    // Real PostgREST exposes Content-Range to JS; without this the browser
+    // hides it from fetch (CORS safelist) and postgrest-js parses count=null.
+    "access-control-expose-headers": "content-range",
   };
   const accept = route.request().headers()["accept"] ?? "";
   if (accept.includes("vnd.pgrst.object")) {

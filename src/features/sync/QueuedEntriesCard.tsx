@@ -50,18 +50,7 @@ function entrySummary(entry: SyncEntry, itemName?: (itemId: string) => string | 
   }
 }
 
-function formatCreatedAt(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) {
-    return iso;
-  }
-  return date.toLocaleString("en-IN", {
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { formatDateTime } from "@/lib/format";
 
 export interface QueuedEntriesCardProps {
   entries: SyncEntry[];
@@ -159,7 +148,7 @@ export function QueuedEntriesCard({ entries, itemName }: QueuedEntriesCardProps)
                   {entrySummary(entry, itemName)}
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Queued {formatCreatedAt(entry.createdAt)}
+                  Queued {formatDateTime(entry.createdAt)}
                   {entry.attempts > 0 && ` · ${entry.attempts} ${entry.attempts === 1 ? "attempt" : "attempts"}`}
                 </p>
                 {entry.error && (

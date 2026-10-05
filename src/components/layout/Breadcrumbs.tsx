@@ -14,14 +14,14 @@ interface Crumb {
 }
 
 interface DetailTarget {
-  kind: "item" | "supplier" | "count";
+  kind: "item" | "supplier" | "count" | "po";
   id: string;
 }
 
 /**
  * Detail routes whose `:id` segment should resolve to the entity's name in
- * the crumb: /items/:id, /suppliers/:id/prices and /stock-counts/:id.
- * Returns null elsewhere.
+ * the crumb: /items/:id, /suppliers/:id/prices, /stock-counts/:id and
+ * /purchase-orders/:id(/print). Returns null elsewhere.
  */
 function detailTargetFor(pathname: string): DetailTarget | null {
   const itemMatch = /^\/items\/([^/]+)$/.exec(pathname);
@@ -36,6 +36,10 @@ function detailTargetFor(pathname: string): DetailTarget | null {
   if (countMatch) {
     return { kind: "count", id: countMatch[1] };
   }
+  const poMatch = /^\/purchase-orders\/([^/]+)(\/print)?$/.exec(pathname);
+  if (poMatch) {
+    return { kind: "po", id: poMatch[1] };
+  }
   return null;
 }
 
@@ -47,8 +51,10 @@ function detailTargetFor(pathname: string): DetailTarget | null {
  * text so the trail never links to a 404.
  *
  * On the detail routes the `:id` segment resolves to the entity's name
- * (via the same cached detail queries the pages use); while loading — or
- * when the fetch fails — the raw segment is shown as before.
+ * (via the same cached detail queries the pages use); purchase order
+ * numbers are derived from the id itself (`#` + first 8 chars, matching the
+ * print page). While loading — or when the fetch fails — the raw segment
+ * is shown as before.
  */
 export function Breadcrumbs() {
   const location = useLocation();
@@ -59,13 +65,15 @@ export function Breadcrumbs() {
   );
   const countQuery = useStockCount(detail?.kind === "count" ? detail.id : null);
   const detailName =
-    detail?.kind === "item"
-      ? itemQuery.data?.name
-      : detail?.kind === "supplier"
-        ? supplierQuery.data?.name
-        : detail?.kind === "count"
-          ? countQuery.data?.title
-          : undefined;
+    detail?.kind === "po"
+      ? `#${detail.id.slice(0, 8).toUpperCase()}`
+      : detail?.kind === "item"
+        ? itemQuery.data?.name
+        : detail?.kind === "supplier"
+          ? supplierQuery.data?.name
+          : detail?.kind === "count"
+            ? countQuery.data?.title
+            : undefined;
 
   const crumbs = useMemo<Crumb[]>(() => {
     const segments = location.pathname.split("/").filter(Boolean);

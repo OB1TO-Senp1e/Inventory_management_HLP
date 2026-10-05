@@ -95,7 +95,7 @@ export function BarcodeEntry({ onResolved, hint, idPrefix }: BarcodeEntryProps) 
         <label htmlFor={inputId} className="mb-1 block text-sm font-medium">
           Barcode
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <input
             id={inputId}
             type="text"
@@ -111,24 +111,26 @@ export function BarcodeEntry({ onResolved, hint, idPrefix }: BarcodeEntryProps) 
             disabled={lookup.isPending}
             className={inputClass}
           />
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-[44px] shrink-0"
-            disabled={lookup.isPending}
-            onClick={() => setScannerOpen(true)}
-            aria-label="Scan with camera"
-          >
-            <ScanLine className="mr-2 h-4 w-4" aria-hidden />
-            Scan
-          </Button>
-          <Button
-            type="submit"
-            className="min-h-[44px] shrink-0"
-            disabled={lookup.isPending || code.trim() === ""}
-          >
-            {lookup.isPending ? "Looking up…" : "Find"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-[44px] flex-1 shrink-0 sm:flex-none"
+              disabled={lookup.isPending}
+              onClick={() => setScannerOpen(true)}
+              aria-label="Scan with camera"
+            >
+              <ScanLine className="mr-2 h-4 w-4" aria-hidden />
+              Scan
+            </Button>
+            <Button
+              type="submit"
+              className="min-h-[44px] flex-1 shrink-0 sm:flex-none"
+              disabled={lookup.isPending || code.trim() === ""}
+            >
+              {lookup.isPending ? "Looking up…" : "Find"}
+            </Button>
+          </div>
         </div>
         {hint && (
           <p id={`${inputId}-hint`} className="mt-1 text-xs text-muted-foreground">

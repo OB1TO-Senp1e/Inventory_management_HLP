@@ -381,7 +381,10 @@ export async function listMovements(
   const movements = z.array(movementRowSchema).parse(data);
   return {
     movements: movements.map(toStockMovement),
-    total: count ?? 0,
+    // count comes from the content-range header; fall back to the page size
+    // when the header is unavailable (same pattern as listItems) so the
+    // pagination label never claims "0 of 0" while rows are visible.
+    total: count ?? movements.length,
   };
 }
 
