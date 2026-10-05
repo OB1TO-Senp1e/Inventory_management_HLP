@@ -477,3 +477,15 @@
 Built the menu engineering tab on /reports (owner/manager only): per-dish quantities sold are parsed from `sale_deduction` ledger notes (the `record_sales` format), merged with live recipe costs and selling prices, and classified into Star/Plowhorse/Puzzle/Dog quadrants against the mean popularity and mean margin. Scatter/bubble chart with average reference lines, quadrant guidance cards, sortable table with classification badges, CSV export, empty states. No migration — client-side aggregation per the v1-volumes precedent. Staff lockout verified at the DB level (no staff policies on `menu_items`/`menu_item_costs`; 9 new DB assertions). Honest edge handling: recipe-less dishes = cost unknown (never ₹0), unpriced dishes and renamed dishes shown with reason badges, live-costing caveat stated in the UI. Review catch: classification-desc sort put unclassified rows first — fixed and tested.
 
 Gates: typecheck ✓, lint ✓, unit 803 passed (88 files) ✓, test:db all passed ✓, build ✓, audit:wiring ✓ (83 matrix rows), audit:routes ✓ (23 routes), e2e 278 passed / 32 live-skipped / 0 failed ✓.
+
+## 2026-10-05 — V2-03: Smart alerts (low-stock & expiry notifications) DONE
+
+Commit: (pending) — migration 20261005130000 (`notifications` + `alert_preferences` + `upsert_alert_preferences` RPC), `src/features/alerts/` (engine hook, bell, inbox page, preferences section), `src/api/notifications.ts`, `src/lib/alerts.ts`, `src/schemas/notifications.ts`.
+
+- Inbox: `/notifications` (owner/manager) with type badges, New pills, mark-read/mark-all-read/dismiss, item links, empty/error states.
+- Header bell with unread badge (mobile top bar + desktop header); badge derives from the inbox query (HEAD+count dropped — e2e stub can't deliver content-range).
+- Background engine: mount + 15-min + focus + debounced realtime; inserts new conditions, deletes cleared; Notification API toast when permitted. True background push (app closed) needs server scheduler + VAPID — documented as deployment follow-up.
+- Preferences: Alerts tab on `/settings` (type toggles, 1–90 day window, browser-notification permission button).
+- Dedupe: one active row per (type, item, batch); DB unique index backstop; read-but-active suppresses re-alert.
+- Gates: typecheck ✓, lint ✓, unit 858 ✓, test:db ✓ (33 new assertions), build ✓, audit:wiring ✓ (88 rows), audit:routes ✓ (24 routes, live crawl), e2e notifications.spec.ts 22 passed / 2 live-skipped.
+- Bugs fixed during build: (1) e2e stub drops content-range on fulfilled responses → badge derived from inbox query; (2) mocked e2e profile has non-UUID restaurantId → preferences upsert moved to SECURITY DEFINER RPC; (3) AppShell unit tests broke — engine's realtime subscription threw without Supabase config → wrapped in try/catch (best-effort); (4) DB test false alarm — RLS-filtered selects in assertions, not deleted rows.

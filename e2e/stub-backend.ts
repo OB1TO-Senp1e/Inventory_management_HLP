@@ -569,6 +569,72 @@ const AUDIT_LOG = [
   },
 ];
 
+// V2-03: smart-alert inbox. The canned conditions EXACTLY match what the
+// background alert engine computes from the canned stock data, so the
+// engine is a deterministic no-op in e2e (no inserts, no resolutions):
+//   - Milk: 3 L on hand ≤ reorder point 10 → low-stock alert (unread);
+//   - Flour: 0 kg on hand ≤ reorder point 20 → low-stock alert (read);
+//   - Tomato batch B-101: 30 kg remaining, expires in 3 days (window 7)
+//     → expiring-soon alert (unread).
+// Newest-first: the client's listNotifications orders by created_at desc.
+const NOTIFICATIONS: Record<string, unknown>[] = [
+  {
+    id: "c0000000-0000-0000-0000-000000000003",
+    restaurant_id: R,
+    type: "expiring_soon",
+    title: "Tomato batch B-101 expiring soon",
+    body: "30 kg expire soon",
+    item_id: ITEMS[0].id,
+    batch_no: "B-101",
+    read_at: null,
+    created_at: "2026-10-05T08:30:00.000Z",
+  },
+  {
+    id: "c0000000-0000-0000-0000-000000000001",
+    restaurant_id: R,
+    type: "low_stock",
+    title: "Milk is running low",
+    body: "3 L left (reorder at 10 L)",
+    item_id: ITEMS[1].id,
+    batch_no: null,
+    read_at: null,
+    created_at: "2026-10-05T08:00:00.000Z",
+  },
+  {
+    id: "c0000000-0000-0000-0000-000000000002",
+    restaurant_id: R,
+    type: "low_stock",
+    title: "Flour is running low",
+    body: "0 kg left (reorder at 20 kg)",
+    item_id: ITEMS[2].id,
+    batch_no: null,
+    read_at: "2026-10-05T09:00:00.000Z",
+    created_at: "2026-10-05T07:00:00.000Z",
+  },
+];
+
+const ALERT_PREFERENCES = [
+  {
+    restaurant_id: R,
+    low_stock_enabled: true,
+    expiry_enabled: true,
+    expiry_days_window: 7,
+  },
+];
+
+// V2-03: the PATCH/POST merge blocks above mutate these arrays in place so
+// specs see posted state on refetch. Reset them on every stubBackend()
+// call so each spec starts from the same canned inbox.
+const INITIAL_NOTIFICATIONS = structuredClone(NOTIFICATIONS);
+const INITIAL_ALERT_PREFERENCES = structuredClone(ALERT_PREFERENCES);
+
+function resetAlertStubs(): void {
+  NOTIFICATIONS.length = 0;
+  NOTIFICATIONS.push(...structuredClone(INITIAL_NOTIFICATIONS));
+  ALERT_PREFERENCES.length = 0;
+  ALERT_PREFERENCES.push(...structuredClone(INITIAL_ALERT_PREFERENCES));
+}
+
 const TABLES: Record<string, Record<string, unknown>[]> = {
   item_categories: CATEGORIES,
   storage_locations: LOCATIONS,
@@ -591,6 +657,8 @@ const TABLES: Record<string, Record<string, unknown>[]> = {
   stock_count_lines: STOCK_COUNT_LINES,
   profiles: PROFILES,
   audit_log: AUDIT_LOG,
+  notifications: NOTIFICATIONS,
+  alert_preferences: ALERT_PREFERENCES,
 };
 
 /** Tiny PostgREST subset: eq/neq/ilike filters, limit/offset, content-range. */
@@ -807,6 +875,43 @@ async function handle(route: Route): Promise<void> {
     return;
   }
 
+  // V2-03: DELETE removes the canned notification in place so dismiss
+  // specs see it gone after the UI refetches.
+  if (route.request().method() === "DELETE" && key === "notifications") {
+    const idMatch = /^eq\.(.*)$/.exec(url.searchParams.get("id") ?? "");
+    if (idMatch) {
+      const idx = NOTIFICATIONS.findIndex(
+        (row) => String(row["id"]) === idMatch[1],
+      );
+      if (idx >= 0) {
+        NOTIFICATIONS.splice(idx, 1);
+      }
+    }
+  }
+
+  // V2-03: upsert_alert_preferences merges the posted fields into the
+  // canned preference row in place (so the settings specs see the saved
+  // state after the UI refetches) and echoes the row back, mirroring the
+  // real RPC's single-row return shape.
+  if (key === "rpc:upsert_alert_preferences") {
+    const body = (await route.request().postDataJSON()) as {
+      p_low_stock_enabled: boolean;
+      p_expiry_enabled: boolean;
+      p_expiry_days_window: number;
+    };
+    Object.assign(ALERT_PREFERENCES[0], {
+      low_stock_enabled: body.p_low_stock_enabled,
+      expiry_enabled: body.p_expiry_enabled,
+      expiry_days_window: body.p_expiry_days_window,
+    });
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(ALERT_PREFERENCES[0]),
+    });
+    return;
+  }
+
   let rows = [...(TABLES[key] ?? [])];
 
   // P5-01: create_stock_count echoes the posted title/assignee as a new
@@ -867,6 +972,30 @@ async function handle(route: Route): Promise<void> {
       // No JSON body — return the rows unchanged.
     }
     rows = rows.map((row) => ({ ...row, ...patchBody }));
+  }
+
+  // V2-03: merge PATCH bodies into the CANNED notifications in place (not
+  // just the per-request copy) so mark-read / mark-all-read specs see the
+  // posted state after the UI refetches. Scoped by the optional id=eq.X
+  // filter; without it (mark-all-read) every row is patched.
+  if (route.request().method() === "PATCH" && key === "notifications") {
+    let patchBody: Record<string, unknown> = {};
+    try {
+      patchBody =
+        ((await route.request().postDataJSON()) as Record<
+          string,
+          unknown
+        >) ?? {};
+    } catch {
+      // No JSON body — return the rows unchanged.
+    }
+    const idMatch = /^eq\.(.*)$/.exec(url.searchParams.get("id") ?? "");
+    for (const row of NOTIFICATIONS) {
+      if (idMatch && String(row["id"]) !== idMatch[1]) {
+        continue;
+      }
+      Object.assign(row, patchBody);
+    }
   }
 
   // P4-02: the recipe detail select asks for full ingredient rows while the
@@ -971,5 +1100,6 @@ async function handle(route: Route): Promise<void> {
  * Auth endpoints are left alone (the `role` fixture handles sessions).
  */
 export async function stubBackend(page: Page): Promise<void> {
+  resetAlertStubs();
   await page.route("**/rest/v1/**", handle);
 }

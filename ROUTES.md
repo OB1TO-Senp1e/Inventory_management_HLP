@@ -25,6 +25,7 @@
 | `/stock-counts/:id`    | `features/counts/CountSheetPage`              | owner, manager, staff | counts list  | DONE   | `e2e/counts.spec.ts`     |
 | `/reports`             | `features/reports/ReportsPage`                | owner, manager        | AppShell nav | DONE   | `e2e/reports.spec.ts`    |
 | `/audit-log`           | `features/admin/AuditLogPage`                 | owner                 | AppShell nav | DONE   | `e2e/admin.spec.ts`      |
+| `/notifications`      | `features/alerts/NotificationsPage`           | owner, manager        | bell (AppShell header) | DONE | `e2e/notifications.spec.ts` |
 | `/users`               | `features/admin/UsersPage`                    | owner                 | AppShell nav | TODO   | `e2e/admin.spec.ts`      |
 | `/settings`            | `features/settings/SettingsPage`              | owner, manager        | AppShell nav | DONE   | `e2e/settings.spec.ts`   |
 | `*`                    | `components/NotFoundPage`                     | public                | —            | DONE   | `e2e/smoke.spec.ts` |

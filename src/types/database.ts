@@ -3,6 +3,38 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      alert_preferences: {
+        Row: {
+          expiry_days_window: number;
+          expiry_enabled: boolean;
+          low_stock_enabled: boolean;
+          restaurant_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          expiry_days_window?: number;
+          expiry_enabled?: boolean;
+          low_stock_enabled?: boolean;
+          restaurant_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          expiry_days_window?: number;
+          expiry_enabled?: boolean;
+          low_stock_enabled?: boolean;
+          restaurant_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "alert_preferences_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: true;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       audit_log: {
         Row: {
           action: string;
@@ -205,6 +237,57 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "menu_items_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      notifications: {
+        Row: {
+          batch_no: string | null;
+          body: string;
+          created_at: string;
+          id: string;
+          item_id: string;
+          read_at: string | null;
+          restaurant_id: string;
+          title: string;
+          type: string;
+        };
+        Insert: {
+          batch_no?: string | null;
+          body?: string;
+          created_at?: string;
+          id?: string;
+          item_id: string;
+          read_at?: string | null;
+          restaurant_id: string;
+          title: string;
+          type: string;
+        };
+        Update: {
+          batch_no?: string | null;
+          body?: string;
+          created_at?: string;
+          id?: string;
+          item_id?: string;
+          read_at?: string | null;
+          restaurant_id?: string;
+          title?: string;
+          type?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_item_id_fkey";
+            columns: ["item_id"];
+            isOneToOne: false;
+            referencedRelation: "items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_restaurant_id_fkey";
             columns: ["restaurant_id"];
             isOneToOne: false;
             referencedRelation: "restaurants";
@@ -1083,6 +1166,18 @@ export type Database = {
         };
       };
       stock_count_visible: { Args: { p_count_id: string }; Returns: boolean };
+      upsert_alert_preferences: {
+        Args: {
+          p_expiry_days_window: number;
+          p_expiry_enabled: boolean;
+          p_low_stock_enabled: boolean;
+        };
+        Returns: {
+          expiry_days_window: number;
+          expiry_enabled: boolean;
+          low_stock_enabled: boolean;
+        }[];
+      };
     };
     Enums: {
       [_ in never]: never;

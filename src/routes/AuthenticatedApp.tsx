@@ -77,6 +77,11 @@ const ReportsPage = lazy(() =>
 const AuditLogPage = lazy(() =>
   import("@/features/admin/AuditLogPage").then((m) => ({ default: m.AuditLogPage })),
 );
+const NotificationsPage = lazy(() =>
+  import("@/features/alerts/NotificationsPage").then((m) => ({
+    default: m.NotificationsPage,
+  })),
+);
 
 type RoleEntry = [string, { roles: UserRole[] }];
 
@@ -113,6 +118,7 @@ const builtSections: Record<string, ReactNode> = {
   "/dashboard": lazySection(<DashboardPage />),
   "/reports": lazySection(<ReportsPage />),
   "/audit-log": lazySection(<AuditLogPage />),
+  "/notifications": lazySection(<NotificationsPage />),
 };
 
 /**

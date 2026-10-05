@@ -67,7 +67,7 @@
 
 - [DONE] V2-01 | Barcode scanning on receiving & stock counts | depends: P2-02, P5-01 | acceptance: items have optional unique-per-restaurant barcode; camera scan resolves item on /receiving and count sheet; manual entry fallback; UI polished; e2e passes
 - [DONE] V2-02 | Menu engineering report | depends: P4-02, P5-04 | acceptance: dish profitability stars/dogs from recipe cost + sales; report tab with chart + empty state; UI polished; e2e passes
-- [TODO] V2-03 | Smart alerts: low-stock & expiry notifications | depends: P2-05 | acceptance: manager/owner get low-stock and expiring-soon alerts (in-app + local push when app open); alert preferences; UI polished; e2e passes
+- [DONE] V2-03 | Smart alerts: low-stock & expiry notifications | depends: P2-05 | acceptance: manager/owner get low-stock and expiring-soon alerts (in-app + local push when app open); alert preferences; UI polished; e2e passes
 - [TODO] V2-04 | Invoice photo capture → draft receipt | depends: P2-02 | acceptance: photo of supplier bill OCRs into draft receipt lines; review/edit before posting; UI polished; e2e passes
 
 ## Phase 8 — V2 features (need external accounts)

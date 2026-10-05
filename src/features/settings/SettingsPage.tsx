@@ -1,26 +1,31 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { TaxonomySection } from "./TaxonomySection";
+import { AlertPreferencesSection } from "@/features/alerts/AlertPreferencesSection";
 import type { TaxonomyKind } from "./hooks";
 
-const TABS: { id: TaxonomyKind; label: string }[] = [
+type SettingsTab = TaxonomyKind | "alerts";
+
+const TABS: { id: SettingsTab; label: string }[] = [
   { id: "category", label: "Categories" },
   { id: "location", label: "Storage locations" },
+  { id: "alerts", label: "Alerts" },
 ];
 
 /**
  * Settings page (P1-02, owner/manager only via the route guard): manages
- * item categories and storage locations. Changes invalidate the item-form
- * dropdown queries, so the item form reflects them immediately.
+ * item categories and storage locations, plus smart-alert preferences
+ * (V2-03). Changes invalidate the item-form dropdown queries, so the item
+ * form reflects them immediately.
  */
 export function SettingsPage() {
-  const [tab, setTab] = useState<TaxonomyKind>("category");
+  const [tab, setTab] = useState<SettingsTab>("category");
 
   return (
     <div>
       <PageHeader
         title="Settings"
-        description="Manage item categories and storage locations."
+        description="Manage item categories, storage locations, and alert preferences."
       />
 
       <div
@@ -49,7 +54,11 @@ export function SettingsPage() {
       </div>
 
       <div role="tabpanel">
-        <TaxonomySection kind={tab} />
+        {tab === "alerts" ? (
+          <AlertPreferencesSection />
+        ) : (
+          <TaxonomySection kind={tab} />
+        )}
       </div>
     </div>
   );
