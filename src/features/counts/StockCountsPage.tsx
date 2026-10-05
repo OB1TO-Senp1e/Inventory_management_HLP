@@ -31,6 +31,7 @@ const statusLabels: Record<StockCountStatus, string> = {
   draft: "Draft",
   in_progress: "In progress",
   submitted: "Submitted",
+  applied: "Applied",
 };
 
 const statusStyles: Record<StockCountStatus, string> = {
@@ -38,6 +39,8 @@ const statusStyles: Record<StockCountStatus, string> = {
   in_progress: "bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200",
   submitted:
     "bg-green-100 text-green-900 dark:bg-green-950 dark:text-green-200",
+  applied:
+    "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200",
 };
 
 function StatusBadge({ status }: { status: StockCountStatus }) {
@@ -253,8 +256,8 @@ function CreateCountDialog({
 /**
  * Stock counts list (P5-01). Owner/manager see all sessions and can create
  * new ones; staff see only their assigned sessions (RLS is the authority).
- * Each session shows its count-sheet progress; variance review and approval
- * land in P5-02.
+ * Each session shows its count-sheet progress; submitted sessions are
+ * reviewed and approved (P5-02) from the count sheet.
  */
 export function StockCountsPage() {
   const { profile } = useAuth();
@@ -367,6 +370,7 @@ export function StockCountsPage() {
           <option value="draft">Draft</option>
           <option value="in_progress">In progress</option>
           <option value="submitted">Submitted</option>
+          <option value="applied">Applied</option>
         </select>
       </form>
 

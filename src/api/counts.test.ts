@@ -2,9 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseClient } from "@/lib/supabase";
 import {
+  applyStockCount,
   countProgressPercent,
   createStockCount,
   getStockCount,
+  isLargeVariance,
+  lineVariance,
   listStockCounts,
   saveCountLine,
   submitStockCount,
@@ -261,5 +264,89 @@ describe("updateStockCountStatus", () => {
     await expect(
       updateStockCountStatus(COUNT_ID, "approved" as never),
     ).rejects.toThrow();
+  });
+});
+
+describe("lineVariance", () => {
+  it("computes counted − expected", () => {
+    expect(lineVariance({ expectedQty: 7.5, countedQty: 8 })).toBe(0.5);
+    expect(lineVariance({ expectedQty: 2, countedQty: 1.5 })).toBe(-0.5);
+    expect(lineVariance({ expectedQty: 5, countedQty: 5 })).toBe(0);
+  });
+
+  it("is null for an uncounted line", () => {
+    expect(lineVariance({ expectedQty: 7.5, countedQty: null })).toBeNull();
+  });
+});
+
+describe("isLargeVariance", () => {
+  it("flags variances at or above 20% of expected", () => {
+    expect(isLargeVariance({ expectedQty: 10, countedQty: 12 })).toBe(true);
+    expect(isLargeVariance({ expectedQty: 10, countedQty: 8 })).toBe(true);
+    expect(isLargeVariance({ expectedQty: 10, countedQty: 11 })).toBe(false);
+    expect(isLargeVariance({ expectedQty: 10, countedQty: 10 })).toBe(false);
+  });
+
+  it("flags any non-zero variance when the system expected nothing", () => {
+    expect(isLargeVariance({ expectedQty: 0, countedQty: 0.5 })).toBe(true);
+    expect(isLargeVariance({ expectedQty: 0, countedQty: 0 })).toBe(false);
+  });
+
+  it("never flags an uncounted line", () => {
+    expect(isLargeVariance({ expectedQty: 10, countedQty: null })).toBe(false);
+  });
+});
+
+describe("applyStockCount", () => {
+  const rpcSummary = {
+    count_id: COUNT_ID,
+    title: "October full count",
+    status: "applied",
+    total_lines: 3,
+    posted_adjustments: 2,
+    adjustments: [
+      {
+        item_id: ITEM_ID,
+        name: "Tomatoes",
+        unit_symbol: "kg",
+        expected_qty: 7.5,
+        counted_qty: 8,
+        variance: 0.5,
+      },
+      {
+        item_id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        name: "Milk",
+        unit_symbol: "L",
+        expected_qty: 2,
+        counted_qty: 1.5,
+        variance: -0.5,
+      },
+    ],
+  };
+
+  it("calls the RPC and maps the summary", async () => {
+    mockRpc.mockResolvedValue({ data: rpcSummary, error: null });
+    const result = await applyStockCount(COUNT_ID);
+    expect(mockRpc).toHaveBeenCalledWith("apply_stock_count", {
+      p_count_id: COUNT_ID,
+    });
+    expect(result.status).toBe("applied");
+    expect(result.postedAdjustments).toBe(2);
+    expect(result.totalLines).toBe(3);
+    expect(result.adjustments).toHaveLength(2);
+    expect(result.adjustments[0]).toMatchObject({
+      name: "Tomatoes",
+      variance: 0.5,
+    });
+  });
+
+  it("rejects an invalid count id before calling", async () => {
+    await expect(applyStockCount("not-a-uuid")).rejects.toThrow();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces RPC errors", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "nope" } });
+    await expect(applyStockCount(COUNT_ID)).rejects.toThrow("nope");
   });
 });

@@ -11,6 +11,7 @@ export const stockCountStatusSchema = z.enum([
   "draft",
   "in_progress",
   "submitted",
+  "applied",
 ]);
 export type StockCountStatus = z.infer<typeof stockCountStatusSchema>;
 

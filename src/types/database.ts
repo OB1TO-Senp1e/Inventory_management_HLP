@@ -960,6 +960,7 @@ export type Database = {
       };
     };
     Functions: {
+      apply_stock_count: { Args: { p_count_id: string }; Returns: Json };
       cancel_purchase_order: { Args: { p_po_id: string }; Returns: undefined };
       compute_sales_deductions: {
         Args: { p_lines: Json };

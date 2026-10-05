@@ -6,12 +6,14 @@ import {
 } from "@tanstack/react-query";
 import { useToast } from "@/components/toast/useToast";
 import {
+  applyStockCount,
   createStockCount,
   getStockCount,
   listStockCounts,
   saveCountLine,
   submitStockCount,
   updateStockCountStatus,
+  type ApplyStockCountResult,
   type StockCount,
   type StockCountDetail,
   type StockCountLine,
@@ -174,6 +176,35 @@ export function useUpdateStockCountStatus() {
       void queryClient.invalidateQueries({
         queryKey: countDetailKey(count.id),
       });
+    },
+    onError: (err) => {
+      toastError(err.message);
+    },
+  });
+}
+
+/**
+ * Approve a submitted count (P5-02): posts the variance adjustments to the
+ * ledger, marks the session applied, and writes the audit entry — all
+ * server-side in the `apply_stock_count` RPC. On success the list and the
+ * detail refetch so the new status and (unchanged) sheet are authoritative.
+ * Owner/manager only — the RPC and the status trigger enforce it.
+ */
+export function useApplyStockCount() {
+  const queryClient = useQueryClient();
+  const { success, error: toastError } = useToast();
+  return useMutation<ApplyStockCountResult, Error, string>({
+    mutationFn: (countId) => applyStockCount(countId),
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: countsQueryKey });
+      void queryClient.invalidateQueries({
+        queryKey: countDetailKey(result.countId),
+      });
+      const n = result.postedAdjustments;
+      success(
+        `Count "${result.title}" applied — ` +
+          `${n} stock adjustment${n === 1 ? "" : "s"} posted.`,
+      );
     },
     onError: (err) => {
       toastError(err.message);

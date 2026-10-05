@@ -57,6 +57,16 @@ const submittedCount: StockCount = {
   totalLines: 4,
 };
 
+const appliedCount: StockCount = {
+  ...sampleCount,
+  id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+  title: "September closing count",
+  status: "applied",
+  assignedTo: null,
+  countedLines: 4,
+  totalLines: 4,
+};
+
 function loadingState() {
   return { data: undefined, isLoading: true, isError: false, isSuccess: false, refetch: vi.fn() };
 }
@@ -126,7 +136,7 @@ describe("StockCountsPage", () => {
 
   it("lists sessions with progress and status badges", () => {
     mockedUseStockCounts.mockReturnValue({
-      data: [sampleCount, submittedCount],
+      data: [sampleCount, submittedCount, appliedCount],
       isLoading: false,
       isError: false,
       isSuccess: true,
@@ -139,11 +149,34 @@ describe("StockCountsPage", () => {
     expect(
       screen.getAllByText("October opening count").length,
     ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("September closing count").length,
+    ).toBeGreaterThan(0);
     // 2/4 = 50% on the draft session; the link cards + table both render
     // (desktop table hidden on mobile breakpoints is still in the DOM).
     expect(screen.getAllByText(/2\/4 \(50%\)/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("In progress").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Submitted").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Applied").length).toBeGreaterThan(0);
+  });
+
+  it("filters by the applied status", () => {
+    mockedUseStockCounts.mockReturnValue({
+      data: [sampleCount, submittedCount, appliedCount],
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      refetch: vi.fn(),
+    } as never);
+    renderPage();
+    fireEvent.change(screen.getByLabelText("Filter by status"), {
+      target: { value: "applied" },
+    });
+    expect(screen.queryAllByText("Weekly full count")).toHaveLength(0);
+    expect(screen.queryAllByText("October opening count")).toHaveLength(0);
+    expect(
+      screen.getAllByText("September closing count").length,
+    ).toBeGreaterThan(0);
   });
 
   it("filters by status", () => {

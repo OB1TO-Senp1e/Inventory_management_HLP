@@ -47,7 +47,7 @@
 ## Phase 5 — Counts and reporting
 
 - [DONE] P5-01 | Stock counts: create, count sheet UI (mobile-optimised), save progress | depends: P2-05 | acceptance: count created and assigned; mobile sheet saves progress offline-tolerant; progress visible to manager
-- [TODO] P5-02 | Variance review and approval → RPC apply_stock_count posts adjustments | depends: P5-01, P2-01 | acceptance: variance = counted − expected shown; approve posts count_adjustment movements; staff cannot approve
+- [DONE] P5-02 | Variance review and approval → RPC apply_stock_count posts adjustments | depends: P5-01, P2-01 | acceptance: variance = counted − expected shown; approve posts count_adjustment movements; staff cannot approve
 - [TODO] P5-03 | Dashboard: low stock, expiring soon, today's usage and wastage, stock value (owner/manager) | depends: P2-05, P2-03 | acceptance: dashboard cards match underlying queries; staff sees no costs; loads < 2s on seeded data
 - [TODO] P5-04 | Reports: usage, wastage by reason, food cost trend, supplier price changes; date filters; CSV export | depends: P4-02, P2-03 | acceptance: each report filters by date; CSV export downloads; charts render with empty state
 - [TODO] P5-05 | Audit log screen (owner only) | depends: P0-04a | acceptance: sensitive actions listed with actor/time; staff/manager blocked by RLS; filter by action/date

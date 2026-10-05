@@ -371,6 +371,19 @@ const STOCK_COUNTS = [
     updated_at: NOW,
     stock_count_lines: [{ counted_qty: 10 }, { counted_qty: 4 }],
   },
+  // P5-02: a submitted session assigned to the staff profile, so the
+  // staff-gating specs can exercise the variance review without an
+  // approve affordance.
+  {
+    id: "90000000-0000-0000-0000-000000000003",
+    restaurant_id: R,
+    title: "Staff night count",
+    status: "submitted",
+    assigned_to: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+    created_at: NOW,
+    updated_at: NOW,
+    stock_count_lines: [{ counted_qty: 8 }, { counted_qty: 1.5 }],
+  },
 ];
 
 const STOCK_COUNT_LINES = [
@@ -390,6 +403,45 @@ const STOCK_COUNT_LINES = [
     item_id: ITEMS[1].id,
     expected_qty: 2,
     counted_qty: null,
+    items: { name: ITEMS[1].name, units: { symbol: "L" } },
+  },
+  // P5-02: lines for the canned submitted sessions. October opening count:
+  // Tomato 8 vs 7.5 (+0.5, ~7% — normal), Milk 1.5 vs 2 (−0.5, 25% — large).
+  // The staff session reuses the same variances.
+  {
+    id: "91000000-0000-0000-0000-000000000003",
+    count_id: "90000000-0000-0000-0000-000000000002",
+    restaurant_id: R,
+    item_id: ITEMS[0].id,
+    expected_qty: 7.5,
+    counted_qty: 8,
+    items: { name: ITEMS[0].name, units: { symbol: "kg" } },
+  },
+  {
+    id: "91000000-0000-0000-0000-000000000004",
+    count_id: "90000000-0000-0000-0000-000000000002",
+    restaurant_id: R,
+    item_id: ITEMS[1].id,
+    expected_qty: 2,
+    counted_qty: 1.5,
+    items: { name: ITEMS[1].name, units: { symbol: "L" } },
+  },
+  {
+    id: "91000000-0000-0000-0000-000000000005",
+    count_id: "90000000-0000-0000-0000-000000000003",
+    restaurant_id: R,
+    item_id: ITEMS[0].id,
+    expected_qty: 7.5,
+    counted_qty: 8,
+    items: { name: ITEMS[0].name, units: { symbol: "kg" } },
+  },
+  {
+    id: "91000000-0000-0000-0000-000000000006",
+    count_id: "90000000-0000-0000-0000-000000000003",
+    restaurant_id: R,
+    item_id: ITEMS[1].id,
+    expected_qty: 2,
+    counted_qty: 1.5,
     items: { name: ITEMS[1].name, units: { symbol: "L" } },
   },
 ];
@@ -537,6 +589,44 @@ async function handle(route: Route): Promise<void> {
       status: 200,
       headers: { "content-type": "application/json" },
       body: JSON.stringify(rows),
+    });
+    return;
+  }
+
+  // P5-02: apply_stock_count computes adjustments from the canned lines
+  // for the posted session (variance = counted − expected, zero-variance
+  // lines post nothing), mirroring the real RPC's summary shape.
+  if (key === "rpc:apply_stock_count") {
+    const body = (await route.request().postDataJSON()) as {
+      p_count_id: string;
+    };
+    const session = STOCK_COUNTS.find((s) => s.id === body.p_count_id);
+    const lines = STOCK_COUNT_LINES.filter(
+      (line) => line.count_id === body.p_count_id,
+    );
+    const adjustments = lines
+      .map((line) => ({
+        item_id: line.item_id,
+        name: line.items.name,
+        unit_symbol: line.items.units.symbol,
+        expected_qty: line.expected_qty,
+        counted_qty: line.counted_qty ?? 0,
+        variance:
+          Math.round((Number(line.counted_qty ?? 0) - line.expected_qty) * 1e6) /
+          1e6,
+      }))
+      .filter((a) => a.variance !== 0);
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        count_id: body.p_count_id,
+        title: session?.title ?? "Unknown",
+        status: "applied",
+        total_lines: lines.length,
+        posted_adjustments: adjustments.length,
+        adjustments,
+      }),
     });
     return;
   }

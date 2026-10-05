@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/toast/ToastProvider";
 import {
+  applyStockCount,
   createStockCount,
   getStockCount,
   listStockCounts,
@@ -14,6 +15,7 @@ import {
 import {
   countDetailKey,
   countsQueryKey,
+  useApplyStockCount,
   useAssignees,
   useCreateStockCount,
   useSaveCountLine,
@@ -26,6 +28,7 @@ import {
 // The API module is mocked: these tests verify hook wiring (delegation,
 // invalidation, toasts) with zero network.
 vi.mock("@/api/counts", () => ({
+  applyStockCount: vi.fn(),
   createStockCount: vi.fn(),
   getStockCount: vi.fn(),
   listStockCounts: vi.fn(),
@@ -44,6 +47,7 @@ const mockedCreateStockCount = vi.mocked(createStockCount);
 const mockedSaveCountLine = vi.mocked(saveCountLine);
 const mockedSubmitStockCount = vi.mocked(submitStockCount);
 const mockedUpdateStockCountStatus = vi.mocked(updateStockCountStatus);
+const mockedApplyStockCount = vi.mocked(applyStockCount);
 
 let queryClient: QueryClient;
 
@@ -287,5 +291,44 @@ describe("useAssignees", () => {
     rerender({ enabled: true });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(listProfiles).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("useApplyStockCount", () => {
+  it("delegates, invalidates list + detail, and toasts the adjustment count", async () => {
+    mockedApplyStockCount.mockResolvedValue({
+      countId: COUNT_ID,
+      title: "October full count",
+      status: "applied",
+      totalLines: 3,
+      postedAdjustments: 2,
+      adjustments: [],
+    });
+    const { result } = renderHook(() => useApplyStockCount(), { wrapper });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    result.current.mutate(COUNT_ID);
+    await waitFor(() => {
+      expect(mockedApplyStockCount).toHaveBeenCalledWith(COUNT_ID);
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByText(/applied — 2 stock adjustments posted/i),
+      ).toBeInTheDocument();
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: countsQueryKey,
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: countDetailKey(COUNT_ID),
+    });
+  });
+
+  it("toasts RPC errors", async () => {
+    mockedApplyStockCount.mockRejectedValue(new Error("already applied"));
+    const { result } = renderHook(() => useApplyStockCount(), { wrapper });
+    result.current.mutate(COUNT_ID);
+    await waitFor(() => {
+      expect(screen.getByText("already applied")).toBeInTheDocument();
+    });
   });
 });

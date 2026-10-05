@@ -9,9 +9,10 @@ import { stubBackend } from "./stub-backend";
  * with debounced auto-save, submit flow) with zero backend. The
  * `create_stock_count` RPC is stubbed dynamically (echoes the posted
  * title/assignee); PATCH bodies are merged into the canned rows so
- * save-progress and submit specs see the state they posted. The live flow
- * needs a real Supabase backend + seed data, so it only runs when
- * E2E_LIVE_SUPABASE=1.
+ * save-progress and submit specs see the state they posted. P5-02 adds an
+ * `apply_stock_count` stub computing adjustments from the canned lines.
+ * The live flow needs a real Supabase backend + seed data, so it only runs
+ * when E2E_LIVE_SUPABASE=1.
  */
 
 const LIVE = process.env.E2E_LIVE_SUPABASE === "1";
@@ -44,7 +45,7 @@ test.describe("stock counts", () => {
         page.locator("span:visible", { hasText: "In progress" }),
       ).toBeVisible();
       await expect(
-        page.locator("span:visible", { hasText: "Submitted" }),
+        page.locator("span:visible", { hasText: "Submitted" }).first(),
       ).toBeVisible();
     });
 
@@ -147,6 +148,45 @@ test.describe("stock counts", () => {
         page.getByRole("alertdialog", { name: "Submit for review?" }),
       ).toHaveCount(0);
     });
+
+    // P5-02: variance review + approval on the canned submitted session.
+    test("submitted count shows variance review and approves with confirmation", async ({
+      page,
+    }) => {
+      await stubBackend(page);
+      await page.goto("/stock-counts/90000000-0000-0000-0000-000000000002");
+      await expect(
+        page.getByRole("heading", { name: /october opening count/i }),
+      ).toBeVisible();
+      await expect(page.getByText(/awaiting variance review/i)).toBeVisible();
+      // Tomato 8 vs 7.5 (+0.5); Milk 1.5 vs 2 (−0.5, 25% — large).
+      await expect(page.getByText("Variance: +0.5 kg")).toBeVisible();
+      await expect(page.getByText("Variance: -0.5 L")).toBeVisible();
+      // Scope to the sheet — the review banner mentions large variances
+      // in prose, which would also match a page-wide text query.
+      await expect(
+        page
+          .getByLabel("Count sheet")
+          .getByText("Large variance", { exact: true }),
+      ).toBeVisible();
+
+      await page.getByRole("button", { name: /approve & apply/i }).click();
+      const dialog = page.getByRole("alertdialog", {
+        name: "Approve & apply this count?",
+      });
+      await expect(dialog).toBeVisible();
+      // Both lines differ → the dialog states 2 adjustments.
+      await expect(
+        dialog.getByText(/posts 2 stock adjustments/i),
+      ).toBeVisible();
+      await dialog.getByRole("button", { name: "Approve & apply" }).click();
+      await expect(
+        page.getByText(/applied — 2 stock adjustments posted/i),
+      ).toBeVisible({ timeout: 10000 });
+      // The stub serves canned rows, so a refetch shows the pre-apply
+      // state — the applied badge is covered by unit tests.
+      await expect(dialog).toHaveCount(0);
+    });
   });
 
   test.describe("as staff", () => {
@@ -163,6 +203,24 @@ test.describe("stock counts", () => {
       await expect(
         page.getByRole("button", { name: /new count/i }),
       ).toHaveCount(0);
+    });
+
+    // P5-02: staff see the variance review on their assigned submitted
+    // session but get no approve affordance.
+    test("staff sees variance review but cannot approve", async ({ page }) => {
+      await stubBackend(page);
+      await page.goto("/stock-counts/90000000-0000-0000-0000-000000000003");
+      await expect(
+        page.getByRole("heading", { name: /staff night count/i }),
+      ).toBeVisible();
+      await expect(page.getByText(/awaiting variance review/i)).toBeVisible();
+      await expect(page.getByText("Variance: +0.5 kg")).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: /approve & apply/i }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByText(/only an owner or manager can approve/i),
+      ).toBeVisible();
     });
   });
 

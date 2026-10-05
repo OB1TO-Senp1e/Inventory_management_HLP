@@ -3,6 +3,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,8 +11,8 @@ import type { StockCountDetail } from "@/api/counts";
 import { CountSheetPage } from "./CountSheetPage";
 
 // Hooks are mocked: these tests verify sheet states (loading / error /
-// rows / debounced save / validation / submit / submitted read-only) with
-// zero network.
+// rows / debounced save / validation / submit / submitted read-only /
+// variance review + approval) with zero network.
 vi.mock("./hooks", () => ({
   useStockCount: vi.fn(),
   useSaveCountLine: vi.fn(() => ({
@@ -26,19 +27,33 @@ vi.mock("./hooks", () => ({
     mutate: vi.fn(),
     isPending: false,
   })),
+  useApplyStockCount: vi.fn(() => ({
+    mutate: vi.fn(),
+    isPending: false,
+  })),
+}));
+
+vi.mock("@/features/auth/useAuth", () => ({
+  useAuth: vi.fn(() => ({
+    profile: { id: "owner-1", restaurantId: "r-1", role: "owner" },
+  })),
 }));
 
 import {
+  useApplyStockCount,
   useSaveCountLine,
   useStockCount,
   useSubmitStockCount,
   useUpdateStockCountStatus,
 } from "./hooks";
+import { useAuth } from "@/features/auth/useAuth";
 
 const mockedUseStockCount = vi.mocked(useStockCount);
 const mockedUseSaveCountLine = vi.mocked(useSaveCountLine);
 const mockedUseSubmitStockCount = vi.mocked(useSubmitStockCount);
 const mockedUseUpdateStockCountStatus = vi.mocked(useUpdateStockCountStatus);
+const mockedUseApplyStockCount = vi.mocked(useApplyStockCount);
+const mockedUseAuth = vi.mocked(useAuth);
 
 const COUNT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const ITEM_A = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -91,6 +106,9 @@ function successState(detail: StockCountDetail) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useRealTimers();
+  mockedUseAuth.mockReturnValue({
+    profile: { id: "owner-1", restaurantId: "r-1", role: "owner" },
+  } as never);
   mockedUseSaveCountLine.mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
@@ -100,6 +118,10 @@ beforeEach(() => {
     isPending: false,
   } as never);
   mockedUseUpdateStockCountStatus.mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as never);
+  mockedUseApplyStockCount.mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
   } as never);
@@ -386,7 +408,7 @@ describe("CountSheetPage", () => {
     expect(submitMutate).toHaveBeenCalledWith(COUNT_ID);
   });
 
-  it("renders submitted counts read-only", () => {
+  it("renders submitted counts read-only with the variance review", () => {
     mockedUseStockCount.mockReturnValue(
       successState(
         makeDetail({
@@ -415,14 +437,172 @@ describe("CountSheetPage", () => {
       ) as never,
     );
     renderPage();
-    expect(
-      screen.getByText(/submitted for review and is read-only/i),
-    ).toBeInTheDocument();
+    // The old "coming in the next update" banner is gone — the review is here.
+    expect(screen.getByText(/awaiting variance review/i)).toBeInTheDocument();
     expect(
       screen.getByLabelText("Counted quantity for Tomatoes"),
     ).toBeDisabled();
     expect(
       screen.queryByRole("button", { name: /submit for review/i }),
+    ).not.toBeInTheDocument();
+    // Variances: Tomatoes 6 − 7.5 = −1.5; Milk 1.5 − 2 = −0.5.
+    expect(screen.getByText("Variance: -1.5 kg")).toBeInTheDocument();
+    expect(screen.getByText("Variance: -0.5 L")).toBeInTheDocument();
+  });
+
+  it("highlights large variances in the review", () => {
+    mockedUseStockCount.mockReturnValue(
+      successState(
+        makeDetail({
+          status: "submitted",
+          countedLines: 2,
+          totalLines: 2,
+          lines: [
+            {
+              id: "d0000000-0000-0000-0000-000000000001",
+              itemId: ITEM_A,
+              itemName: "Tomatoes",
+              unitSymbol: "kg",
+              expectedQty: 7.5,
+              countedQty: 12, // +4.5 = 60% — large
+            },
+            {
+              id: "d0000000-0000-0000-0000-000000000002",
+              itemId: ITEM_B,
+              itemName: "Milk",
+              unitSymbol: "L",
+              expectedQty: 2,
+              countedQty: 2, // zero — not large
+            },
+          ],
+        }),
+      ) as never,
+    );
+    renderPage();
+    // The badge (exact text) marks the large line only — the review banner
+    // mentions large variances in prose, which is matched separately below.
+    expect(screen.getAllByText("Large variance")).toHaveLength(1);
+    expect(screen.getByText("Variance: +4.5 kg")).toBeInTheDocument();
+    expect(screen.getByText("Variance: 0 L")).toBeInTheDocument();
+  });
+
+  it("owner approves a submitted count after explicit confirmation", async () => {
+    const applyMutate = vi.fn();
+    mockedUseApplyStockCount.mockReturnValue({
+      mutate: applyMutate,
+      isPending: false,
+    } as never);
+    mockedUseStockCount.mockReturnValue(
+      successState(
+        makeDetail({
+          status: "submitted",
+          countedLines: 2,
+          totalLines: 2,
+          lines: [
+            {
+              id: "d0000000-0000-0000-0000-000000000001",
+              itemId: ITEM_A,
+              itemName: "Tomatoes",
+              unitSymbol: "kg",
+              expectedQty: 7.5,
+              countedQty: 8,
+            },
+            {
+              id: "d0000000-0000-0000-0000-000000000002",
+              itemId: ITEM_B,
+              itemName: "Milk",
+              unitSymbol: "L",
+              expectedQty: 2,
+              countedQty: 2,
+            },
+          ],
+        }),
+      ) as never,
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /approve & apply/i }));
+    const dialog = await waitFor(() => {
+      expect(
+        screen.getByRole("alertdialog", { name: "Approve & apply this count?" }),
+      ).toBeInTheDocument();
+      return screen.getByRole("alertdialog", {
+        name: "Approve & apply this count?",
+      });
+    });
+    // The dialog states the adjustment count (Tomatoes only; Milk matches).
+    expect(
+      within(dialog).getByText(/posts 1 stock adjustment/i),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Approve & apply" }),
+    );
+    expect(applyMutate).toHaveBeenCalledWith(COUNT_ID);
+  });
+
+  it("staff sees the review but no approve button", () => {
+    mockedUseAuth.mockReturnValue({
+      profile: { id: "staff-1", restaurantId: "r-1", role: "staff" },
+    } as never);
+    mockedUseStockCount.mockReturnValue(
+      successState(
+        makeDetail({
+          status: "submitted",
+          countedLines: 2,
+          totalLines: 2,
+          lines: [
+            {
+              id: "d0000000-0000-0000-0000-000000000001",
+              itemId: ITEM_A,
+              itemName: "Tomatoes",
+              unitSymbol: "kg",
+              expectedQty: 7.5,
+              countedQty: 8,
+            },
+          ],
+        }),
+      ) as never,
+    );
+    renderPage();
+    // Variance review is visible to the assigned staffer…
+    expect(screen.getByText("Variance: +0.5 kg")).toBeInTheDocument();
+    // …but the approve affordance is not.
+    expect(
+      screen.queryByRole("button", { name: /approve & apply/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/only an owner or manager can approve/i),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the applied state read-only", () => {
+    mockedUseStockCount.mockReturnValue(
+      successState(
+        makeDetail({
+          status: "applied",
+          countedLines: 2,
+          totalLines: 2,
+          lines: [
+            {
+              id: "d0000000-0000-0000-0000-000000000001",
+              itemId: ITEM_A,
+              itemName: "Tomatoes",
+              unitSymbol: "kg",
+              expectedQty: 7.5,
+              countedQty: 8,
+            },
+          ],
+        }),
+      ) as never,
+    );
+    renderPage();
+    expect(
+      screen.getByText(/count was applied.*posted to the stock ledger/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Counted quantity for Tomatoes"),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: /approve & apply/i }),
     ).not.toBeInTheDocument();
   });
 

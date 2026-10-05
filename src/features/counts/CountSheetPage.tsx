@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Check, RotateCcw } from "lucide-react";
+import { Check, RotateCcw, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageHeader } from "@/components/PageHeader";
+import { useAuth } from "@/features/auth/useAuth";
 import { formatNumber } from "@/lib/format";
 import {
   countProgressPercent,
+  isLargeVariance,
+  lineVariance,
   type StockCountDetail,
   type StockCountLine,
 } from "@/api/counts";
 import {
+  useApplyStockCount,
   useSaveCountLine,
   useStockCount,
   useSubmitStockCount,
@@ -48,11 +52,14 @@ function CountLineRow({
   countId,
   line,
   disabled,
+  showVariance,
   onSaved,
 }: {
   countId: string;
   line: StockCountLine;
   disabled: boolean;
+  /** Variance review (submitted/applied sheets): show the per-line variance. */
+  showVariance: boolean;
   onSaved: () => void;
 }) {
   const [text, setText] = useState(
@@ -137,13 +144,47 @@ function CountLineRow({
     }
   };
 
+  const variance = showVariance ? lineVariance(line) : null;
+  const large = showVariance && isLargeVariance(line);
+
   return (
-    <div className="flex items-center gap-3 border-b py-3 last:border-0">
+    <div
+      className={`flex items-center gap-3 border-b py-3 last:border-0 ${
+        large ? "rounded-md bg-amber-50 px-2 dark:bg-amber-950/40" : ""
+      }`}
+    >
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{line.itemName}</p>
+        <p className="truncate font-medium">
+          {line.itemName}
+          {large && (
+            <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 align-middle text-[11px] font-medium text-amber-900 dark:bg-amber-900 dark:text-amber-100">
+              <TriangleAlert className="size-3" aria-hidden="true" />
+              Large variance
+            </span>
+          )}
+        </p>
         <p className="text-xs text-muted-foreground">
           System: {formatNumber(line.expectedQty)} {line.unitSymbol}
+          {variance !== null && line.countedQty !== null && (
+            <>
+              {" · "}Counted: {formatNumber(line.countedQty)} {line.unitSymbol}
+            </>
+          )}
         </p>
+        {variance !== null && (
+          <p
+            className={`text-xs font-medium tabular-nums ${
+              variance === 0
+                ? "text-muted-foreground"
+                : variance > 0
+                  ? "text-green-700 dark:text-green-300"
+                  : "text-destructive"
+            }`}
+          >
+            Variance: {variance > 0 ? "+" : ""}
+            {formatNumber(variance)} {line.unitSymbol}
+          </p>
+        )}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
         <input
@@ -193,19 +234,27 @@ function CountLineRow({
  * instead of silently losing the count. The real offline queue is P6-02's
  * scope.
  *
- * Submitting moves the session to `submitted` (frozen); variance review and
- * approval land in P5-02.
+ * Submitting moves the session to `submitted` (frozen). A submitted sheet
+ * shows the variance review (counted − expected per line, large variances
+ * highlighted); an owner/manager can approve it, which posts the
+ * adjustments to the ledger via `apply_stock_count` (P5-02) and moves the
+ * session to `applied` (terminal).
  */
 export function CountSheetPage() {
   const { id } = useParams<{ id: string }>();
+  const { profile } = useAuth();
   const detailQuery = useStockCount(id ?? null);
   const detail: StockCountDetail | undefined = detailQuery.data;
   const submitCount = useSubmitStockCount();
+  const applyCount = useApplyStockCount();
   const advanceStatus = useUpdateStockCountStatus();
   const advanceFiredRef = useRef(false);
 
   const [searchInput, setSearchInput] = useState("");
   const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [confirmApply, setConfirmApply] = useState(false);
+
+  const canApprove = profile?.role === "owner" || profile?.role === "manager";
 
   const lines = detail?.lines ?? [];
   const q = searchInput.trim().toLowerCase();
@@ -218,7 +267,19 @@ export function CountSheetPage() {
     detail.lines.length > 0 &&
     detail.lines.every((line) => line.countedQty !== null);
   const isSubmitted = detail?.status === "submitted";
-  const readOnly = isSubmitted || detailQuery.isLoading;
+  const isApplied = detail?.status === "applied";
+  const inReview = isSubmitted || isApplied;
+  const readOnly = inReview || detailQuery.isLoading;
+
+  // Variance review: per-line variances from the frozen snapshot +
+  // counted quantities (client-side display math; the posting is DB-side).
+  const variances = inReview
+    ? lines.map((line) => ({ line, variance: lineVariance(line) ?? 0 }))
+    : [];
+  const nonZeroCount = variances.filter((v) => v.variance !== 0).length;
+  const largeCount = inReview
+    ? lines.filter((line) => isLargeVariance(line)).length
+    : 0;
 
   // First successful save moves draft → in_progress so the list reflects
   // real progress (the status trigger enforces the machine server-side).
@@ -237,13 +298,23 @@ export function CountSheetPage() {
     submitCount.mutate(id);
   };
 
+  const doApply = () => {
+    if (!id) {
+      return;
+    }
+    setConfirmApply(false);
+    applyCount.mutate(id);
+  };
+
   return (
     <div>
       <PageHeader
         title={detail?.title ?? "Count sheet"}
         description={
           detail
-            ? `${detail.countedLines} of ${detail.totalLines} items counted`
+            ? inReview
+              ? `Variance review — ${nonZeroCount} of ${detail.totalLines} lines differ from the system count`
+              : `${detail.countedLines} of ${detail.totalLines} items counted`
             : "Loading the count sheet…"
         }
         actions={
@@ -254,6 +325,14 @@ export function CountSheetPage() {
               disabled={submitCount.isPending}
             >
               {submitCount.isPending ? "Submitting…" : "Submit for review"}
+            </Button>
+          ) : isSubmitted && canApprove ? (
+            <Button
+              onClick={() => setConfirmApply(true)}
+              className="min-h-[44px]"
+              disabled={applyCount.isPending}
+            >
+              {applyCount.isPending ? "Applying…" : "Approve & apply"}
             </Button>
           ) : undefined
         }
@@ -297,10 +376,28 @@ export function CountSheetPage() {
       {detail && isSubmitted && (
         <div
           role="status"
+          className="mb-4 rounded-md border border-amber-600/30 bg-amber-50 p-3 text-sm dark:bg-amber-950"
+        >
+          <p className="font-medium">Awaiting variance review.</p>
+          <p className="mt-1 text-muted-foreground">
+            {nonZeroCount === 0
+              ? "Every line matches the system count — approving posts no adjustments."
+              : `Approving posts ${nonZeroCount} stock adjustment${nonZeroCount === 1 ? "" : "s"} to the ledger.`}
+            {largeCount > 0 &&
+              ` ${largeCount} line${largeCount === 1 ? " has" : "s have"} a large variance (highlighted).`}
+            {!canApprove &&
+              " Only an owner or manager can approve."}
+          </p>
+        </div>
+      )}
+
+      {detail && isApplied && (
+        <div
+          role="status"
           className="mb-4 rounded-md border border-green-600/30 bg-green-50 p-3 text-sm dark:bg-green-950"
         >
-          This count was submitted for review and is read-only. Variance
-          review and approval are coming in the next update.
+          This count was applied — its variances are posted to the stock
+          ledger and the session is read-only.
         </div>
       )}
 
@@ -349,6 +446,7 @@ export function CountSheetPage() {
                 countId={detail.id}
                 line={line}
                 disabled={readOnly}
+                showVariance={inReview}
                 onSaved={handleSaved}
               />
             ))}
@@ -373,10 +471,25 @@ export function CountSheetPage() {
       <ConfirmDialog
         open={confirmSubmit}
         title="Submit for review?"
-        description={`All ${detail?.totalLines ?? 0} items are counted. Submitting locks the sheet — variance review and approval come next.`}
+        description={`All ${detail?.totalLines ?? 0} items are counted. Submitting locks the sheet for variance review and approval.`}
         confirmLabel="Submit count"
         onConfirm={doSubmit}
         onCancel={() => setConfirmSubmit(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmApply}
+        title="Approve & apply this count?"
+        description={
+          nonZeroCount === 0
+            ? "Every line matches the system count. Approving marks the count applied and posts no adjustments."
+            : `This posts ${nonZeroCount} stock adjustment${nonZeroCount === 1 ? "" : "s"} ` +
+              `(counted − expected) to the ledger and marks the count applied. ` +
+              `Lines that match post nothing. This can't be undone — a re-count needs a new session.`
+        }
+        confirmLabel={applyCount.isPending ? "Applying…" : "Approve & apply"}
+        onConfirm={doApply}
+        onCancel={() => setConfirmApply(false)}
       />
     </div>
   );

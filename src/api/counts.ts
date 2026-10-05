@@ -115,6 +115,40 @@ export function countProgressPercent(count: StockCount): number {
 }
 
 /**
+ * Variance for one count line: counted − expected (the frozen snapshot).
+ * Positive = found more than the system expected; negative = found less.
+ * A null counted_qty means "not counted yet" — there is no variance.
+ */
+export function lineVariance(line: Pick<StockCountLine, "expectedQty" | "countedQty">): number | null {
+  if (line.countedQty === null) {
+    return null;
+  }
+  // Round to 6dp so float artifacts (7.5 vs 7.4999999) don't show as noise.
+  return Math.round((line.countedQty - line.expectedQty) * 1e6) / 1e6;
+}
+
+/** Relative variance threshold that counts as "large" in the review UI. */
+export const LARGE_VARIANCE_RATIO = 0.2;
+
+/**
+ * A variance is "large" when it is at least 20% of the expected quantity
+ * (or any non-zero variance when the system expected nothing — an
+ * unexpected find is always worth a second look).
+ */
+export function isLargeVariance(
+  line: Pick<StockCountLine, "expectedQty" | "countedQty">,
+): boolean {
+  const variance = lineVariance(line);
+  if (variance === null || variance === 0) {
+    return false;
+  }
+  if (line.expectedQty === 0) {
+    return true;
+  }
+  return Math.abs(variance) / Math.abs(line.expectedQty) >= LARGE_VARIANCE_RATIO;
+}
+
+/**
  * List the count sessions visible to the caller (RLS: owner/manager see
  * all; staff see only their assigned sessions). Newest first.
  */
@@ -229,11 +263,81 @@ export async function saveCountLine(
   };
 }
 
+export interface ApplyStockCountAdjustment {
+  itemId: string;
+  name: string;
+  unitSymbol: string;
+  expectedQty: number;
+  countedQty: number;
+  variance: number;
+}
+
+export interface ApplyStockCountResult {
+  countId: string;
+  title: string;
+  status: StockCountStatus;
+  totalLines: number;
+  postedAdjustments: number;
+  adjustments: ApplyStockCountAdjustment[];
+}
+
+const applyAdjustmentSchema = z.object({
+  item_id: z.string(),
+  name: z.string(),
+  unit_symbol: z.string(),
+  expected_qty: z.coerce.number(),
+  counted_qty: z.coerce.number(),
+  variance: z.coerce.number(),
+});
+
+const applyStockCountResultSchema = z.object({
+  count_id: z.string(),
+  title: z.string(),
+  status: stockCountStatusSchema,
+  total_lines: z.coerce.number(),
+  posted_adjustments: z.coerce.number(),
+  adjustments: z.array(applyAdjustmentSchema),
+});
+
+/**
+ * Apply a submitted count (P5-02): posts one signed `count_adjustment`
+ * movement per non-zero variance (counted − expected), marks the session
+ * applied, writes one audit_log row. Owner/manager only — the RPC and the
+ * status trigger both enforce it (staff cannot approve).
+ */
+export async function applyStockCount(
+  countId: string,
+): Promise<ApplyStockCountResult> {
+  const parsed = z.string().uuid().parse(countId);
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc("apply_stock_count", {
+    p_count_id: parsed,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  const result = applyStockCountResultSchema.parse(data);
+  return {
+    countId: result.count_id,
+    title: result.title,
+    status: result.status,
+    totalLines: result.total_lines,
+    postedAdjustments: result.posted_adjustments,
+    adjustments: result.adjustments.map((a) => ({
+      itemId: a.item_id,
+      name: a.name,
+      unitSymbol: a.unit_symbol,
+      expectedQty: a.expected_qty,
+      countedQty: a.counted_qty,
+      variance: a.variance,
+    })),
+  };
+}
+
 /**
  * Submit a session for variance review (P5-02 picks it up from here).
  * The database's status trigger enforces the machine (draft/in_progress →
- * submitted, submitted terminal). The UI only offers this when every line
- * is counted.
+ * submitted). The UI only offers this when every line is counted.
  */
 export async function submitStockCount(countId: string): Promise<StockCount> {
   const client = getSupabaseClient();
