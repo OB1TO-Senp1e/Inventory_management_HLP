@@ -124,27 +124,43 @@ self.addEventListener("install", (event) => {
   );
 });
 
+// Tracks whether the activate handler's critical work (claim + cache
+// cleanup) has finished.
+let riActivateDone = false;
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
+    // Claim first: taking control of open pages must not wait for cache
+    // maintenance — an offline reload right after activation would
+    // otherwise miss the worker and fail at the network layer (P6-03).
+    self.clients
+      .claim()
+      .then(() => caches.keys())
       .then((keys) =>
         Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))),
       )
-      .then(() => self.clients.claim())
-      // Large bundles are cached here rather than during install: a ~1MB
-      // install-time addAll() leaves the worker unable to take control
-      // (see MAX_PRECACHE_BYTES). Best-effort — activation must succeed
-      // even if this fetch fails (e.g. updating while offline).
-      .then(() =>
-        caches
-          .open(CACHE_NAME)
-          .then((cache) => cache.addAll(LAZY_URLS))
-          .catch(() => undefined),
-      ),
+      .then(() => {
+        riActivateDone = true;
+      }),
   );
+  // Large bundles are cached in the background, deliberately NOT in
+  // waitUntil: a ~1MB addAll() would hold the worker in "activating" while
+  // the page already sees it as active (Chromium propagates the state
+  // change optimistically), making "activated" untrustworthy for
+  // offline-readiness checks (P6-03). Best-effort — a failure here (e.g.
+  // updating while offline) must not affect activation, and the fetch
+  // handler caches assets on miss anyway.
+  caches
+    .open(CACHE_NAME)
+    .then((cache) => cache.addAll(LAZY_URLS))
+    .catch(() => undefined);
 });
 
+// Readiness ping (P6-03). The page's view of registration.active.state
+// can report "activated" before the browser process finishes the activate
+// handler (Chromium propagates the state change optimistically). The pong
+// is only sent after riActivateDone is set, giving tests a trustworthy
+// offline-readiness signal. Harmless in production.
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;

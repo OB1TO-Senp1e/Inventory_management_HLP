@@ -38,13 +38,27 @@ test.describe("pwa", () => {
     test("offline reload serves the cached app shell", async ({ page, context }) => {
       await stubBackend(page);
       await page.goto("/");
-      // Wait for the worker to install + activate (skipWaiting + claim)
-      // before cutting the network — only an activated worker can serve
-      // the offline shell.
+      // Wait until the worker is truly ready to serve offline. Merely
+      // observing `active.state === "activated"` is racy — Chromium
+      // propagates the state change optimistically, so the page can see
+      // "activated" while the browser process is still finishing
+      // activation (P6-03). We wait for the controller plus the cached
+      // shell, then let the worker settle before cutting the network:
+      // going offline immediately after activation races the worker's
+      // startup and the offline navigation fails with
+      // ERR_INTERNET_DISCONNECTED.
       await page.waitForFunction(async () => {
         const reg = await navigator.serviceWorker.getRegistration();
-        return reg?.active?.state === "activated";
+        if (reg?.active?.state !== "activated") return false;
+        if (navigator.serviceWorker.controller?.state !== "activated")
+          return false;
+        const keys = await caches.keys();
+        const shell = keys.find((k) => k.startsWith("ri-shell"));
+        if (!shell) return false;
+        const cache = await caches.open(shell);
+        return (await cache.match("/index.html")) !== undefined;
       });
+      await page.waitForTimeout(2000);
       await context.setOffline(true);
       try {
         await page.reload();

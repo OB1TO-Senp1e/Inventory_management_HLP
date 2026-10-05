@@ -40,7 +40,9 @@ describe("buildServiceWorkerSource", () => {
     expect(source).toContain('request.mode === "navigate"');
     expect(source).toContain('caches.match("/index.html")');
     expect(source).toContain("self.skipWaiting()");
-    expect(source).toContain("self.clients.claim()");
+    // Claim takes control of open pages; written as a chained call so it
+    // runs before cache maintenance in the activate handler.
+    expect(source).toMatch(/self\.clients\s*\n?\s*\.claim\(\)/);
     // Vary: Origin would otherwise make precached responses unmatchable
     // for the page's CORS-mode module scripts.
     expect(source).toContain("ignoreVary: true");

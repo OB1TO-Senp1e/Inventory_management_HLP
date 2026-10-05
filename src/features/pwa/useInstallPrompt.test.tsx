@@ -1,5 +1,6 @@
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stashInstallPrompt } from "./earlyInstallPrompt";
 import { InstallAppButton } from "./InstallAppButton";
 import { useInstallPrompt } from "./useInstallPrompt";
 
@@ -21,6 +22,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Reset the shared module store so stashed events don't leak between tests.
+  stashInstallPrompt(null);
   vi.restoreAllMocks();
 });
 

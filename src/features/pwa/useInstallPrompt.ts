@@ -1,4 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  getInstallPrompt,
+  stashInstallPrompt,
+  subscribeInstallPrompt,
+} from "./earlyInstallPrompt";
 
 /**
  * The install prompt event Chromium fires when the PWA is installable.
@@ -18,13 +23,19 @@ export interface InstallPromptState {
 }
 
 /**
- * PWA install prompt (P6-01). Captures `beforeinstallprompt` so the app can
- * surface its own install button, and hides once the app is installed
- * (either via `appinstalled` or an already-standalone display mode).
+ * PWA install prompt (P6-01, shared store P6-03). The deferred
+ * `beforeinstallprompt` event lives in a module-level store (see
+ * `./earlyInstallPrompt`) so every hook instance — the button is rendered
+ * in both the mobile top bar and the desktop header — sees it, and hiding
+ * after prompting hides all instances. The entry bundle captures the event
+ * early via `captureEarlyInstallPrompt` so a fast-firing event isn't lost
+ * while the lazy shell chunk downloads.
  */
 export function useInstallPrompt(): InstallPromptState {
-  const [deferredPrompt, setDeferredPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
+  const deferredPrompt = useSyncExternalStore(
+    subscribeInstallPrompt,
+    getInstallPrompt,
+  );
   const [installed, setInstalled] = useState<boolean>(() =>
     typeof window !== "undefined" &&
     typeof window.matchMedia === "function"
@@ -33,14 +44,17 @@ export function useInstallPrompt(): InstallPromptState {
   );
 
   useEffect(() => {
+    // Fallback for environments where captureEarlyInstallPrompt was not
+    // called (unit tests): forward late-firing events into the shared store.
+    // In the app the entry bundle's listener is already attached and also
+    // calls preventDefault(); double-handling is harmless (idempotent stash).
     const onBeforeInstallPrompt = (event: Event) => {
-      // Suppress the automatic mini-infobar; the app shows its own button.
       event.preventDefault();
-      setDeferredPrompt(event as BeforeInstallPromptEvent);
+      stashInstallPrompt(event as BeforeInstallPromptEvent);
     };
     const onAppInstalled = () => {
       setInstalled(true);
-      setDeferredPrompt(null);
+      stashInstallPrompt(null);
     };
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onAppInstalled);
@@ -51,12 +65,12 @@ export function useInstallPrompt(): InstallPromptState {
   }, []);
 
   const promptInstall = useCallback(async () => {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    // Hide the button once the user has seen the prompt; the
-    // `appinstalled` event covers acceptance.
-    setDeferredPrompt(null);
-  }, [deferredPrompt]);
+    const promptEvent = getInstallPrompt();
+    // Clear first: hides every button instance, and a remount won't re-offer
+    // the consumed event.
+    stashInstallPrompt(null);
+    await promptEvent?.prompt();
+  }, []);
 
   return { canInstall: !installed && deferredPrompt !== null, promptInstall };
 }
