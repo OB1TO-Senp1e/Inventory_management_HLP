@@ -41,7 +41,7 @@
 
 - [DONE] P4-01 | Menu items and recipes: schema, builder UI, yield, unit conversion | depends: P1-01 | acceptance: recipe builder adds ingredients with qty/unit; yield set; unit conversion validated and tested
 - [DONE] P4-02 | Recipe costing: live cost per dish, food-cost %, selling price field | depends: P4-01, P2-02 | acceptance: cost per dish updates as ingredient costs change; food-cost % = cost/price; en-IN ₹ formatting
-- [TODO] P4-03 | RPC record_sales deducting stock via recipes + sales entry UI (per dish, per day) | depends: P4-01, P2-01 | acceptance: sales entry posts sale_deduction movements per ingredient; daily entry aggregates; e2e passes
+- [DONE] P4-03 | RPC record_sales deducting stock via recipes + sales entry UI (per dish, per day) | depends: P4-01, P2-01 | acceptance: sales entry posts sale_deduction movements per ingredient; daily entry aggregates; e2e passes
 - [TODO] P4-04 | Insufficient stock handling on sale deduction (warn, allow with negative flag, audit) | depends: P4-03 | acceptance: selling beyond stock shows warning, allows with explicit confirm, flags movement and audit log entry
 
 ## Phase 5 — Counts and reporting

@@ -231,6 +231,10 @@ const PURCHASE_ORDER_LINES = [
  * result. These let the deterministic specs exercise the PO UI flows without
  * a backend; the real RPC semantics are covered by supabase/tests and
  * the live e2e flow.
+ *
+ * `record_sales` (P4-03) is dynamic: it echoes the posted lines (resolving
+ * dish names from MENU_ITEMS) and the posted sale date, so date-sensitive
+ * assertions stay correct without a backend.
  */
 const RPC_STUBS: Record<string, unknown> = {
   "rpc:create_purchase_order": "c0000000-0000-0000-0000-000000000001",
@@ -375,6 +379,38 @@ async function handle(route: Route): Promise<void> {
       status: 200,
       headers: { "content-type": "application/json" },
       body: JSON.stringify(RPC_STUBS[key]),
+    });
+    return;
+  }
+
+  // P4-03: record_sales echoes the posted entry so the sales specs can
+  // assert on the real summary (sale date + dish names) with zero backend.
+  if (key === "rpc:record_sales") {
+    const body = (await route.request().postDataJSON()) as {
+      p_lines: { menu_item_id: string; dishes: number }[];
+      p_sale_date: string;
+    };
+    const lines = (body.p_lines ?? []).map((line) => ({
+      menu_item_id: line.menu_item_id,
+      name:
+        MENU_ITEMS.find((m) => m.id === line.menu_item_id)?.name ?? "Unknown",
+      dishes: line.dishes,
+    }));
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sale_date: body.p_sale_date,
+        lines,
+        ingredients: [
+          {
+            item_id: ITEMS[0].id,
+            name: ITEMS[0].name,
+            quantity: 2,
+            unit_symbol: "kg",
+          },
+        ],
+      }),
     });
     return;
   }

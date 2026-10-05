@@ -856,6 +856,7 @@ export type Database = {
         Returns: Json;
       };
       receive_purchase_order: { Args: { p_lines: Json; p_po_id: string }; Returns: Json };
+      record_sales: { Args: { p_lines: Json; p_sale_date?: string }; Returns: Json };
       send_purchase_order: { Args: { p_po_id: string }; Returns: undefined };
       set_preferred_supplier: {
         Args: { p_item_id: string; p_supplier_id: string };

@@ -21,6 +21,7 @@ import { PurchaseOrderPrintPage } from "@/features/purchasing/PurchaseOrderPrint
 import { StockOverviewPage } from "@/features/stock/StockOverviewPage";
 import { WastagePage } from "@/features/stock/WastagePage";
 import { RecipesPage } from "@/features/recipes/RecipesPage";
+import { SalesEntryPage } from "@/features/sales/SalesEntryPage";
 import { routeAccess } from "./access";
 import type { UserRole } from "@/schemas/role";
 
@@ -47,6 +48,7 @@ const builtSections: Record<string, ReactNode> = {
   "/purchase-orders/:id": <PurchaseOrderDetailPage />,
   "/purchase-orders/:id/print": <PurchaseOrderPrintPage />,
   "/recipes": <RecipesPage />,
+  "/sales": <SalesEntryPage />,
 };
 
 /**

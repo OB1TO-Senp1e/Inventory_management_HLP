@@ -20,7 +20,7 @@
 | `/stock`               | `features/stock/StockOverviewPage`            | owner, manager        | AppShell nav | DONE   | `e2e/stock.spec.ts`      |
 | `/wastage`             | `features/stock/WastagePage`                  | owner, manager, staff | AppShell nav | DONE   | `e2e/stock.spec.ts`      |
 | `/recipes`             | `features/recipes/RecipesPage`                | owner, manager        | AppShell nav | DONE   | `e2e/recipes.spec.ts`    |
-| `/sales`               | `features/sales/SalesEntryPage`               | owner, manager        | AppShell nav | TODO   | `e2e/sales.spec.ts`      |
+| `/sales`               | `features/sales/SalesEntryPage`               | owner, manager        | AppShell nav | DONE   | `e2e/sales.spec.ts`      |
 | `/stock-counts`        | `features/counts/StockCountsPage`             | owner, manager, staff | AppShell nav | TODO   | `e2e/counts.spec.ts`     |
 | `/stock-counts/:id`    | `features/counts/CountSheetPage`              | owner, manager, staff | counts list  | TODO   | `e2e/counts.spec.ts`     |
 | `/reports`             | `features/reports/ReportsPage`                | owner, manager        | AppShell nav | TODO   | `e2e/reports.spec.ts`    |
