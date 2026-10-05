@@ -160,6 +160,15 @@ const STOCK_MOVEMENTS = [
     unit_cost: null, reason_code: "expired", reference_type: null, notes: null,
     created_by: null, created_at: new Date().toISOString(),
   },
+  // P5-04: today's sale deduction for the food-cost trend — dynamic
+  // "today" timestamp so the IST day-boundary filter keeps it.
+  {
+    id: "a0000000-0000-0000-0000-000000000007", restaurant_id: R, item_id: ITEMS[0].id,
+    movement_type: "sale_deduction", quantity: -4, batch_no: null, expiry_date: null,
+    unit_cost: null, reason_code: null, reference_type: "sale",
+    notes: "Sale today: Butter Chicken x4",
+    created_by: null, created_at: new Date().toISOString(),
+  },
 ];
 
 const RECEIVABLE_ITEMS = ITEMS.map((item) => ({
@@ -167,6 +176,36 @@ const RECEIVABLE_ITEMS = ITEMS.map((item) => ({
   item_name: item.name,
   unit_symbol: item.units.symbol,
 }));
+
+// P5-04: supplier price history for the reports spec — one change today
+// (dynamic timestamp) and one on the fixed NOW date, both inside the
+// default 30-day report range.
+const PRICE_HISTORY = [
+  {
+    id: "c1000000-0000-0000-0000-000000000001",
+    restaurant_id: R,
+    supplier_id: SUPPLIERS[0].id,
+    item_id: ITEMS[0].id,
+    old_price: 30,
+    new_price: 32.5,
+    changed_by: null,
+    changed_at: new Date().toISOString(),
+    suppliers: { name: SUPPLIERS[0].name },
+    items: { name: ITEMS[0].name },
+  },
+  {
+    id: "c1000000-0000-0000-0000-000000000002",
+    restaurant_id: R,
+    supplier_id: SUPPLIERS[0].id,
+    item_id: ITEMS[0].id,
+    old_price: 28,
+    new_price: 30,
+    changed_by: null,
+    changed_at: NOW,
+    suppliers: { name: SUPPLIERS[0].name },
+    items: { name: ITEMS[0].name },
+  },
+];
 
 const PURCHASE_ORDERS = [
   {
@@ -483,7 +522,7 @@ const TABLES: Record<string, Record<string, unknown>[]> = {
   items: ITEMS,
   suppliers: SUPPLIERS,
   supplier_prices: SUPPLIER_PRICES,
-  supplier_price_history: [],
+  supplier_price_history: PRICE_HISTORY,
   current_stock: CURRENT_STOCK,
   stock_movements: STOCK_MOVEMENTS,
   "rpc:list_receivable_items": RECEIVABLE_ITEMS,
@@ -724,6 +763,28 @@ async function handle(route: Route): Promise<void> {
           (ing) => ing.menu_item_id === row["id"],
         ),
       }));
+    }
+  }
+
+  // P5-04: the reports queries select `items(name, avg_unit_cost,
+  // units(symbol))` on stock_movements — expand the nested item the same
+  // way the menu_items block above expands recipe ingredients.
+  if (key === "stock_movements") {
+    const select = url.searchParams.get("select") ?? "";
+    if (select.includes("items(name")) {
+      rows = rows.map((row) => {
+        const item = ITEMS.find((i) => i.id === row["item_id"]);
+        return {
+          ...row,
+          items: item
+            ? {
+                name: item.name,
+                avg_unit_cost: item.avg_unit_cost,
+                units: { symbol: item.units.symbol },
+              }
+            : null,
+        };
+      });
     }
   }
 

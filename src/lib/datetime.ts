@@ -27,3 +27,35 @@ export function todayISODateIST(): string {
 export function startOfTodayIST(): string {
   return `${todayISODateIST()}T00:00:00+05:30`;
 }
+
+/**
+ * Start of an arbitrary `YYYY-MM-DD` day in Asia/Kolkata as an ISO
+ * timestamp with the IST offset — the inclusive lower bound for a
+ * PostgREST `gte` filter on a timestamptz column.
+ */
+export function startOfDayIST(isoDate: string): string {
+  return `${isoDate}T00:00:00+05:30`;
+}
+
+/**
+ * End of an arbitrary `YYYY-MM-DD` day in Asia/Kolkata as an ISO
+ * timestamp with the IST offset — the inclusive upper bound for a
+ * PostgREST `lte` filter on a timestamptz column.
+ */
+export function endOfDayIST(isoDate: string): string {
+  return `${isoDate}T23:59:59.999+05:30`;
+}
+
+/**
+ * Convert a timestamptz ISO string to its `YYYY-MM-DD` calendar date in
+ * Asia/Kolkata. Used to bucket movements into daily series (food-cost
+ * trend) on the restaurant's wall clock rather than UTC.
+ */
+export function toISTDateString(isoDateTime: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(isoDateTime));
+}
