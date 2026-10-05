@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Plus, RotateCcw, ScanText, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { formatINR, formatNumber } from "@/lib/format";
@@ -303,6 +304,21 @@ export function ReceivingPage() {
                 onResolved={handleBarcodeResolved}
                 hint="Scanning a barcode fills the first empty line — or adds a new one."
               />
+            </div>
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border p-4">
+              <div>
+                <p className="font-medium">Have a supplier bill?</p>
+                <p className="text-sm text-muted-foreground">
+                  Photograph the bill — the scanner drafts the receipt lines
+                  for your review.
+                </p>
+              </div>
+              <Button asChild variant="outline" className="min-h-[44px]">
+                <Link to="/receiving/invoice">
+                  <ScanText className="mr-2 h-4 w-4" aria-hidden />
+                  Scan invoice
+                </Link>
+              </Button>
             </div>
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
             <div className="space-y-4">

@@ -128,6 +128,7 @@ describe("RoleGuard", () => {
 describe("canAccessPath", () => {
   it("lets staff into operational pages but not reports", () => {
     expect(canAccessPath("/receiving", "staff")).toBe(true);
+    expect(canAccessPath("/receiving/invoice", "staff")).toBe(true);
     expect(canAccessPath("/wastage", "staff")).toBe(true);
     expect(canAccessPath("/stock-counts", "staff")).toBe(true);
     expect(canAccessPath("/reports", "staff")).toBe(false);
@@ -157,6 +158,7 @@ describe("canAccessPath", () => {
 describe("isRegisteredPath", () => {
   it("matches exact and :param routes", () => {
     expect(isRegisteredPath("/receiving")).toBe(true);
+    expect(isRegisteredPath("/receiving/invoice")).toBe(true);
     expect(isRegisteredPath("/suppliers/abc-123/prices")).toBe(true);
     expect(isRegisteredPath("/items/abc-123")).toBe(true);
   });

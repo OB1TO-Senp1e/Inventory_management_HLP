@@ -35,6 +35,11 @@ const SupplierPricesPage = lazy(() =>
 const ReceivingPage = lazy(() =>
   import("@/features/stock/ReceivingPage").then((m) => ({ default: m.ReceivingPage })),
 );
+const InvoiceScanPage = lazy(() =>
+  import("@/features/invoice/InvoiceScanPage").then((m) => ({
+    default: m.InvoiceScanPage,
+  })),
+);
 const PurchaseOrdersPage = lazy(() =>
   import("@/features/purchasing/PurchaseOrdersPage").then((m) => ({
     default: m.PurchaseOrdersPage,
@@ -106,6 +111,7 @@ const builtSections: Record<string, ReactNode> = {
   "/suppliers": lazySection(<SuppliersPage />),
   "/suppliers/:id/prices": lazySection(<SupplierPricesPage />),
   "/receiving": lazySection(<ReceivingPage />),
+  "/receiving/invoice": lazySection(<InvoiceScanPage />),
   "/stock": lazySection(<StockOverviewPage />),
   "/wastage": lazySection(<WastagePage />),
   "/purchase-orders": lazySection(<PurchaseOrdersPage />),
