@@ -295,6 +295,67 @@ export type Database = {
           },
         ];
       };
+      pos_imports: {
+        Row: {
+          created_by: string | null;
+          dishes: number;
+          external_sale_id: string;
+          id: string;
+          imported_at: string;
+          menu_item_id: string;
+          provider: string;
+          restaurant_id: string;
+          sale_date: string;
+          sold_at: string | null;
+        };
+        Insert: {
+          created_by?: string | null;
+          dishes: number;
+          external_sale_id: string;
+          id?: string;
+          imported_at?: string;
+          menu_item_id: string;
+          provider: string;
+          restaurant_id: string;
+          sale_date: string;
+          sold_at?: string | null;
+        };
+        Update: {
+          created_by?: string | null;
+          dishes?: number;
+          external_sale_id?: string;
+          id?: string;
+          imported_at?: string;
+          menu_item_id?: string;
+          provider?: string;
+          restaurant_id?: string;
+          sale_date?: string;
+          sold_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pos_imports_menu_item_id_fkey";
+            columns: ["menu_item_id"];
+            isOneToOne: false;
+            referencedRelation: "menu_item_costs";
+            referencedColumns: ["menu_item_id"];
+          },
+          {
+            foreignKeyName: "pos_imports_menu_item_id_fkey";
+            columns: ["menu_item_id"];
+            isOneToOne: false;
+            referencedRelation: "menu_items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pos_imports_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           created_at: string;
@@ -1114,6 +1175,10 @@ export type Database = {
       gen_random_uuid: { Args: Record<PropertyKey, never>; Returns: string };
       gen_salt: { Args: { "": string }; Returns: string };
       has_role: { Args: { p_required: string }; Returns: boolean };
+      import_pos_sales: {
+        Args: { p_provider: string; p_sale_date?: string; p_sales: Json };
+        Returns: Json;
+      };
       list_receivable_items: {
         Args: Record<PropertyKey, never>;
         Returns: {

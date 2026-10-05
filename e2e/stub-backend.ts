@@ -627,6 +627,16 @@ const ALERT_PREFERENCES = [
   },
 ];
 
+// V2-06: imported POS sale tracking. The import_pos_sales RPC stub records
+// each posted external_sale_id here so a refetch (listImportedExternalIds)
+// shows "already imported" — the dedupe loop specs assert on it. Reset on
+// every stubBackend() call so each spec starts clean.
+const POS_IMPORTS: { external_sale_id: string; provider: string }[] = [];
+
+function resetPosStubs(): void {
+  POS_IMPORTS.length = 0;
+}
+
 // V2-03: the PATCH/POST merge blocks above mutate these arrays in place so
 // specs see posted state on refetch. Reset them on every stubBackend()
 // call so each spec starts from the same canned inbox.
@@ -664,6 +674,7 @@ const TABLES: Record<string, Record<string, unknown>[]> = {
   audit_log: AUDIT_LOG,
   notifications: NOTIFICATIONS,
   alert_preferences: ALERT_PREFERENCES,
+  pos_imports: POS_IMPORTS,
 };
 
 /** Tiny PostgREST subset: eq/neq/ilike filters, limit/offset, content-range. */
@@ -746,6 +757,68 @@ async function handle(route: Route): Promise<void> {
             unit_symbol: "kg",
           },
         ],
+      }),
+    });
+    return;
+  }
+
+  // V2-06: import_pos_sales records each posted external_sale_id in the
+  // per-test POS_IMPORTS set (so refetch shows "already imported") and
+  // echoes the posted lines aggregated per dish in the real RPC's shape —
+  // { provider, sale_date, imported, sales: { sale_date, lines,
+  // ingredients } } — mirroring record_sales for the inner summary.
+  if (key === "rpc:import_pos_sales") {
+    const body = (await route.request().postDataJSON()) as {
+      p_provider: string;
+      p_sales: { external_sale_id: string; menu_item_id: string; dishes: number }[];
+      p_sale_date: string;
+    };
+    const sales = body.p_sales ?? [];
+    for (const sale of sales) {
+      if (
+        !POS_IMPORTS.some(
+          (row) =>
+            row.external_sale_id === sale.external_sale_id &&
+            row.provider === body.p_provider,
+        )
+      ) {
+        POS_IMPORTS.push({
+          external_sale_id: sale.external_sale_id,
+          provider: body.p_provider,
+        });
+      }
+    }
+    const byDish = new Map<string, number>();
+    for (const sale of sales) {
+      byDish.set(
+        sale.menu_item_id,
+        (byDish.get(sale.menu_item_id) ?? 0) + sale.dishes,
+      );
+    }
+    const lines = [...byDish.entries()].map(([menu_item_id, dishes]) => ({
+      menu_item_id,
+      name: MENU_ITEMS.find((m) => m.id === menu_item_id)?.name ?? "Unknown",
+      dishes,
+    }));
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        provider: body.p_provider,
+        sale_date: body.p_sale_date,
+        imported: sales.length,
+        sales: {
+          sale_date: body.p_sale_date,
+          lines,
+          ingredients: [
+            {
+              item_id: ITEMS[0].id,
+              name: ITEMS[0].name,
+              quantity: 2,
+              unit_symbol: "kg",
+            },
+          ],
+        },
       }),
     });
     return;
@@ -1106,5 +1179,6 @@ async function handle(route: Route): Promise<void> {
  */
 export async function stubBackend(page: Page): Promise<void> {
   resetAlertStubs();
+  resetPosStubs();
   await page.route("**/rest/v1/**", handle);
 }

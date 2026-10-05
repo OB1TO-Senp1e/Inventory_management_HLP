@@ -43,6 +43,12 @@ const recordSalesResultSchema = z.object({
   ingredients: z.array(summaryIngredientSchema),
 });
 
+/**
+ * Exported for the POS import API (V2-06): `import_pos_sales` nests the
+ * `record_sales` summary inside its own result, under the same contract.
+ */
+export { recordSalesResultSchema };
+
 export interface SalesSummaryLine {
   menuItemId: string;
   name: string;
@@ -60,6 +66,15 @@ export interface RecordSalesResult {
   saleDate: string;
   lines: SalesSummaryLine[];
   ingredients: SalesSummaryIngredient[];
+}
+
+/**
+ * Exported for the POS import API (V2-06), which nests this summary.
+ */
+export function toRecordSalesResult(
+  raw: z.infer<typeof recordSalesResultSchema>,
+): RecordSalesResult {
+  return toResult(raw);
 }
 
 function toResult(

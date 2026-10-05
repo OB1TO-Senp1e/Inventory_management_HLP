@@ -16,6 +16,7 @@ import {
 } from "@/schemas/sales";
 import { useMenuItems } from "@/features/recipes/hooks";
 import { usePreviewSalesDeductions, useRecordSales } from "./hooks";
+import { PosImportDialog } from "./PosImportDialog";
 
 const inputClass =
   "h-11 w-full rounded-md border border-input bg-background px-3 text-sm " +
@@ -81,6 +82,7 @@ export function SalesEntryPage() {
   const previewDeductions = usePreviewSalesDeductions();
   const [pendingOverSale, setPendingOverSale] =
     useState<PendingOverSale | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const {
     register,
@@ -167,7 +169,18 @@ export function SalesEntryPage() {
       <PageHeader
         title="Sales entry"
         description="Record a day's sales per dish. Each entry deducts the recipe ingredients from stock on the append-only ledger — entries cannot be edited afterwards."
+        actions={
+          <Button
+            variant="outline"
+            className="min-h-[44px]"
+            onClick={() => setImportOpen(true)}
+            data-testid="pos-import-open"
+          >
+            Import from POS
+          </Button>
+        }
       />
+      <PosImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
 
       {dishes.isLoading && (
         <div className="max-w-xl space-y-3" aria-label="Loading dishes">

@@ -10,6 +10,7 @@ import { useMenuItems } from "@/features/recipes/hooks";
 vi.mock("./hooks", () => ({
   useRecordSales: vi.fn(),
   usePreviewSalesDeductions: vi.fn(),
+  useImportPosSales: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 // The real useMenuItems needs an auth session + backend; mock it — these
