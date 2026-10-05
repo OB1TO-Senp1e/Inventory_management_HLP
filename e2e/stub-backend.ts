@@ -347,6 +347,68 @@ const UNIT_CONVERSIONS = [
   },
 ];
 
+// P5-01: stock count sessions. The list select nests
+// `stock_count_lines(counted_qty)`; the detail select expands full line rows
+// (see the handler below, mirroring the P4-02 menu_items expansion).
+const STOCK_COUNTS = [
+  {
+    id: "90000000-0000-0000-0000-000000000001",
+    restaurant_id: R,
+    title: "Weekly full count",
+    status: "in_progress",
+    assigned_to: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+    created_at: NOW,
+    updated_at: NOW,
+    stock_count_lines: [{ counted_qty: 6 }, { counted_qty: null }],
+  },
+  {
+    id: "90000000-0000-0000-0000-000000000002",
+    restaurant_id: R,
+    title: "October opening count",
+    status: "submitted",
+    assigned_to: null,
+    created_at: NOW,
+    updated_at: NOW,
+    stock_count_lines: [{ counted_qty: 10 }, { counted_qty: 4 }],
+  },
+];
+
+const STOCK_COUNT_LINES = [
+  {
+    id: "91000000-0000-0000-0000-000000000001",
+    count_id: "90000000-0000-0000-0000-000000000001",
+    restaurant_id: R,
+    item_id: ITEMS[0].id,
+    expected_qty: 7.5,
+    counted_qty: 6,
+    items: { name: ITEMS[0].name, units: { symbol: "kg" } },
+  },
+  {
+    id: "91000000-0000-0000-0000-000000000002",
+    count_id: "90000000-0000-0000-0000-000000000001",
+    restaurant_id: R,
+    item_id: ITEMS[1].id,
+    expected_qty: 2,
+    counted_qty: null,
+    items: { name: ITEMS[1].name, units: { symbol: "L" } },
+  },
+];
+
+// P5-01: profiles for the count assignee picker (v1 has no display names —
+// the UI shows role + short id).
+const PROFILES = [
+  {
+    id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+    restaurant_id: R,
+    role: "staff",
+  },
+  {
+    id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+    restaurant_id: R,
+    role: "owner",
+  },
+];
+
 const TABLES: Record<string, Record<string, unknown>[]> = {
   item_categories: CATEGORIES,
   storage_locations: LOCATIONS,
@@ -365,6 +427,9 @@ const TABLES: Record<string, Record<string, unknown>[]> = {
   recipe_ingredients: RECIPE_INGREDIENTS,
   unit_conversions: UNIT_CONVERSIONS,
   restaurants: [{ id: R, name: "Testaurant", created_at: NOW, updated_at: NOW }],
+  stock_counts: STOCK_COUNTS,
+  stock_count_lines: STOCK_COUNT_LINES,
+  profiles: PROFILES,
 };
 
 /** Tiny PostgREST subset: eq/neq/ilike filters, limit/offset, content-range. */
@@ -477,6 +542,66 @@ async function handle(route: Route): Promise<void> {
   }
 
   let rows = [...(TABLES[key] ?? [])];
+
+  // P5-01: create_stock_count echoes the posted title/assignee as a new
+  // draft session row, so the create-dialog specs can assert the real
+  // success path (toast + "open the count sheet") with zero backend.
+  if (key === "rpc:create_stock_count") {
+    const body = (await route.request().postDataJSON()) as {
+      p_title: string;
+      p_assigned_to: string | null;
+    };
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "90000000-0000-0000-0000-000000000003",
+        restaurant_id: R,
+        title: body.p_title,
+        status: "draft",
+        assigned_to: body.p_assigned_to,
+        created_at: NOW,
+        updated_at: NOW,
+      }),
+    });
+    return;
+  }
+
+  // P5-01: the count detail select asks for full line rows while the list
+  // select asks for `stock_count_lines(counted_qty)`. The canned sessions
+  // carry the count shape, so expand the nested rows for detail-shaped
+  // selects — otherwise the detail Zod schema rejects the response.
+  if (key === "stock_counts") {
+    const select = url.searchParams.get("select") ?? "";
+    if (select.includes("stock_count_lines(id,")) {
+      rows = rows.map((row) => ({
+        ...row,
+        stock_count_lines: STOCK_COUNT_LINES.filter(
+          (line) => line.count_id === row["id"],
+        ),
+      }));
+    }
+  }
+
+  // P5-01: merge PATCH bodies into the returned rows (scoped to the counts
+  // tables) so save-progress and submit specs see the state they posted —
+  // the UI refetches after both mutations.
+  if (
+    route.request().method() === "PATCH" &&
+    (key === "stock_counts" || key === "stock_count_lines")
+  ) {
+    let patchBody: Record<string, unknown> = {};
+    try {
+      patchBody =
+        ((await route.request().postDataJSON()) as Record<
+          string,
+          unknown
+        >) ?? {};
+    } catch {
+      // No JSON body — return the rows unchanged.
+    }
+    rows = rows.map((row) => ({ ...row, ...patchBody }));
+  }
 
   // P4-02: the recipe detail select asks for full ingredient rows while the
   // list select asks for `recipe_ingredients(count)`. The canned menu_items

@@ -4,14 +4,17 @@ import { MemoryRouter } from "react-router-dom";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { useItem } from "@/features/items/hooks";
 import { useSupplier } from "@/features/suppliers/hooks";
+import { useStockCount } from "@/features/counts/hooks";
 
 // The detail-name lookups are mocked: these tests verify crumb labels and
 // link behavior, not data fetching.
 vi.mock("@/features/items/hooks", () => ({ useItem: vi.fn() }));
 vi.mock("@/features/suppliers/hooks", () => ({ useSupplier: vi.fn() }));
+vi.mock("@/features/counts/hooks", () => ({ useStockCount: vi.fn() }));
 
 const mockedUseItem = vi.mocked(useItem);
 const mockedUseSupplier = vi.mocked(useSupplier);
+const mockedUseStockCount = vi.mocked(useStockCount);
 
 function renderAt(path: string) {
   return render(
@@ -29,6 +32,9 @@ beforeEach(() => {
   >);
   mockedUseSupplier.mockReturnValue({ data: undefined } as ReturnType<
     typeof useSupplier
+  >);
+  mockedUseStockCount.mockReturnValue({ data: undefined } as ReturnType<
+    typeof useStockCount
   >);
 });
 
@@ -112,5 +118,18 @@ describe("Breadcrumbs", () => {
       "aria-current",
       "page",
     );
+  });
+
+  it("resolves the count id crumb to the count title", () => {
+    mockedUseStockCount.mockReturnValue({
+      data: { title: "Weekly full count" },
+    } as ReturnType<typeof useStockCount>);
+    renderAt("/stock-counts/abc-123");
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(nav).getByText("Weekly full count")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(nav).queryByText("Abc 123")).not.toBeInTheDocument();
   });
 });

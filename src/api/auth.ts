@@ -181,3 +181,29 @@ export function onAuthStateChange(callback: (session: AuthSession | null) => voi
     data.subscription.unsubscribe();
   };
 }
+
+/**
+ * List the profiles of the caller's restaurant (P5-01: assignee picker for
+ * stock counts). RLS (`profiles_select_same_restaurant`) limits rows to the
+ * caller's restaurant. Profiles carry no display name in v1 — callers show
+ * the role plus a short id.
+ */
+export interface AssigneeProfile {
+  id: string;
+  role: UserRole;
+}
+
+export async function listProfiles(): Promise<AssigneeProfile[]> {
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .from("profiles")
+    .select("id, role")
+    .order("role", { ascending: true })
+    .order("id", { ascending: true });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return z
+    .array(z.object({ id: z.string(), role: userRoleSchema }))
+    .parse(data);
+}

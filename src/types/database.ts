@@ -458,6 +458,109 @@ export type Database = {
         };
         Relationships: [];
       };
+      stock_count_lines: {
+        Row: {
+          count_id: string;
+          counted_qty: number | null;
+          created_at: string;
+          expected_qty: number;
+          id: string;
+          item_id: string;
+          restaurant_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          count_id: string;
+          counted_qty?: number | null;
+          created_at?: string;
+          expected_qty: number;
+          id?: string;
+          item_id: string;
+          restaurant_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          count_id?: string;
+          counted_qty?: number | null;
+          created_at?: string;
+          expected_qty?: number;
+          id?: string;
+          item_id?: string;
+          restaurant_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stock_count_lines_count_id_fkey";
+            columns: ["count_id"];
+            isOneToOne: false;
+            referencedRelation: "stock_counts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_count_lines_item_id_fkey";
+            columns: ["item_id"];
+            isOneToOne: false;
+            referencedRelation: "items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_count_lines_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      stock_counts: {
+        Row: {
+          assigned_to: string | null;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          restaurant_id: string;
+          status: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          assigned_to?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          restaurant_id: string;
+          status?: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          assigned_to?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          restaurant_id?: string;
+          status?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stock_counts_assigned_to_fkey";
+            columns: ["assigned_to"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_counts_restaurant_id_fkey";
+            columns: ["restaurant_id"];
+            isOneToOne: false;
+            referencedRelation: "restaurants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       stock_movements: {
         Row: {
           batch_no: string | null;
@@ -885,7 +988,27 @@ export type Database = {
         };
         Returns: string;
       };
+      create_stock_count: {
+        Args: { p_assigned_to?: string; p_title: string };
+        Returns: {
+          assigned_to: string | null;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          restaurant_id: string;
+          status: string;
+          title: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "stock_counts";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       current_restaurant_id: { Args: Record<PropertyKey, never>; Returns: string };
+      current_user_id: { Args: Record<PropertyKey, never>; Returns: string };
       dearmor: { Args: { "": string }; Returns: string };
       gen_random_uuid: { Args: Record<PropertyKey, never>; Returns: string };
       gen_salt: { Args: { "": string }; Returns: string };
@@ -947,6 +1070,7 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      stock_count_visible: { Args: { p_count_id: string }; Returns: boolean };
     };
     Enums: {
       [_ in never]: never;

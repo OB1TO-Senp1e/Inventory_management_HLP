@@ -13,6 +13,9 @@ vi.mock("@/features/items/hooks", () => ({
 vi.mock("@/features/suppliers/hooks", () => ({
   useSupplier: () => ({ data: undefined }),
 }));
+vi.mock("@/features/counts/hooks", () => ({
+  useStockCount: () => ({ data: undefined }),
+}));
 
 function signedInValue(role: UserRole): AuthContextValue {
   return {
