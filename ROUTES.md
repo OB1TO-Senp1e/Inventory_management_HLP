@@ -8,7 +8,7 @@
 | `/login`               | `features/auth/LoginPage`                     | public                | redirect     | DONE   | `e2e/auth.spec.ts` (deferred: P0-04b) |
 | `/reset-password`      | `features/auth/ResetPasswordPage`             | public                | login        | DONE   | `e2e/auth.spec.ts` (deferred: P0-04b) |
 | `/`                    | `features/home/HomePage`                      | owner, manager, staff | AppShell nav | DONE   | `e2e/smoke.spec.ts` |
-| `/dashboard`           | `features/dashboard/DashboardPage`            | owner, manager        | AppShell nav | TODO   | `e2e/dashboard.spec.ts`  |
+| `/dashboard`           | `features/dashboard/DashboardPage`            | owner, manager        | AppShell nav | DONE   | `e2e/dashboard.spec.ts`  |
 | `/items`               | `features/items/ItemsPage`                    | owner, manager        | AppShell nav | DONE   | `e2e/items.spec.ts`      |
 | `/items/:id`           | `features/items/ItemDetailPage`               | owner, manager        | items list   | DONE   | `e2e/stock.spec.ts`      |
 | `/suppliers`           | `features/suppliers/SuppliersPage`            | owner, manager        | AppShell nav | DONE   | `e2e/suppliers.spec.ts`  |

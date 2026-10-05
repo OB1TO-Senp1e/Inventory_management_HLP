@@ -145,6 +145,21 @@ const STOCK_MOVEMENTS = [
     unit_cost: null, reason_code: "kitchen_use", reference_type: null, notes: null,
     created_by: null, created_at: NOW,
   },
+  // P5-03: today's movements for the dashboard card — dynamic "today"
+  // timestamps so the IST day-boundary filter keeps them. No batch_no so
+  // they stay out of the overview's batch-expiry aggregates.
+  {
+    id: "a0000000-0000-0000-0000-000000000005", restaurant_id: R, item_id: ITEMS[0].id,
+    movement_type: "usage", quantity: -2, batch_no: null, expiry_date: null,
+    unit_cost: null, reason_code: "kitchen_use", reference_type: null, notes: null,
+    created_by: null, created_at: new Date().toISOString(),
+  },
+  {
+    id: "a0000000-0000-0000-0000-000000000006", restaurant_id: R, item_id: ITEMS[1].id,
+    movement_type: "wastage", quantity: -1, batch_no: null, expiry_date: null,
+    unit_cost: null, reason_code: "expired", reference_type: null, notes: null,
+    created_by: null, created_at: new Date().toISOString(),
+  },
 ];
 
 const RECEIVABLE_ITEMS = ITEMS.map((item) => ({
@@ -728,7 +743,7 @@ async function handle(route: Route): Promise<void> {
       rows = rows.filter((row) => values.includes(String(row[param])));
       continue;
     }
-    const m = /^(eq|neq|ilike)\.(.*)$/.exec(value);
+    const m = /^(eq|neq|ilike|gte|lte|gt|lt)\.(.*)$/.exec(value);
     if (!m) continue;
     const [, op, raw] = m;
     rows = rows.filter((row) => {
@@ -736,6 +751,12 @@ async function handle(route: Route): Promise<void> {
       const s = v === null || v === undefined ? "" : String(v);
       if (op === "eq") return s === raw;
       if (op === "neq") return s !== raw;
+      // Range ops compare as strings — correct for ISO timestamps and
+      // numeric strings PostgREST returns.
+      if (op === "gte") return s >= raw;
+      if (op === "lte") return s <= raw;
+      if (op === "gt") return s > raw;
+      if (op === "lt") return s < raw;
       // ilike: treat % as wildcard on both sides
       return s.toLowerCase().includes(raw.replace(/%/g, "").toLowerCase());
     });

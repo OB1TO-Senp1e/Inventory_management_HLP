@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { useItemLookups } from "@/features/items/hooks";
@@ -8,6 +8,7 @@ import {
   useStockOverviewRealtime,
 } from "@/features/items/stockHooks";
 import { ReorderSuggestions } from "@/features/purchasing/ReorderSuggestions";
+import { isExpiring, isLowStock } from "./stockStatus";
 import type { StockOverviewRow } from "@/api/stock";
 import { expiryStatus } from "@/lib/expiry";
 import { formatDate, formatNumber } from "@/lib/format";
@@ -15,15 +16,6 @@ import { formatDate, formatNumber } from "@/lib/format";
 const inputClass =
   "h-11 rounded-md border border-input bg-background px-3 text-sm " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-
-function isLowStock(row: StockOverviewRow): boolean {
-  return row.quantity <= row.reorderPoint;
-}
-
-function isExpiring(row: StockOverviewRow): boolean {
-  const status = expiryStatus(row.earliestExpiry);
-  return status === "soon" || status === "expired";
-}
 
 function LowStockBadge() {
   return (
@@ -188,10 +180,17 @@ function StockCards({ rows }: { rows: StockOverviewRow[] }) {
  * the overview so it refreshes without a reload (best-effort).
  */
 export function StockOverviewPage() {
+  // The dashboard links here with ?low=1 / ?expiring=1; the checkboxes stay
+  // interactive afterwards.
+  const [searchParams] = useSearchParams();
   const [categoryId, setCategoryId] = useState("");
   const [locationId, setLocationId] = useState("");
-  const [lowOnly, setLowOnly] = useState(false);
-  const [expiringOnly, setExpiringOnly] = useState(false);
+  const [lowOnly, setLowOnly] = useState(
+    () => searchParams.get("low") === "1",
+  );
+  const [expiringOnly, setExpiringOnly] = useState(
+    () => searchParams.get("expiring") === "1",
+  );
 
   const overview = useStockOverview();
   const lookups = useItemLookups();

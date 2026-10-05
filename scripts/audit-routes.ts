@@ -238,7 +238,10 @@ function staticPhase(): { rows: RouteRow[]; registered: string[] } {
         if (target === "" || isExternalUrl(target)) {
           continue;
         }
-        if (!matchesRegistered(target)) {
+        // Query strings and hashes don't change the route (e.g. the
+        // dashboard links to /stock?low=1); strip them before matching.
+        const pathOnly = target.split(/[?#]/)[0] || "/";
+        if (!matchesRegistered(pathOnly)) {
           fail(`${rel}: navigation target "${target}" is not a registered route`);
         }
       }
