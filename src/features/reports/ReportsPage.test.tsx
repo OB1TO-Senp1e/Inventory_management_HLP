@@ -9,10 +9,16 @@ import {
   useFoodCostTrend,
   useMenuEngineeringReport,
   usePriceChangeReport,
+  useRevenueReport,
   useUsageReport,
   useWastageReport,
 } from "./hooks";
-import type { UsageRow, WastageReasonRow, FoodCostDay } from "@/lib/reports";
+import type {
+  UsageRow,
+  WastageReasonRow,
+  FoodCostDay,
+  RevenueReport,
+} from "@/lib/reports";
 import type { PriceChangeReport } from "@/api/reports";
 import type { MenuEngineeringReport } from "@/lib/menuEngineering";
 
@@ -22,6 +28,7 @@ vi.mock("./hooks", () => ({
   useFoodCostTrend: vi.fn(),
   usePriceChangeReport: vi.fn(),
   useMenuEngineeringReport: vi.fn(),
+  useRevenueReport: vi.fn(),
 }));
 
 vi.mock("@/lib/csv", async (importOriginal) => {
@@ -34,6 +41,7 @@ const mockedUseWastageReport = vi.mocked(useWastageReport);
 const mockedUseFoodCostTrend = vi.mocked(useFoodCostTrend);
 const mockedUsePriceChangeReport = vi.mocked(usePriceChangeReport);
 const mockedUseMenuEngineeringReport = vi.mocked(useMenuEngineeringReport);
+const mockedUseRevenueReport = vi.mocked(useRevenueReport);
 const mockedDownloadCSV = vi.mocked(downloadCSV);
 
 const USAGE: UsageRow[] = [
@@ -137,12 +145,45 @@ const MENU_ENGINEERING: MenuEngineeringReport = {
   totalContribution: 1519,
 };
 
+const REVENUE: RevenueReport = {
+  days: [
+    {
+      date: "2026-10-05",
+      revenue: 1690,
+      foodCost: 130,
+      foodCostPct: (130 / 1690) * 100,
+    },
+  ],
+  dishes: [
+    {
+      name: "Dal Makhani",
+      qtySold: 6,
+      sellingPrice: 149,
+      revenue: 894,
+      share: 894 / 1690,
+    },
+    {
+      name: "Butter Chicken",
+      qtySold: 4,
+      sellingPrice: 199,
+      revenue: 796,
+      share: 796 / 1690,
+    },
+  ],
+  totalRevenue: 1690,
+  totalFoodCost: 130,
+  overallFoodCostPct: (130 / 1690) * 100,
+  avgDailyRevenue: 1690 / 30,
+  unpricedDishes: [],
+};
+
 function mockQueries(overrides?: {
   usage?: UsageRow[];
   wastage?: WastageReasonRow[];
   foodCost?: FoodCostDay[];
   priceChanges?: PriceChangeReport;
   menuEngineering?: MenuEngineeringReport;
+  revenue?: RevenueReport;
 }) {
   const query = (data: unknown) =>
     ({ data, isLoading: false, isError: false }) as never;
@@ -158,6 +199,9 @@ function mockQueries(overrides?: {
   );
   mockedUseMenuEngineeringReport.mockReturnValue(
     query(overrides?.menuEngineering ?? MENU_ENGINEERING),
+  );
+  mockedUseRevenueReport.mockReturnValue(
+    query(overrides?.revenue ?? REVENUE),
   );
 }
 
@@ -192,6 +236,7 @@ describe("ReportsPage", () => {
       "Food cost trend",
       "Supplier price changes",
       "Menu engineering",
+      "Revenue",
     ]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
@@ -237,7 +282,7 @@ describe("ReportsPage", () => {
     mockQueries();
     renderPage();
     fireEvent.click(screen.getByRole("tab", { name: "Food cost trend" }));
-    expect(screen.getByText(/Revenue is not captured in v1/)).toBeInTheDocument();
+    expect(screen.getByText(/Revenue and the food-cost % trend live on the Revenue tab/)).toBeInTheDocument();
     expect(screen.getByText("₹130.00")).toBeInTheDocument();
   });
 
@@ -364,6 +409,119 @@ describe("ReportsPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Menu engineering" }));
     expect(
       screen.getByText("No sales recorded in this date range."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the revenue summary, dish table and live-price caveat", () => {
+    mockQueries();
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "Revenue" }));
+
+    const panel = within(screen.getByLabelText("Revenue report"));
+    // Live-price caveat is stated plainly.
+    expect(
+      panel.getByText(/evaluated at today.s price/),
+    ).toBeInTheDocument();
+    // Summary stats.
+    expect(panel.getByText("Total revenue")).toBeInTheDocument();
+    expect(panel.getByText("₹1,690.00")).toBeInTheDocument();
+    expect(panel.getByText("Avg per day")).toBeInTheDocument();
+    expect(panel.getByText("₹56.33")).toBeInTheDocument();
+    expect(panel.getByText("Food-cost %")).toBeInTheDocument();
+    expect(panel.getByText("7.7%")).toBeInTheDocument();
+    // Charts render.
+    expect(
+      panel.getByLabelText("Revenue per day (₹)"),
+    ).toBeInTheDocument();
+    expect(panel.getByLabelText("Food-cost % per day")).toBeInTheDocument();
+    // Dish table: revenue and share per dish.
+    const table = within(panel.getByRole("table"));
+    expect(table.getByText("Butter Chicken")).toBeInTheDocument();
+    expect(table.getByText("₹796.00")).toBeInTheDocument();
+    expect(table.getByText("47.1%")).toBeInTheDocument();
+    expect(table.getByText("Dal Makhani")).toBeInTheDocument();
+    expect(table.getByText("₹894.00")).toBeInTheDocument();
+    expect(table.getByText("52.9%")).toBeInTheDocument();
+  });
+
+  it("sorts the revenue table by column", () => {
+    mockQueries();
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "Revenue" }));
+
+    const panel = within(screen.getByLabelText("Revenue report"));
+    const table = panel.getByRole("table");
+    const dishCells = () =>
+      Array.from(table.querySelectorAll("tbody tr")).map(
+        (tr) => tr.querySelector("td")?.textContent ?? "",
+      );
+    // Default sort: revenue desc → Dal Makhani first.
+    expect(dishCells()).toEqual(["Dal Makhani", "Butter Chicken"]);
+    // Sort by dish name ascending.
+    fireEvent.click(screen.getByRole("button", { name: "Sort by Dish" }));
+    expect(dishCells()).toEqual(["Butter Chicken", "Dal Makhani"]);
+  });
+
+  it("exports the revenue report as CSV", () => {
+    mockQueries();
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "Revenue" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /export csv/i }));
+    expect(mockedDownloadCSV).toHaveBeenCalledTimes(1);
+    const [filename, content] = mockedDownloadCSV.mock.calls[0];
+    expect(filename).toMatch(/^revenue-by-dish-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(content).toContain("Butter Chicken");
+    expect(content).toContain("Dal Makhani");
+  });
+
+  it("shows an empty state when the revenue range has no sales", () => {
+    mockQueries({
+      revenue: {
+        days: [],
+        dishes: [],
+        totalRevenue: 0,
+        totalFoodCost: 0,
+        overallFoodCostPct: null,
+        avgDailyRevenue: 0,
+        unpricedDishes: [],
+      },
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "Revenue" }));
+    expect(
+      screen.getByText("No sales recorded in this date range."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the unpriced-dishes notice instead of dropping them", () => {
+    mockQueries({
+      revenue: {
+        ...REVENUE,
+        dishes: [
+          ...REVENUE.dishes,
+          {
+            name: "Mystery Thali",
+            qtySold: 2,
+            sellingPrice: null,
+            revenue: 0,
+            share: 0,
+          },
+        ],
+        unpricedDishes: [{ name: "Mystery Thali", qtySold: 2 }],
+      },
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "Revenue" }));
+
+    const panel = within(screen.getByLabelText("Revenue report"));
+    expect(
+      panel.getByText(/Excluded from revenue \(no sale price set\)/),
+    ).toBeInTheDocument();
+    expect(panel.getByText(/Mystery Thali ×2/)).toBeInTheDocument();
+    const table = within(panel.getByRole("table"));
+    expect(
+      within(table.getByText("Mystery Thali").closest("tr")!).getByText("—"),
     ).toBeInTheDocument();
   });
 });

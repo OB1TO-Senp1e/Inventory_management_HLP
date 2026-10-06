@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { getSupabaseClient } from "@/lib/supabase";
-import { endOfDayIST, startOfDayIST } from "@/lib/datetime";
+import { endOfDayIST, startOfDayIST, toISTDateString } from "@/lib/datetime";
 import {
   aggregateFoodCostByDay,
   aggregatePriceChanges,
+  aggregateRevenue,
   aggregateUsage,
   aggregateWastageByReason,
   priceChangePct,
@@ -11,6 +12,8 @@ import {
   type PriceChangeEvent,
   type PriceChangeSummary,
   type ReportMovement,
+  type RevenueDishSale,
+  type RevenueReport,
   type UsageRow,
   type WastageReasonRow,
 } from "@/lib/reports";
@@ -41,6 +44,7 @@ const movementRowSchema = z.object({
   quantity: z.coerce.number(),
   reason_code: z.string().nullable(),
   created_at: z.string(),
+  notes: z.string().nullable(),
   items: z.object({
     name: z.string(),
     avg_unit_cost: z.coerce.number().nullable(),
@@ -49,7 +53,7 @@ const movementRowSchema = z.object({
 });
 
 const MOVEMENT_SELECT =
-  "item_id, movement_type, quantity, reason_code, created_at, " +
+  "item_id, movement_type, quantity, reason_code, created_at, notes, " +
   "items(name, avg_unit_cost, units(symbol))";
 
 function toReportMovement(
@@ -116,14 +120,76 @@ export async function getWastageReport(
 /**
  * Food-cost trend: daily ₹ cost of `sale_deduction` movements in the
  * range, bucketed on the IST calendar date. Ingredient cost of dishes
- * sold — revenue is not captured in v1 (no POS), so the trend is ₹, not
- * %; the live food-cost % per dish stays on /recipes (P4-02).
+ * sold — the Revenue tab reports revenue and the food-cost % trend; the
+ * live food-cost % per dish stays on /recipes (P4-02).
  */
 export async function getFoodCostTrend(
   range: ReportRange,
 ): Promise<FoodCostDay[]> {
   const rows = await listMovementsInRange(range, ["sale_deduction"]);
   return aggregateFoodCostByDay(rows.map(toReportMovement), costsByItem(rows));
+}
+
+/** Inclusive calendar-day count of a validated report range. */
+function daysInRangeInclusive(range: ReportRange): number {
+  const ms =
+    new Date(`${range.to}T00:00:00Z`).getTime() -
+    new Date(`${range.from}T00:00:00Z`).getTime();
+  return Math.max(1, Math.round(ms / 86_400_000) + 1);
+}
+
+/**
+ * Revenue report (V2-10): daily revenue, revenue by dish, and the
+ * food-cost % trend for the range.
+ *
+ * Revenue = Σ (dish qty sold × dish's CURRENT sale price). Dish
+ * quantities come from parsing `sale_deduction` movement notes
+ * (`parseSaleNotes` — the same path as menu engineering, never a second
+ * parser); prices come from `listMenuItems`. Food cost reuses
+ * `aggregateFoodCostByDay` over the same movements.
+ *
+ * Live-price caveat: revenue is evaluated at TODAY's sale prices — a
+ * dish sold before a price change counts at its current price. The UI
+ * states this plainly. There is no refund concept in the ledger, so
+ * revenue is gross of refunds. No recommended prices are computed
+ * (pricing guardrail, ARCHITECTURE.md §11).
+ *
+ * Staff lockout: same as menu engineering — the route guard keeps staff
+ * off /reports, and `menu_items` has no staff RLS policies, so the
+ * price-bearing half of this query is denied to staff at the database
+ * (pinned by `supabase/tests/v2_10_revenue_test.sql`).
+ */
+export async function getRevenueReport(
+  range: ReportRange,
+): Promise<RevenueReport> {
+  const input = reportRangeSchema.parse(range);
+  const rows = await listMovementsInRange(range, ["sale_deduction"]);
+
+  const movements = rows.map(toReportMovement);
+  const foodCostDays = aggregateFoodCostByDay(movements, costsByItem(rows));
+  const foodCostByDay = new Map(
+    foodCostDays.map((day) => [day.date, day.foodCost] as const),
+  );
+
+  const sales: RevenueDishSale[] = [];
+  for (const row of rows) {
+    const date = toISTDateString(row.created_at);
+    for (const sale of parseSaleNotes(row.notes)) {
+      sales.push({ name: sale.name, qty: sale.qty, date });
+    }
+  }
+
+  const menuItems = await listMenuItems({});
+  const pricesByName = new Map(
+    menuItems.map((item) => [item.name, item.sellingPrice] as const),
+  );
+
+  return aggregateRevenue(
+    sales,
+    pricesByName,
+    foodCostByDay,
+    daysInRangeInclusive(input),
+  );
 }
 
 export interface PriceChangeReportEvent {

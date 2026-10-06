@@ -4,6 +4,7 @@ import {
   getFoodCostTrend,
   getMenuEngineeringReport,
   getPriceChangeReport,
+  getRevenueReport,
   getUsageReport,
   getWastageReport,
 } from "@/api/reports";
@@ -64,6 +65,20 @@ export function usePriceChangeReport(range: ReportRange) {
   return useQuery({
     queryKey: [...reportsQueryKey, "price-changes", rangeKey(range), restaurantId],
     queryFn: () => getPriceChangeReport(range),
+    enabled: restaurantId !== null,
+  });
+}
+
+/**
+ * Revenue (V2-10): daily revenue, revenue by dish, and the food-cost %
+ * trend in the range. Shares the reports query key family so
+ * stock-changing mutations refresh it alongside the other reports.
+ */
+export function useRevenueReport(range: ReportRange) {
+  const restaurantId = useRestaurantId();
+  return useQuery({
+    queryKey: [...reportsQueryKey, "revenue", rangeKey(range), restaurantId],
+    queryFn: () => getRevenueReport(range),
     enabled: restaurantId !== null,
   });
 }

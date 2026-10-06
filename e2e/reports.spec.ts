@@ -12,6 +12,8 @@ import { stubBackend } from "./stub-backend";
  *   ("Sale <today>: Dal Makhani x6")
  * - menu engineering: Butter Chicken (4 sold, ₹168.25 margin) → Puzzle;
  *   Dal Makhani (6 sold, ₹141.00 margin) → Plowhorse
+ * - revenue: 4×199 + 6×149 = ₹1,690.00 total; ₹56.33 avg/day;
+ *   food-cost % = 130/1690 = 7.7%
  * - wastage: Milk −1 L, reason "expired" (₹58.00 lost)
  * - supplier price history: Tomato 28 → 30 (NOW) and 30 → 32.5 (today)
  *   with Fresh Farms Produce
@@ -61,7 +63,9 @@ test.describe("reports", () => {
       await page.getByRole("tab", { name: "Food cost trend" }).click();
 
       const panel = page.getByLabel("Food cost trend report", { exact: true });
-      await expect(panel.getByText(/Revenue is not captured in v1/)).toBeVisible();
+      await expect(
+        panel.getByText(/Revenue and the food-cost % trend live on the Revenue tab/),
+      ).toBeVisible();
       await expect(panel.getByRole("table").getByText("₹130.00", { exact: true })).toBeVisible();
     });
 
@@ -111,6 +115,56 @@ test.describe("reports", () => {
       await expect(
         page.getByText("No sales recorded in this date range."),
       ).toBeVisible();
+      await page.getByRole("tab", { name: "Revenue" }).click();
+      await expect(
+        page.getByText("No sales recorded in this date range."),
+      ).toBeVisible();
+    });
+
+    test("revenue tab shows daily revenue, dish table and food-cost % trend", async ({
+      page,
+    }) => {
+      await stubBackend(page);
+      await page.goto("/reports");
+      await page.getByRole("tab", { name: "Revenue" }).click();
+
+      const panel = page.getByLabel("Revenue report", { exact: true });
+      // Summary: 4×199 + 6×149 = ₹1,690.00 total; avg/day = 1690/30;
+      // food-cost % = 130/1690 = 7.7%. (Scoped to the stat cards — the
+      // same strings can appear as chart axis ticks.)
+      const statCard = (label: string) =>
+        panel.getByText(label, { exact: true }).locator("..");
+      await expect(statCard("Total revenue")).toContainText("₹1,690.00");
+      await expect(statCard("Avg per day")).toContainText("₹56.33");
+      await expect(statCard("Food-cost %")).toContainText("7.7%");
+      // Charts render.
+      await expect(
+        panel.getByLabel("Revenue per day (₹)", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        panel.getByLabel("Food-cost % per day", { exact: true }),
+      ).toBeVisible();
+      // Dish table: Butter Chicken 4×199 = ₹796.00 (47.1%),
+      // Dal Makhani 6×149 = ₹894.00 (52.9%).
+      const table = panel.getByRole("table");
+      await expect(
+        table.getByText("Butter Chicken", { exact: true }),
+      ).toBeVisible();
+      await expect(table.getByText("₹796.00", { exact: true })).toBeVisible();
+      await expect(table.getByText("47.1%", { exact: true })).toBeVisible();
+      await expect(
+        table.getByText("Dal Makhani", { exact: true }),
+      ).toBeVisible();
+      await expect(table.getByText("₹894.00", { exact: true })).toBeVisible();
+      await expect(table.getByText("52.9%", { exact: true })).toBeVisible();
+      // Live-price caveat is stated plainly.
+      await expect(
+        panel.getByText(/evaluated at today's price/),
+      ).toBeVisible();
+      // CSV export is available.
+      await expect(
+        panel.getByRole("button", { name: /export csv/i }),
+      ).toBeEnabled();
     });
 
     test("menu engineering tab classifies dishes into quadrants", async ({
@@ -193,6 +247,7 @@ test.describe("reports live flow", () => {
       "Food cost trend",
       "Supplier price changes",
       "Menu engineering",
+      "Revenue",
     ]) {
       await expect(page.getByRole("tab", { name: label })).toBeVisible({
         timeout: 20000,

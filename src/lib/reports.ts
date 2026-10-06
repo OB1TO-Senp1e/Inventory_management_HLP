@@ -225,3 +225,155 @@ export function aggregatePriceChanges(
       a.itemName.localeCompare(b.itemName),
   );
 }
+
+/**
+ * Revenue report math (V2-10). Pure functions — no I/O.
+ *
+ * Revenue is DESCRIPTIVE: Σ (dish qty sold × dish's current sale price).
+ * Prices are the live operator-set values (P4-01), never snapshotted, so
+ * historical sales are evaluated at today's prices — the UI states this
+ * plainly. There is no refund concept in the ledger, so revenue is gross
+ * of refunds. No recommended prices are computed here (pricing guardrail,
+ * ARCHITECTURE.md §11).
+ */
+
+export interface RevenueDishSale {
+  name: string;
+  qty: number;
+  /** IST calendar date (YYYY-MM-DD) of the sale movement's posting time. */
+  date: string;
+}
+
+export interface RevenueDay {
+  /** IST calendar date, YYYY-MM-DD. */
+  date: string;
+  /** ₹ revenue = Σ dish qty × live sale price. */
+  revenue: number;
+  /** ₹ food cost = Σ |sale_deduction qty| × avg_unit_cost. */
+  foodCost: number;
+  /**
+   * (foodCost / revenue) × 100. Null when revenue is 0 — a gap in the
+   * trend, never 0% (0% would claim free food).
+   */
+  foodCostPct: number | null;
+}
+
+export interface RevenueDishRow {
+  name: string;
+  qtySold: number;
+  /** Null when the dish has no sale price set. */
+  sellingPrice: number | null;
+  /** qtySold × sellingPrice; 0 when the price is unknown. */
+  revenue: number;
+  /** revenue / totalRevenue; 0 when totalRevenue is 0. */
+  share: number;
+}
+
+export interface UnpricedDishSale {
+  name: string;
+  qtySold: number;
+}
+
+export interface RevenueReport {
+  /** One row per IST date with any sale activity, chronological. */
+  days: RevenueDay[];
+  /** One row per dish sold, sorted by revenue descending. */
+  dishes: RevenueDishRow[];
+  totalRevenue: number;
+  totalFoodCost: number;
+  /** (totalFoodCost / totalRevenue) × 100; null when totalRevenue is 0. */
+  overallFoodCostPct: number | null;
+  /** totalRevenue / daysInRange. */
+  avgDailyRevenue: number;
+  /**
+   * Dishes sold without a sale price — excluded from revenue but never
+   * dropped silently.
+   */
+  unpricedDishes: UnpricedDishSale[];
+}
+
+/**
+ * Revenue aggregation: dish sales (parsed from `sale_deduction` notes)
+ * valued at live sale prices, joined with daily food cost.
+ *
+ * @param sales per-dish quantities with their IST sale date
+ * @param pricesByName live sale price per dish name (null = not set)
+ * @param foodCostByDay daily ingredient cost keyed by IST date
+ * @param daysInRange number of calendar days in the selected range
+ *   (inclusive) — the denominator for avgDailyRevenue
+ */
+export function aggregateRevenue(
+  sales: RevenueDishSale[],
+  pricesByName: Map<string, number | null>,
+  foodCostByDay: Map<string, number>,
+  daysInRange: number,
+): RevenueReport {
+  const revenueByDay = new Map<string, number>();
+  const qtyByDish = new Map<string, number>();
+  const unpricedQty = new Map<string, number>();
+
+  for (const sale of sales) {
+    qtyByDish.set(sale.name, (qtyByDish.get(sale.name) ?? 0) + sale.qty);
+    const price = pricesByName.get(sale.name) ?? null;
+    if (price === null) {
+      unpricedQty.set(sale.name, (unpricedQty.get(sale.name) ?? 0) + sale.qty);
+      continue;
+    }
+    const lineRevenue = sale.qty * price;
+    revenueByDay.set(sale.date, (revenueByDay.get(sale.date) ?? 0) + lineRevenue);
+  }
+
+  const totalRevenue = [...revenueByDay.values()].reduce((a, b) => a + b, 0);
+
+  const dishes: RevenueDishRow[] = [...qtyByDish.entries()].map(
+    ([name, qtySold]) => {
+      const sellingPrice = pricesByName.get(name) ?? null;
+      const revenue = sellingPrice === null ? 0 : qtySold * sellingPrice;
+      return {
+        name,
+        qtySold,
+        sellingPrice,
+        revenue,
+        share: totalRevenue > 0 ? revenue / totalRevenue : 0,
+      };
+    },
+  );
+  dishes.sort(
+    (a, b) => b.revenue - a.revenue || a.name.localeCompare(b.name),
+  );
+
+  const daySet = new Set<string>([
+    ...revenueByDay.keys(),
+    ...foodCostByDay.keys(),
+  ]);
+  const days: RevenueDay[] = [...daySet].sort().map((date) => {
+    const revenue = revenueByDay.get(date) ?? 0;
+    const foodCost = foodCostByDay.get(date) ?? 0;
+    return {
+      date,
+      revenue,
+      foodCost,
+      foodCostPct: revenue > 0 ? (foodCost / revenue) * 100 : null,
+    };
+  });
+
+  const totalFoodCost = [...foodCostByDay.values()].reduce(
+    (a, b) => a + b,
+    0,
+  );
+
+  const unpricedDishes: UnpricedDishSale[] = [...unpricedQty.entries()]
+    .map(([name, qtySold]) => ({ name, qtySold }))
+    .sort((a, b) => b.qtySold - a.qtySold || a.name.localeCompare(b.name));
+
+  return {
+    days,
+    dishes,
+    totalRevenue,
+    totalFoodCost,
+    overallFoodCostPct:
+      totalRevenue > 0 ? (totalFoodCost / totalRevenue) * 100 : null,
+    avgDailyRevenue: daysInRange > 0 ? totalRevenue / daysInRange : 0,
+    unpricedDishes,
+  };
+}

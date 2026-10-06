@@ -3,6 +3,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ReferenceLine,
   ResponsiveContainer,
   Scatter,
@@ -31,6 +33,7 @@ import {
 } from "@/schemas/reports";
 import type {
   FoodCostDay,
+  RevenueDishRow,
   UsageRow,
   WastageReasonRow,
 } from "@/lib/reports";
@@ -39,6 +42,7 @@ import {
   useFoodCostTrend,
   useMenuEngineeringReport,
   usePriceChangeReport,
+  useRevenueReport,
   useUsageReport,
   useWastageReport,
 } from "./hooks";
@@ -52,7 +56,7 @@ import { cn } from "@/lib/utils";
  * range filters server-side on the Asia/Kolkata wall clock.
  */
 
-type TabId = "usage" | "wastage" | "food-cost" | "price-changes" | "menu-engineering";
+type TabId = "usage" | "wastage" | "food-cost" | "price-changes" | "menu-engineering" | "revenue";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "usage", label: "Usage" },
@@ -60,6 +64,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "food-cost", label: "Food cost trend" },
   { id: "price-changes", label: "Supplier price changes" },
   { id: "menu-engineering", label: "Menu engineering" },
+  { id: "revenue", label: "Revenue" },
 ];
 
 const REASON_LABELS: Record<string, string> = {
@@ -314,8 +319,8 @@ function FoodCostPanel({ range }: { range: ReportRange }) {
     <section aria-label="Food cost trend report" className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Daily ingredient cost of dishes sold (sale deductions × average unit
-        cost). Revenue is not captured in v1, so the trend is in ₹ — the live
-        food-cost % per dish stays on the recipes page.
+        cost). Revenue and the food-cost % trend live on the Revenue tab —
+        the live food-cost % per dish stays on the recipes page.
       </p>
       {query.isLoading ? (
         <div className="h-48 animate-pulse rounded-lg border bg-muted/40" aria-label="Loading food cost trend" />
@@ -904,6 +909,291 @@ function MenuEngineeringPanel({ range }: { range: ReportRange }) {
   );
 }
 
+type RevenueSortKey = "name" | "qtySold" | "sellingPrice" | "revenue" | "share";
+
+const REVENUE_SORT_LABELS: Record<RevenueSortKey, string> = {
+  name: "Dish",
+  qtySold: "Dishes sold",
+  sellingPrice: "Selling price",
+  revenue: "Revenue",
+  share: "Share",
+};
+
+/**
+ * Revenue-by-dish sort. Unknown selling prices (NaN) always sink to the
+ * bottom, then the dish name breaks ties.
+ */
+function sortRevenueRows(
+  rows: RevenueDishRow[],
+  key: RevenueSortKey,
+  dir: "asc" | "desc",
+): RevenueDishRow[] {
+  const factor = dir === "asc" ? 1 : -1;
+  const valueOf = (row: RevenueDishRow): number | string => {
+    switch (key) {
+      case "name":
+        return row.name.toLowerCase();
+      case "qtySold":
+        return row.qtySold;
+      case "sellingPrice":
+        return row.sellingPrice ?? Number.NaN;
+      case "revenue":
+        return row.revenue;
+      case "share":
+        return row.share;
+    }
+  };
+  return [...rows].sort((a, b) => {
+    const va = valueOf(a);
+    const vb = valueOf(b);
+    const aUnknown = typeof va === "number" && Number.isNaN(va);
+    const bUnknown = typeof vb === "number" && Number.isNaN(vb);
+    if (aUnknown || bUnknown) {
+      if (aUnknown && bUnknown) return a.name.localeCompare(b.name);
+      return aUnknown ? 1 : -1;
+    }
+    if (typeof va === "string" && typeof vb === "string") {
+      return factor * va.localeCompare(vb);
+    }
+    const diff = (va as number) - (vb as number);
+    return factor * diff || a.name.localeCompare(b.name);
+  });
+}
+
+function RevenueStatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border p-4">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+/**
+ * Revenue report (V2-10): summary stats, daily revenue bar chart,
+ * food-cost % trend, and a sortable revenue-by-dish table.
+ *
+ * Revenue is evaluated at TODAY's sale prices (the ledger keeps no price
+ * history) — the caveat below says so plainly, the same honesty as the
+ * menu-engineering caveat. Descriptive only: no recommended prices
+ * (pricing guardrail, ARCHITECTURE.md §11).
+ */
+function RevenuePanel({ range }: { range: ReportRange }) {
+  const query = useRevenueReport(range);
+  const report = query.data;
+  const [sortKey, setSortKey] = useState<RevenueSortKey>("revenue");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const rows = report ? sortRevenueRows(report.dishes, sortKey, sortDir) : [];
+
+  const toggleSort = (key: RevenueSortKey) => {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "name" ? "asc" : "desc");
+    }
+  };
+
+  const revenueChartData = (report?.days ?? []).map((day) => ({
+    label: formatDate(day.date),
+    revenue: Math.round(day.revenue * 100) / 100,
+  }));
+  const pctChartData = (report?.days ?? []).map((day) => ({
+    label: formatDate(day.date),
+    foodCostPct:
+      day.foodCostPct === null ? null : Math.round(day.foodCostPct * 10) / 10,
+  }));
+  const hasPctData = pctChartData.some((d) => d.foodCostPct !== null);
+
+  const onExport = () => {
+    exportCsv(
+      "revenue-by-dish",
+      ["Dish", "Dishes sold", "Selling price (INR)", "Revenue (INR)", "Share (%)"],
+      rows.map((row) => [
+        row.name,
+        String(row.qtySold),
+        row.sellingPrice === null ? "" : row.sellingPrice.toFixed(2),
+        row.revenue.toFixed(2),
+        (row.share * 100).toFixed(1),
+      ]),
+    );
+  };
+
+  return (
+    <section aria-label="Revenue report" className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Revenue is Σ (dishes sold × selling price). Prices are the{" "}
+        <em>current</em> sale prices — a dish sold before a price change is
+        evaluated at today&apos;s price, so older days are approximate. The
+        ledger has no refund concept, so revenue is gross of refunds.
+      </p>
+      {query.isLoading ? (
+        <div className="grid gap-3 sm:grid-cols-3" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-20 animate-pulse rounded-lg bg-muted"
+            />
+          ))}
+        </div>
+      ) : query.isError || report === undefined ? (
+        <EmptyState message="Could not load the revenue report. Try again." />
+      ) : report.days.length === 0 ? (
+        <EmptyState message="No sales recorded in this date range." />
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <RevenueStatCard
+              label="Total revenue"
+              value={formatINR(report.totalRevenue)}
+            />
+            <RevenueStatCard
+              label="Avg per day"
+              value={formatINR(report.avgDailyRevenue)}
+            />
+            <RevenueStatCard
+              label="Food-cost %"
+              value={
+                report.overallFoodCostPct === null
+                  ? "—"
+                  : `${report.overallFoodCostPct.toFixed(1)}%`
+              }
+            />
+          </div>
+
+          <ChartShell title="Revenue per day (₹)">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={revenueChartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={(v: number) => `₹${v}`} width={56} />
+                <Tooltip formatter={(value) => formatINR(Number(value))} />
+                <Bar
+                  dataKey="revenue"
+                  fill="hsl(var(--primary))"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartShell>
+
+          {hasPctData ? (
+            <ChartShell title="Food-cost % per day">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={pctChartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                  <YAxis tickFormatter={(v: number) => `${v}%`} width={48} />
+                  <Tooltip
+                    formatter={(value) =>
+                      value === null || value === undefined
+                        ? "No revenue"
+                        : `${Number(value).toFixed(1)}%`
+                    }
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="foodCostPct"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartShell>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No food-cost % to show — none of the dishes sold in this range
+              have a sale price set.
+            </p>
+          )}
+
+          {report.unpricedDishes.length > 0 && (
+            <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+              Excluded from revenue (no sale price set):{" "}
+              {report.unpricedDishes
+                .map((d) => `${d.name} ×${formatNumber(d.qtySold)}`)
+                .join(", ")}
+              . Set a sale price on the menu to include them.
+            </p>
+          )}
+
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full min-w-[560px] text-sm">
+              <caption className="sr-only">Revenue by dish</caption>
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  {(Object.keys(REVENUE_SORT_LABELS) as RevenueSortKey[]).map(
+                    (key) => (
+                      <th
+                        key={key}
+                        scope="col"
+                        aria-sort={
+                          sortKey === key
+                            ? sortDir === "asc"
+                              ? "ascending"
+                              : "descending"
+                            : "none"
+                        }
+                        className={cn(
+                          "whitespace-nowrap px-4 py-2 font-medium",
+                          key !== "name" && "text-right",
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleSort(key)}
+                          aria-label={`Sort by ${REVENUE_SORT_LABELS[key]}`}
+                          className="inline-flex items-center gap-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {REVENUE_SORT_LABELS[key]}
+                          <span aria-hidden="true" className="text-xs">
+                            {sortKey === key
+                              ? sortDir === "asc"
+                                ? "▲"
+                                : "▼"
+                              : "△"}
+                          </span>
+                        </button>
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.name} className="border-b last:border-0">
+                    <Cell>{row.name}</Cell>
+                    <Cell numeric>{formatNumber(row.qtySold)}</Cell>
+                    <Cell numeric>
+                      {row.sellingPrice === null
+                        ? "—"
+                        : formatINR(row.sellingPrice)}
+                    </Cell>
+                    <Cell numeric>{formatINR(row.revenue)}</Cell>
+                    <Cell numeric>{`${(row.share * 100).toFixed(1)}%`}</Cell>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      <div>
+        <Button
+          variant="outline"
+          onClick={onExport}
+          disabled={rows.length === 0}
+        >
+          <Download aria-hidden="true" className="mr-2 h-4 w-4" />
+          Export CSV
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 export function ReportsPage() {
   const [range, setRange] = useState<ReportRange>(() => defaultReportRange());
   const [draft, setDraft] = useState({ from: range.from, to: range.to });
@@ -926,7 +1216,7 @@ export function ReportsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Reports"
-        description="Usage, wastage, food cost, supplier prices and menu engineering over a date range."
+        description="Usage, wastage, food cost, supplier prices, menu engineering and revenue over a date range."
       />
 
       <div className="flex flex-wrap items-end gap-3" aria-label="Date range filter">
@@ -989,6 +1279,7 @@ export function ReportsPage() {
       {tab === "food-cost" && <FoodCostPanel range={range} />}
       {tab === "price-changes" && <PriceChangesPanel range={range} />}
       {tab === "menu-engineering" && <MenuEngineeringPanel range={range} />}
+      {tab === "revenue" && <RevenuePanel range={range} />}
     </div>
   );
 }

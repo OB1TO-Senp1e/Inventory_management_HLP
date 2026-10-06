@@ -5,6 +5,7 @@ import {
   getFoodCostTrend,
   getMenuEngineeringReport,
   getPriceChangeReport,
+  getRevenueReport,
   getUsageReport,
   getWastageReport,
 } from "./reports";
@@ -64,6 +65,7 @@ function movementRow(overrides: Record<string, unknown>) {
     quantity: -2,
     reason_code: "kitchen_use",
     created_at: "2026-10-04T08:30:00.000Z",
+    notes: null,
     items: {
       name: "Tomato",
       avg_unit_cost: 32.5,
@@ -317,5 +319,155 @@ describe("getMenuEngineeringReport", () => {
       ),
     } as unknown as SupabaseClient);
     await expect(getMenuEngineeringReport(RANGE)).rejects.toThrow("boom");
+  });
+});
+
+describe("getRevenueReport", () => {
+  const PRICED_MENU = [
+    {
+      id: "f0000000-0000-0000-0000-000000000001",
+      name: "Butter Chicken",
+      description: null,
+      yieldQuantity: 4,
+      yieldUnit: "servings",
+      sellingPrice: 199,
+      active: true,
+      ingredientCount: 2,
+      ingredientCost: 123,
+      costPerDish: 30.75,
+      foodCostPct: 15.45,
+      createdAt: "2026-10-04T08:30:00.000Z",
+      updatedAt: "2026-10-04T08:30:00.000Z",
+    },
+    {
+      id: "f0000000-0000-0000-0000-000000000002",
+      name: "Dal Makhani",
+      description: null,
+      yieldQuantity: 6,
+      yieldUnit: "servings",
+      sellingPrice: 149,
+      active: true,
+      ingredientCount: 1,
+      ingredientCost: 48,
+      costPerDish: 8,
+      foodCostPct: 5.37,
+      createdAt: "2026-10-04T08:30:00.000Z",
+      updatedAt: "2026-10-04T08:30:00.000Z",
+    },
+    {
+      id: "f0000000-0000-0000-0000-000000000003",
+      name: "Priceless Thali",
+      description: null,
+      yieldQuantity: 2,
+      yieldUnit: "servings",
+      sellingPrice: null,
+      active: true,
+      ingredientCount: 1,
+      ingredientCost: 40,
+      costPerDish: 20,
+      foodCostPct: null,
+      createdAt: "2026-10-04T08:30:00.000Z",
+      updatedAt: "2026-10-04T08:30:00.000Z",
+    },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("values parsed sale notes at live prices and joins daily food cost", async () => {
+    mockedGetSupabaseClient.mockReturnValue({
+      from: vi.fn(() =>
+        chainable({
+          data: [
+            movementRow({
+              movement_type: "sale_deduction",
+              quantity: -4,
+              notes: "Sale 2026-10-05: Butter Chicken x4, Dal Makhani x6",
+              created_at: "2026-10-05T08:30:00.000Z",
+            }),
+          ],
+          error: null,
+        }),
+      ),
+    } as unknown as SupabaseClient);
+    mockedListMenuItems.mockResolvedValue(PRICED_MENU);
+
+    const report = await getRevenueReport(RANGE);
+
+    // 4×199 + 6×149 = 1690 revenue; 4×32.5 = 130 food cost.
+    expect(report.totalRevenue).toBe(1690);
+    expect(report.totalFoodCost).toBe(130);
+    expect(report.overallFoodCostPct).toBeCloseTo((130 / 1690) * 100, 6);
+    expect(report.avgDailyRevenue).toBeCloseTo(1690 / 31, 6);
+    const byName = new Map(report.dishes.map((d) => [d.name, d]));
+    expect(byName.get("Butter Chicken")?.revenue).toBe(796);
+    expect(byName.get("Dal Makhani")?.revenue).toBe(894);
+    expect(report.days).toHaveLength(1);
+    expect(report.days[0].date).toBe("2026-10-05");
+    expect(report.unpricedDishes).toEqual([]);
+    expect(mockedListMenuItems).toHaveBeenCalledWith({});
+  });
+
+  it("lists dishes without a sale price as unpriced and excludes their revenue", async () => {
+    mockedGetSupabaseClient.mockReturnValue({
+      from: vi.fn(() =>
+        chainable({
+          data: [
+            movementRow({
+              movement_type: "sale_deduction",
+              quantity: -3,
+              notes: "Sale 2026-10-05: Priceless Thali x3",
+              created_at: "2026-10-05T08:30:00.000Z",
+            }),
+          ],
+          error: null,
+        }),
+      ),
+    } as unknown as SupabaseClient);
+    mockedListMenuItems.mockResolvedValue(PRICED_MENU);
+
+    const report = await getRevenueReport(RANGE);
+
+    expect(report.totalRevenue).toBe(0);
+    expect(report.overallFoodCostPct).toBeNull();
+    expect(report.days[0].foodCostPct).toBeNull();
+    expect(report.unpricedDishes).toEqual([
+      { name: "Priceless Thali", qtySold: 3 },
+    ]);
+  });
+
+  it("buckets sales on the IST date of the movement, not the note label", async () => {
+    mockedGetSupabaseClient.mockReturnValue({
+      from: vi.fn(() =>
+        chainable({
+          data: [
+            movementRow({
+              movement_type: "sale_deduction",
+              quantity: -2,
+              // Note label disagrees with the posting timestamp: the
+              // timestamp wins for daily bucketing.
+              notes: "Sale 2026-10-01: Butter Chicken x2",
+              created_at: "2026-10-05T08:30:00.000Z",
+            }),
+          ],
+          error: null,
+        }),
+      ),
+    } as unknown as SupabaseClient);
+    mockedListMenuItems.mockResolvedValue(PRICED_MENU);
+
+    const report = await getRevenueReport(RANGE);
+    expect(report.days.map((d) => d.date)).toEqual(["2026-10-05"]);
+    expect(report.totalRevenue).toBe(398);
+  });
+
+  it("throws a friendly error when the movements query fails", async () => {
+    mockedGetSupabaseClient.mockReturnValue({
+      from: vi.fn(() =>
+        chainable({ data: null, error: { message: "boom" } }),
+      ),
+    } as unknown as SupabaseClient);
+    await expect(getRevenueReport(RANGE)).rejects.toThrow("boom");
   });
 });
