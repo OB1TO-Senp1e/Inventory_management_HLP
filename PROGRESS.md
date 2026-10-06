@@ -557,3 +557,6 @@ Commit: (pending) — migration 20261005130000 (`notifications` + `alert_prefere
 - Final gates (all green): typecheck ✓, lint ✓ (0 warnings), unit **953/953** ✓, test:db ✓, build ✓, audit:wiring ✓ (95 rows, 17 modules), audit:routes ✓ (26 routes, live crawl), full `pnpm test:e2e` **346 passed / 34 live-skipped / 0 failed** ✓.
 - Before/after evidence: `~/workspace/your_files/app-screenshots/v2-08-polish/before/` (50 shots, 25 routes × mobile+desktop) and `after/` (barcode mobile layout, PO breadcrumb, ledger count).
 - Next: v2 roadmap complete. Blockers unchanged: B-001 (Supabase cloud credentials) gates the v1 deploy chain; B-002 (interim DB) persists.
+
+## 2026-10-06 — V2-09 pricing guardrails (audit + docs, no code changes)
+User asked to "work on" the McDonald's AI-pricing lawsuit guardrail. Audited every pricing-adjacent surface: menu engineering is descriptive-only (no recommended prices, nothing auto-applied), sale prices are operator-set, multi-outlet tenancy is single-operator by design, POS import never touches prices. App is compliant. Binding future-work rules recorded in ARCHITECTURE.md §11 (2026-10-06 entry): no automated price-setting, no cross-business data pooling, any future pricing suggestions must be per-outlet, labeled, never auto-applied. TASKS.md V2-09 marked DONE.
