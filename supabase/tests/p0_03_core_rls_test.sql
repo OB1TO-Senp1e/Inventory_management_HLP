@@ -8,9 +8,9 @@
 -- file is re-runnable.
 --
 -- Pitfall: superusers and table owners bypass RLS, so every access check
--- runs as the non-superuser `authenticated` role via SET ROLE. JWT claims
--- are faked through the `request.jwt.claims` GUC — the same channel
--- Supabase uses to populate auth.jwt().
+-- runs as the non-superuser `authenticated` role via SET ROLE. JWT subject
+-- claims are faked through `request.jwt.claims`; tenant and role are resolved
+-- from the matching profile, not from custom JWT claims.
 -- ============================================================================
 
 \set ON_ERROR_STOP on
@@ -69,18 +69,18 @@ $$;
 set role authenticated;
 
 -- ---------------------------------------------------------------------------
--- T1: helpers resolve claims (manager of restaurant A)
+-- T1: helpers resolve the profile, ignoring forged tenant/role claims
 -- ---------------------------------------------------------------------------
 
 do $$
 begin
   perform set_config('request.jwt.claims',
-    '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","restaurant_id":"11111111-1111-1111-1111-111111111111","role":"manager"}',
+    '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","restaurant_id":"22222222-2222-2222-2222-222222222222","role":"owner"}',
     true);
-  perform pg_temp.assert_true('current_restaurant_id() returns A',
+  perform pg_temp.assert_true('current_restaurant_id() returns profile restaurant A',
     public.current_restaurant_id() = '11111111-1111-1111-1111-111111111111'::uuid);
-  perform pg_temp.assert_true('has_role(manager) is true', public.has_role('manager'));
-  perform pg_temp.assert_true('has_role(owner) is false', not public.has_role('owner'));
+  perform pg_temp.assert_true('has_role(manager) uses profile', public.has_role('manager'));
+  perform pg_temp.assert_true('forged owner claim is ignored', not public.has_role('owner'));
   perform pg_temp.assert_true('has_role(staff) is false', not public.has_role('staff'));
 end $$;
 
@@ -136,7 +136,7 @@ end $$;
 do $$
 begin
   perform set_config('request.jwt.claims',
-    '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","restaurant_id":"11111111-1111-1111-1111-111111111111","role":"staff"}',
+    '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc"}',
     true);
 
   begin
@@ -174,7 +174,7 @@ declare
   v_n int;
 begin
   perform set_config('request.jwt.claims',
-    '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","restaurant_id":"11111111-1111-1111-1111-111111111111","role":"manager"}',
+    '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}',
     true);
 
   insert into public.item_categories (restaurant_id, name)
@@ -209,7 +209,7 @@ do $$
 begin
   -- manager of A cannot create profiles
   perform set_config('request.jwt.claims',
-    '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","restaurant_id":"11111111-1111-1111-1111-111111111111","role":"manager"}',
+    '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}',
     true);
   begin
     insert into public.profiles (id, restaurant_id, role)
@@ -221,7 +221,7 @@ begin
 
   -- owner of B creates a profile for B
   perform set_config('request.jwt.claims',
-    '{"sub":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","restaurant_id":"22222222-2222-2222-2222-222222222222","role":"owner"}',
+    '{"sub":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"}',
     true);
   insert into public.profiles (id, restaurant_id, role)
   values ('dddddddd-dddd-dddd-dddd-dddddddddddd', '22222222-2222-2222-2222-222222222222', 'staff');
@@ -247,7 +247,7 @@ declare
   v_after timestamptz;
 begin
   perform set_config('request.jwt.claims',
-    '{"sub":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","restaurant_id":"22222222-2222-2222-2222-222222222222","role":"owner"}',
+    '{"sub":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"}',
     true);
 
   begin
@@ -267,7 +267,7 @@ begin
   end;
 
   perform set_config('request.jwt.claims',
-    '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","restaurant_id":"11111111-1111-1111-1111-111111111111","role":"manager"}',
+    '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}',
     true);
   begin
     insert into public.item_categories (restaurant_id, name)
