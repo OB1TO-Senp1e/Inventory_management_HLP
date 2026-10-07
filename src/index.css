@@ -4,26 +4,31 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 0 0% 96%;
-    --accent-foreground: 0 0% 9%;
+    /* V2-11 "7-star" theme: warm ivory + deep espresso + brass/gold.
+       Primary stays deep espresso so buttons keep AA contrast; gold is
+       reserved for accents, icons, active states, and focus rings. */
+    --background: 38 25% 97.5%;
+    --foreground: 25 20% 13%;
+    --card: 40 30% 99%;
+    --card-foreground: 25 20% 13%;
+    --popover: 40 30% 99%;
+    --popover-foreground: 25 20% 13%;
+    --primary: 25 25% 15%;
+    --primary-foreground: 40 30% 97%;
+    --secondary: 40 20% 93.5%;
+    --secondary-foreground: 25 20% 22%;
+    --muted: 40 18% 94%;
+    --muted-foreground: 28 12% 42%;
+    --accent: 42 55% 92%;
+    --accent-foreground: 35 50% 26%;
+    --gold: 40 62% 42%;
+    --gold-soft: 42 60% 94%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 9%;
-    --radius: 0.5rem;
+    --border: 32 18% 87%;
+    --input: 32 18% 84%;
+    --ring: 40 65% 45%;
+    --radius: 0.75rem;
   }
 
   * {
@@ -39,6 +44,41 @@
       "Segoe UI",
       Roboto,
       sans-serif;
+  }
+}
+
+/* Serif display face for page titles and hero numerals — system serif
+   stack so it works offline with zero new dependencies. */
+@layer utilities {
+  .font-display {
+    font-family: Georgia, "Times New Roman", "Noto Serif", serif;
+    letter-spacing: -0.01em;
+  }
+
+  /* Elevated card: warm border + soft layered shadow + gentle hover lift.
+     Apply to dashboard stat cards and other hero surfaces. */
+  .lux-card {
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+    box-shadow:
+      0 1px 2px hsl(25 20% 13% / 0.04),
+      0 8px 24px -12px hsl(25 20% 13% / 0.12);
+    transition:
+      box-shadow 0.25s ease,
+      transform 0.25s ease;
+  }
+  .lux-card:hover {
+    box-shadow:
+      0 2px 4px hsl(25 20% 13% / 0.05),
+      0 16px 36px -12px hsl(25 20% 13% / 0.18);
+    transform: translateY(-2px);
+  }
+
+  /* Brass icon medallion for stat cards and feature highlights. */
+  .gold-medallion {
+    background: linear-gradient(135deg, hsl(42 60% 94%), hsl(40 55% 88%));
+    border: 1px solid hsl(40 45% 78%);
+    color: hsl(35 55% 30%);
   }
 }
 

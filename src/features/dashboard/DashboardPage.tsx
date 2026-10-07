@@ -25,20 +25,20 @@ function CardShell({
   return (
     <section
       aria-labelledby={`dashboard-card-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-      className="flex flex-col rounded-lg border bg-card p-4"
+      className="lux-card flex flex-col rounded-xl p-5"
     >
-      <div className="flex items-center gap-2">
-        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-secondary">
-          <Icon aria-hidden="true" className="h-4 w-4 text-secondary-foreground" />
+      <div className="flex items-center gap-3">
+        <span className="gold-medallion flex h-10 w-10 items-center justify-center rounded-xl">
+          <Icon aria-hidden="true" className="h-5 w-5" />
         </span>
         <h2
           id={`dashboard-card-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-          className="text-sm font-medium text-muted-foreground"
+          className="text-sm font-semibold uppercase tracking-wider text-muted-foreground"
         >
           {title}
         </h2>
       </div>
-      <div className="mt-3 flex-1">{children}</div>
+      <div className="mt-4 flex-1">{children}</div>
     </section>
   );
 }
@@ -132,7 +132,7 @@ export function DashboardPage() {
       {isLoading ? (
         <LoadingSkeleton />
       ) : isError ? (
-        <div className="rounded-lg border p-8 text-center">
+        <div className="lux-card rounded-xl p-8 text-center">
           <p role="alert" className="font-medium">
             Could not load the dashboard.
           </p>
@@ -152,7 +152,7 @@ export function DashboardPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <CardShell icon={AlertTriangle} title="Low stock">
-            <p className="text-3xl font-semibold tabular-nums">
+            <p className="font-display text-4xl font-semibold tabular-nums">
               {lowStockCount}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -163,7 +163,7 @@ export function DashboardPage() {
           </CardShell>
 
           <CardShell icon={Timer} title="Expiring soon">
-            <p className="text-3xl font-semibold tabular-nums">
+            <p className="font-display text-4xl font-semibold tabular-nums">
               {expiringCount}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -184,7 +184,7 @@ export function DashboardPage() {
           </CardShell>
 
           <CardShell icon={IndianRupee} title="Stock value">
-            <p className="text-3xl font-semibold tabular-nums">
+            <p className="font-display text-4xl font-semibold tabular-nums">
               {formatINR(summary.data?.stockValue ?? 0)}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">

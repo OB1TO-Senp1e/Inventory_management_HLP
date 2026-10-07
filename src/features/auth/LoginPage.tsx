@@ -36,9 +36,9 @@ export function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-dvh items-center justify-center px-4 py-8">
-      <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+    <main className="flex min-h-dvh items-center justify-center bg-[radial-gradient(ellipse_at_top,hsl(var(--gold-soft))_0%,transparent_55%)] px-4 py-8">
+      <div className="lux-card w-full max-w-sm rounded-2xl p-8">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Sign in</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Use your restaurant account to continue.
         </p>

@@ -27,10 +27,10 @@ export function AppNav({
                 onClick={onNavigate}
                 className={({ isActive }) =>
                   cn(
-                    "flex min-h-[44px] items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
+                    "relative flex min-h-[44px] items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     isActive
-                      ? "bg-accent text-accent-foreground"
+                      ? "bg-accent text-accent-foreground shadow-[inset_3px_0_0_0_hsl(var(--gold))]"
                       : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                   )
                 }

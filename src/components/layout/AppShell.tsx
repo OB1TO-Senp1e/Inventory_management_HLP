@@ -21,8 +21,8 @@ function Brand() {
       to="/"
       className="flex min-h-[44px] min-w-0 items-center gap-2 rounded-md px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <UtensilsCrossed aria-hidden="true" className="h-6 w-6 shrink-0 text-primary" />
-      <span className="truncate text-base font-semibold tracking-tight">
+      <UtensilsCrossed aria-hidden="true" className="h-6 w-6 shrink-0 text-gold" />
+      <span className="font-display truncate text-lg font-semibold tracking-tight">
         Restaurant Inventory
       </span>
     </Link>
