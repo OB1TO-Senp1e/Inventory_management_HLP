@@ -32,6 +32,16 @@ Built by an autonomous build loop — see `docs/LOOP_PROMPT.md`.
 - Reports: usage, wastage by reason, food-cost trend, supplier price changes — date filters, charts, CSV export
 - Audit log (owner only): over-sales, count applications, with actor/time/details
 
+**V2 features**
+- Barcode scanning on receiving and stock counts (camera scanner + manual entry)
+- Menu engineering report: dish profitability Stars/Plowhorses/Puzzles/Dogs quadrants
+- Smart alerts: low-stock and expiring-soon notifications, inbox page, per-user preferences
+- Invoice photo capture: on-device OCR (tesseract.js) turns a supplier bill photo into a reviewable draft receipt
+- Send purchase orders via WhatsApp/email deep links; re-send logging
+- POS sales auto-import with fuzzy dish matching, dedupe, and over-sale preview
+- Multi-outlet support: outlet-scoped stock, outlet switcher, atomic inter-outlet transfers
+- Reports: revenue analytics tab (daily revenue, revenue by dish, food-cost % trend) alongside menu engineering
+
 **PWA & offline**
 - Installable (manifest, icons, service worker, install prompt); Lighthouse PWA 1.0
 - Offline shell; wastage/usage/receiving queue offline and sync on reconnect with visible sync status
@@ -203,8 +213,11 @@ downloadable template). Reports pages support CSV export of every tab.
 
 ## Status
 
-All credential-independent work is complete and green: 744 unit tests, full DB
-suite, e2e 258 passed / 0 failed, Lighthouse mobile 0.97, PWA 1.0.
+All credential-independent work is complete and green: 967 unit tests, full DB
+suite (654 assertions), e2e 348 passed / 0 failed (34 live-backend specs skipped
+without credentials), Lighthouse mobile 0.97, PWA 1.0 — including the full v2
+feature set above (barcode, alerts, invoice OCR, PO send, POS import,
+multi-outlet, revenue analytics, plus a UI refinement & audit pass).
 
 Blocked on cloud credentials (Supabase project + Vercel): live auth E2E, user
 management (invite/change role/deactivate), final security pass, full
