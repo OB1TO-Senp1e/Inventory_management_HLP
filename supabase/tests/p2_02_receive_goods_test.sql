@@ -423,7 +423,7 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- T9: roles — owner/manager/staff may receive; role-less session is rejected
+-- T9: roles — owner/manager/staff may receive; unknown subject is rejected
 -- ---------------------------------------------------------------------------
 
 do $$
@@ -442,9 +442,12 @@ begin
       )
     ))) = 1);
 
-  -- A session without a role claim is rejected (tenant set, role empty).
+  -- A subject with no profile at all is rejected. Tenant and role now resolve
+  -- from profiles, not JWT claims (20261006223000): with no profile row,
+  -- current_restaurant_id() is null, so the tenant gate fires first.
+  -- (e9e9e9e9 has no auth.users row and no profile row — truly unknown.)
   perform set_config('request.jwt.claims',
-    '{"sub":"e6e6e6e6-e6e6-4e6e-8e6e-e6e6e6e6e6e6","restaurant_id":"e0e0e0e0-e0e0-4e0e-8e0e-e0e0e0e0e0e0","role":""}',
+    '{"sub":"e9e9e9e9-e9e9-4e9e-8e9e-e9e9e9e9e9e9"}',
     true);
   begin
     perform public.receive_goods(jsonb_build_array(
@@ -453,11 +456,11 @@ begin
         'quantity', 2, 'unit_cost', 42
       )
     ));
-    perform pg_temp.assert_true('T9: role-less session raises', false);
+    perform pg_temp.assert_true('T9: unknown subject raises', false);
   exception when raise_exception then
     get stacked diagnostics v_msg = message_text;
-    perform pg_temp.assert_true('T9: role error is friendly',
-      v_msg like '%cannot receive stock%');
+    perform pg_temp.assert_true('T9: tenant error is friendly',
+      v_msg like '%no restaurant in session%');
   end;
 end $$;
 
@@ -556,13 +559,14 @@ begin
   select count(*) into v_count from public.list_receivable_items();
   perform pg_temp.assert_true('T11: manager sees the same 2 rows', v_count = 2);
 
-  -- Role-less session is rejected with a friendly error.
+  -- Unknown subject (no profile row) is rejected with a friendly error.
+  -- Tenant/role resolve from profiles, so forged claims are irrelevant here.
   perform set_config('request.jwt.claims',
-    '{"sub":"e6e6e6e6-e6e6-4e6e-8e6e-e6e6e6e6e6e6","restaurant_id":"e0e0e0e0-e0e0-4e0e-8e0e-e0e0e0e0e0e0","role":""}',
+    '{"sub":"e9e9e9e9-e9e9-4e9e-8e9e-e9e9e9e9e9e9"}',
     true);
   begin
     perform public.list_receivable_items();
-    perform pg_temp.assert_true('T11: role-less session raises', false);
+    perform pg_temp.assert_true('T11: unknown subject raises', false);
   exception when raise_exception then
     get stacked diagnostics v_msg = message_text;
     perform pg_temp.assert_true('T11: role error is friendly',

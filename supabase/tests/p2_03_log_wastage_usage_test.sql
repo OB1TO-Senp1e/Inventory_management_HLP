@@ -269,16 +269,18 @@ declare
   v_msg text;
   v_id uuid;
 begin
+  -- Unknown subject (no profile row) is rejected at the tenant gate.
+  -- Tenant/role resolve from profiles, not JWT claims (20261006223000).
   perform set_config('request.jwt.claims',
-    '{"sub":"e6e6e6e6-e6e6-4e6e-8e6e-e6e6e6e6e6e6","restaurant_id":"e0e0e0e0-e0e0-4e0e-8e0e-e0e0e0e0e0e0","role":""}',
+    '{"sub":"e9e9e9e9-e9e9-4e9e-8e9e-e9e9e9e9e9e9"}',
     true);
   begin
     perform public.log_wastage('f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1', 1, 'expired', null);
-    perform pg_temp.assert_true('T7: role-less session raises', false);
+    perform pg_temp.assert_true('T7: unknown subject raises', false);
   exception when raise_exception then
     get stacked diagnostics v_msg = message_text;
-    perform pg_temp.assert_true('T7: role error is friendly',
-      v_msg like '%your role cannot log wastage%');
+    perform pg_temp.assert_true('T7: tenant error is friendly',
+      v_msg like '%no restaurant in session%');
   end;
 
   -- Manager of A can log usage.
